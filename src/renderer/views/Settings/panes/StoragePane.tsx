@@ -1,3 +1,4 @@
+import { SettingsPageHeader } from '../components/SettingsPageHeader'
 import ModalHeader from '../../../components/ModalHeader'
 import React from 'react'
 import { createPortal } from 'react-dom'
@@ -110,11 +111,8 @@ export function StoragePane({ notify }: StoragePaneProps) {
   }
 
   return (
-    <div className="storage-pane">
-      <div>
-        <strong>Speicher & Sicherungen</strong>
-        <div className="helper">Verwalte Speicherort und Sicherungen der Datenbank.</div>
-      </div>
+    <div className="settings-page storage-pane">
+      <SettingsPageHeader title="Speicher & Sicherungen" description="Verwalte Datenordner, automatische Sicherungen und Wiederherstellung." meta={info?.organization ? `Für ${info.organization.name}` : 'Für diese Organisation'} />
 
       <section className="card storage-section">
         <div className="storage-location-heading">

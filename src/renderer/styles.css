@@ -2530,7 +2530,8 @@ input[type='checkbox'].toggle:disabled {
   box-shadow: 0 1px 0 color-mix(in oklab, var(--text) / 10%, transparent) inset;
 }
 
-:root[data-theme='dark'] {
+:root[data-theme='dark'],
+.setup-theme-preview[data-theme='dark'] {
   --bg: #0f1115;
   --surface: #151821;
   --muted: #1c2028;
@@ -2565,7 +2566,8 @@ input[type='checkbox'].toggle:disabled {
   --table-row-sep: color-mix(in oklab, var(--border) 120%, transparent);
 }
 
-:root[data-theme='light'] {
+:root[data-theme='light'],
+.setup-theme-preview[data-theme='light'] {
   --bg: #f6f7f9;
   --surface: #ffffff;
   --muted: #eef1f4;
@@ -2599,14 +2601,16 @@ input[type='checkbox'].toggle:disabled {
   --table-row-sep: color-mix(in oklab, var(--border) 130%, transparent);
 }
 
-/* Color theme palettes (override accent colors). Applied via data-color-theme on <html>. */
-:root[data-color-theme='default'] {
+/* Shared palettes: application root and isolated setup previews use the same tokens. */
+:root[data-color-theme='default'],
+.setup-theme-preview[data-color-theme='default'] {
   --accent: #6aa6ff;
   --accent-hover: #8bb9ff;
 }
 
 /* Fiery Ocean */
-:root[data-color-theme='fiery-ocean'] {
+:root[data-color-theme='fiery-ocean'],
+.setup-theme-preview[data-color-theme='fiery-ocean'] {
   /* Palette: barn red, fire brick, papaya whip, prussian blue, air superiority blue */
   --bg: #0e0f14; /* deepened backdrop */
   --surface: #141720;
@@ -2630,7 +2634,8 @@ input[type='checkbox'].toggle:disabled {
 }
 
 /* Peachy Delight */
-:root[data-color-theme='peachy-delight'] {
+:root[data-color-theme='peachy-delight'],
+.setup-theme-preview[data-color-theme='peachy-delight'] {
   --bg: #18191c;
   --surface: #1f2126;
   --muted: #262933;
@@ -2653,7 +2658,8 @@ input[type='checkbox'].toggle:disabled {
 }
 
 /* Pastel Dreamland Adventure */
-:root[data-color-theme='pastel-dreamland'] {
+:root[data-color-theme='pastel-dreamland'],
+.setup-theme-preview[data-color-theme='pastel-dreamland'] {
   --bg: #0e1116;
   --surface: #151922;
   --muted: #1b2030;
@@ -2676,7 +2682,8 @@ input[type='checkbox'].toggle:disabled {
 }
 
 /* Ocean Breeze */
-:root[data-color-theme='ocean-breeze'] {
+:root[data-color-theme='ocean-breeze'],
+.setup-theme-preview[data-color-theme='ocean-breeze'] {
   --bg: #090b16;
   --surface: #0e1120;
   --muted: #131833;
@@ -2699,7 +2706,8 @@ input[type='checkbox'].toggle:disabled {
 }
 
 /* Earthy Tones */
-:root[data-color-theme='earthy-tones'] {
+:root[data-color-theme='earthy-tones'],
+.setup-theme-preview[data-color-theme='earthy-tones'] {
   /* Palette inspiration: cherry-blossom-pink, champagne-pink, timberwolf, ash-gray, outer-space */
   --bg: #0f1211; /* deep charcoal with a hint of green */
   --surface: #151a18;
@@ -2723,7 +2731,8 @@ input[type='checkbox'].toggle:disabled {
 }
 
 /* Monochrome Harmony */
-:root[data-color-theme='monochrome-harmony'] {
+:root[data-color-theme='monochrome-harmony'],
+.setup-theme-preview[data-color-theme='monochrome-harmony'] {
   /* Provided palette:
        --platinum: #cfdbd5ff;
     --alabaster: #e8eddfff;
@@ -2752,7 +2761,8 @@ input[type='checkbox'].toggle:disabled {
 }
 
 /* Soft Blush */
-:root[data-color-theme='soft-blush'] {
+:root[data-color-theme='soft-blush'],
+.setup-theme-preview[data-color-theme='soft-blush'] {
   /* Pastel palette with warm peachy tones */
   --bg: #fae1dd; /* soft-blush background */
   --surface: #ffffff; /* white for better table contrast */
@@ -2780,7 +2790,8 @@ input[type='checkbox'].toggle:disabled {
 }
 
 /* Professional Light */
-:root[data-color-theme='professional-light'] {
+:root[data-color-theme='professional-light'],
+.setup-theme-preview[data-color-theme='professional-light'] {
   /* Dezentes, professionelles Light Theme */
   --bg: #f4f3f1; /* warmes Off-White - gedämpfter Hintergrund */
   --surface: #fafaf8; /* leicht getöntes Weiß für Karten */
@@ -2816,7 +2827,8 @@ input[type='checkbox'].toggle:disabled {
 }
 
 /* Vintage Charm */
-:root[data-color-theme='vintage-charm'] {
+:root[data-color-theme='vintage-charm'],
+.setup-theme-preview[data-color-theme='vintage-charm'] {
   /* Provided palette:
        --rich-black: #04151f;
        --dark-slate-gray: #183a37;
@@ -3932,9 +3944,9 @@ svg text {
 }
 
 .modal :is(input:not([type='checkbox']):not([type='radio']):not([type='color']), select, textarea, .input):focus {
-  background: color-mix(in oklab, var(--surface) 70%, var(--accent) 30%);
+  background: var(--field-surface);
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 28%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 20%, transparent);
 }
 
 .activity-report-modal {
@@ -5835,7 +5847,7 @@ input[type='date'] {
 
 /* Improve focus ring visibility against dark surfaces */
 :root[data-theme='dark'] input[type='date']:focus {
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 28%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 20%, transparent);
 }
 
 /* Input adornments (prefix/suffix like €) */
@@ -11561,13 +11573,6 @@ button.dashboard-task-strip__item:hover {
   border-left: 4px solid var(--account-color);
   border-radius: 0;
   box-shadow: none;
-  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
-}
-
-.payment-account-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 5px 14px rgba(0, 0, 0, .12);
-  background: color-mix(in oklab, var(--account-color) 14%, var(--surface));
 }
 
 .payment-account-card__initial {
@@ -20548,6 +20553,151 @@ textarea {
 
 .settings-content .settings-layout-grid {
   gap: 0 16px;
+}
+
+.settings-content .settings-page {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-content .settings-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-content .settings-page-header h2 {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.3;
+}
+
+.settings-content .settings-page-header p {
+  max-width: 76ch;
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.settings-page-header__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-workflow-page {
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+}
+
+.settings-workflow-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: color-mix(in oklab, var(--surface) 92%, var(--muted));
+}
+
+.settings-workflow-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.settings-workflow-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--accent) 28%, var(--border));
+  border-radius: var(--radius-control);
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+}
+
+.settings-workflow-status.is-locked {
+  border-color: color-mix(in oklab, var(--danger) 32%, var(--border));
+  background: color-mix(in oklab, var(--danger) 10%, var(--surface));
+}
+
+.settings-workflow-year {
+  min-width: 160px;
+}
+
+.settings-workflow-section__heading h3 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.settings-workflow-section__heading p {
+  margin: 3px 0 0;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.settings-workflow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-workflow-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settings-workflow-metric {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.settings-workflow-metric__value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-workflow-metric__amount {
+  font-weight: 600;
+}
+
+.settings-workflow-metric__amount.is-positive {
+  color: var(--success);
+}
+
+.settings-workflow-metric__amount.is-negative {
+  color: var(--danger);
+}
+
+.settings-page-error {
+  color: var(--danger);
+}
+
+@media (max-width: 700px) {
+  .settings-content .settings-page-header {
+    flex-direction: column;
+  }
+
+  .settings-workflow-metrics {
+    grid-template-columns: 1fr;
+  }
 }
 
 .quick-add-modal .booking-description-card,

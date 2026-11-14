@@ -1,10 +1,10 @@
 import React from 'react'
 import { GeneralPaneProps } from '../types'
 import { compressImageFileToDataUrl } from '../../../utils/imageCompression'
-import { BACKGROUND_IMAGE_OPTIONS, COLOR_THEME_OPTIONS, DATE_FORMAT_OPTIONS } from '../../../utils/appearanceOptions'
+import { BACKGROUND_IMAGE_OPTIONS, COLOR_THEME_OPTIONS } from '../../../utils/appearanceOptions'
 import { getProfileNavigationItems, type NavKey } from '../../../utils/navItems'
 import { getNavIcon } from '../../../utils/navIcons'
-import { IconPalette, IconSparkles } from '@tabler/icons-react'
+import { SettingsPageHeader, SettingsSection, SettingsRow } from '../components'
 
 /**
  * GeneralPane - Darstellung & Layout Settings
@@ -13,27 +13,15 @@ import { IconPalette, IconSparkles } from '@tabler/icons-react'
  * - Setup wizard re-open
  * - Theme selection
  * - Navigation layout (left/top)
- * - Journal row style & density
- * - Date format
  */
 export function GeneralPane({
   organizationProfile,
-  journalRowStyle,
-  setJournalRowStyle,
-  journalRowDensity,
-  setJournalRowDensity,
   navLayout,
   setNavLayout,
-  sidebarCollapsed,
-  setSidebarCollapsed,
   navIconColorMode,
   setNavIconColorMode,
   colorTheme,
   setColorTheme,
-  journalLimit,
-  setJournalLimit,
-  dateFmt,
-  setDateFmt,
   notify,
   openSetupWizard,
   visibleNavItems,
@@ -45,10 +33,13 @@ export function GeneralPane({
   customBackgroundImage,
   setCustomBackgroundImage,
   glassModals,
-  setGlassModals,
+  setGlassModals
 }: GeneralPaneProps) {
   const customBgInputRef = React.useRef<HTMLInputElement | null>(null)
-  const lockedNavItems = React.useMemo(() => new Set<NavKey>(['Dashboard', 'Buchungen', 'Einstellungen']), [])
+  const lockedNavItems = React.useMemo(
+    () => new Set<NavKey>(['Dashboard', 'Buchungen', 'Einstellungen']),
+    []
+  )
 
   const openCustomBgPicker = () => {
     customBgInputRef.current?.click()
@@ -69,24 +60,30 @@ export function GeneralPane({
 
       let result = await compressImageFileToDataUrl(file, {
         maxDimension: 2800,
-        targetBytes: TARGET_BYTES,
+        targetBytes: TARGET_BYTES
       })
 
       if (result.bytes > TARGET_BYTES) {
         result = await compressImageFileToDataUrl(file, {
           maxDimension: 2048,
-          targetBytes: TARGET_BYTES,
+          targetBytes: TARGET_BYTES
         })
       }
 
       if (result.bytes > TARGET_BYTES) {
-        notify('error', 'Bild ist nach Kompression noch zu groß. Bitte ein kleineres Bild wählen oder vorher zuschneiden.')
+        notify(
+          'error',
+          'Bild ist nach Kompression noch zu groß. Bitte ein kleineres Bild wählen oder vorher zuschneiden.'
+        )
         return
       }
 
       setCustomBackgroundImage(result.dataUrl)
       setBackgroundImage('custom')
-      notify('success', `Eigenes Hintergrundbild gespeichert (${Math.round(result.bytes / 1024)} KB).`)
+      notify(
+        'success',
+        `Eigenes Hintergrundbild gespeichert (${Math.round(result.bytes / 1024)} KB).`
+      )
     } catch (e) {
       notify('error', `Bild konnte nicht verarbeitet werden: ${String((e as any)?.message || e)}`)
     }
@@ -107,7 +104,7 @@ export function GeneralPane({
   }
 
   return (
-    <div className="settings-pane">
+    <div className="settings-pane settings-page settings-preferences-page">
       <input
         ref={customBgInputRef}
         type="file"
@@ -120,30 +117,15 @@ export function GeneralPane({
           e.currentTarget.value = ''
         }}
       />
-      {/* Setup (Erststart) – Reopen wizard */}
-      <div className="card settings-pane-card">
-        <div className="settings-title">
-          <IconSparkles size={18} aria-hidden="true" /> <strong>Setup (Erststart)</strong>
-        </div>
-        <div className="settings-sub">
-          Öffne den Einrichtungs-Assistenten erneut, um Organisation, Darstellung und Tags schnell zu konfigurieren.
-        </div>
-        <div className="settings-pane-actions">
-          <button className="btn" onClick={() => openSetupWizard?.()}>
-            Setup erneut öffnen…
-          </button>
-        </div>
-      </div>
-
-      {/* Cluster: Farbschema & Design - organization-specific */}
-      <div className="card settings-card settings-pane-card">
-        <div className="settings-title">
-          <IconPalette size={18} aria-hidden="true" /> <strong>Farbschema & Design</strong>
-        </div>
-        <div className="settings-sub">
-          Diese Einstellungen werden pro Organisation gespeichert.
-        </div>
-
+      <SettingsPageHeader
+        title="Darstellung"
+        description="Passe Farben, Hintergrund und Navigation an deinen Arbeitsstil an."
+        meta="Änderungen werden automatisch übernommen."
+      />
+      <SettingsSection
+        title="Farben & Hintergrund"
+        description="Diese Einstellungen werden pro Organisation gespeichert."
+      >
         {/* Visual Theme Picker */}
         <div className="field" style={{ marginTop: 16 }}>
           <label>Farb-Theme</label>
@@ -206,7 +188,11 @@ export function GeneralPane({
             >
               <div
                 className="bg-card__preview bg-card__preview--custom"
-                style={customBackgroundImage ? { backgroundImage: `url(${customBackgroundImage})` } : undefined}
+                style={
+                  customBackgroundImage
+                    ? { backgroundImage: `url(${customBackgroundImage})` }
+                    : undefined
+                }
               >
                 {!customBackgroundImage && <span>＋</span>}
                 {/* Overlay icons for change/remove when image exists */}
@@ -221,9 +207,18 @@ export function GeneralPane({
                         openCustomBgPicker()
                       }}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                        <path d="m15 5 4 4"/>
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        <path d="m15 5 4 4" />
                       </svg>
                     </button>
                     <button
@@ -235,9 +230,19 @@ export function GeneralPane({
                         handleRemoveCustomBg()
                       }}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M3 6h18" />
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
                       </svg>
                     </button>
                   </div>
@@ -248,11 +253,11 @@ export function GeneralPane({
           </div>
         </div>
 
-        <div className="field background-visibility-field">
-          <div className="background-visibility-heading">
-            <label htmlFor="background-image-visibility">Bildsichtbarkeit</label>
-            <output htmlFor="background-image-visibility">{backgroundImageVisibility} %</output>
-          </div>
+        <SettingsRow
+          title="Bildsichtbarkeit"
+          description="Regelt, wie deutlich das Bild hinter den Arbeitsflächen erscheint."
+          htmlFor="background-image-visibility"
+        >
           <input
             id="background-image-visibility"
             className="background-visibility-slider"
@@ -262,52 +267,36 @@ export function GeneralPane({
             step="5"
             value={backgroundImageVisibility}
             disabled={backgroundImage === 'none'}
-            aria-describedby="background-image-visibility-hint"
             onChange={(event) => setBackgroundImageVisibility(Number(event.target.value))}
           />
-          <span id="background-image-visibility-hint" className="helper">
-            Regelt, wie deutlich das Bild hinter den Arbeitsflächen erscheint.
-          </span>
-        </div>
-
-        {/* Glass effect toggle - inline with preview */}
-        <div className="field" style={{ marginTop: 20 }}>
-          <div className="glass-toggle-row">
-            <div className="glass-toggle-info">
-              <label htmlFor="toggle-glass-modals">Glaseffekt (Blur)</label>
-              <span className="helper">Transparente Fenster mit Unschärfe-Effekt</span>
-            </div>
-            <div className="glass-toggle-preview" data-enabled={glassModals}>
-              <div className="glass-toggle-preview__window" />
-            </div>
-            <input
-              id="toggle-glass-modals"
-              role="switch"
-              aria-checked={glassModals}
-              className="toggle"
-              type="checkbox"
-              checked={glassModals}
-              onChange={(e) => setGlassModals(e.target.checked)}
-            />
+          <output htmlFor="background-image-visibility">{backgroundImageVisibility} %</output>
+        </SettingsRow>
+        <SettingsRow
+          title="Glaseffekt (Blur)"
+          description="Transparente Fenster mit Unschärfe-Effekt."
+          htmlFor="toggle-glass-modals"
+        >
+          <div className="glass-toggle-preview" data-enabled={glassModals} aria-hidden="true">
+            <div className="glass-toggle-preview__window" />
           </div>
-        </div>
-      </div>
+          <input
+            id="toggle-glass-modals"
+            role="switch"
+            aria-checked={glassModals}
+            className="toggle"
+            type="checkbox"
+            checked={glassModals}
+            onChange={(e) => setGlassModals(e.target.checked)}
+          />
+        </SettingsRow>
+      </SettingsSection>
 
-      {/* Cluster: Navigation & Layout */}
-      <div className="card settings-card settings-pane-card">
-        <div className="settings-title">
-          <span aria-hidden="true">🧭</span> <strong>Navigation & Layout</strong>
-        </div>
-        <div className="settings-sub">Steuere, wie du dich durch die App bewegst und wie dicht Buchungen angezeigt werden.</div>
-
+      <SettingsSection
+        title="Navigation"
+        description="Bestimme Position und sichtbare Bereiche der Hauptnavigation."
+      >
         <div className="settings-layout-stack">
           <section className="settings-layout-panel">
-            <div>
-              <div className="settings-layout-kicker">Navigation</div>
-              <h3>Menüführung</h3>
-              <p>Position und Farbigkeit der Hauptnavigation.</p>
-            </div>
-
             <div className="settings-layout-grid">
               <div className="settings-layout-control">
                 <div className="settings-layout-label-row">
@@ -335,7 +324,9 @@ export function GeneralPane({
               <label className="settings-toggle-card" htmlFor="toggle-menu-icons">
                 <span className="settings-toggle-card__copy">
                   <strong>Farbige Menüicons</strong>
-                  <span>Hebt Menüpunkte mit farbigen Symbolen hervor. Aus zeigt Icons neutral.</span>
+                  <span>
+                    Hebt Menüpunkte mit farbigen Symbolen hervor. Aus zeigt Icons neutral.
+                  </span>
                 </span>
                 <input
                   id="toggle-menu-icons"
@@ -352,15 +343,23 @@ export function GeneralPane({
             <div className="settings-layout-control settings-nav-visibility-control">
               <div className="settings-layout-label-row">
                 <label>Reiterleiste</label>
-                <span>Bestimme, welche Hauptbereiche in der Navigation dieser Organisation sichtbar sind.</span>
+                <span>
+                  Bestimme, welche Hauptbereiche in der Navigation dieser Organisation sichtbar
+                  sind.
+                </span>
               </div>
               <div className="settings-nav-visibility-grid">
                 {getProfileNavigationItems(organizationProfile).map((item) => {
                   const locked = lockedNavItems.has(item.key)
                   const checked = locked || visibleNavItems.includes(item.key)
                   return (
-                    <label key={item.key} className={`settings-nav-visibility-item ${locked ? 'is-locked' : ''}`}>
-                      <span className={`settings-nav-visibility-icon ${navIconColorMode === 'color' ? `icon-color-${item.key}` : ''}`}>
+                    <label
+                      key={item.key}
+                      className={`settings-nav-visibility-item ${locked ? 'is-locked' : ''}`}
+                    >
+                      <span
+                        className={`settings-nav-visibility-icon ${navIconColorMode === 'color' ? `icon-color-${item.key}` : ''}`}
+                      >
                         {getNavIcon(item.key)}
                       </span>
                       <span>{item.label}</span>
@@ -378,108 +377,16 @@ export function GeneralPane({
               </div>
             </div>
           </section>
-
-          <section className="settings-layout-panel">
-            <div>
-              <div className="settings-layout-kicker">Buchungstabelle</div>
-              <h3>Lesbarkeit</h3>
-              <p>Darstellung der Zeilen in der Buchungsübersicht.</p>
-            </div>
-
-            <div className="settings-layout-grid">
-              <div className="settings-layout-control">
-                <div className="settings-layout-label-row">
-                  <label>Zeilenhöhe</label>
-                  <span>Normal für mehr Luft, kompakt für mehr Buchungen auf einmal.</span>
-                </div>
-                <div className="btn-group">
-                  <button
-                    type="button"
-                    className={`btn-option ${journalRowDensity === 'normal' ? 'active' : ''}`}
-                    onClick={() => setJournalRowDensity('normal')}
-                  >
-                    Normal
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn-option ${journalRowDensity === 'compact' ? 'active' : ''}`}
-                    onClick={() => setJournalRowDensity('compact')}
-                  >
-                    Kompakt
-                  </button>
-                </div>
-              </div>
-
-              <div className="settings-layout-control">
-                <div className="settings-layout-label-row">
-                  <label htmlFor="select-row-style">Zeilenlayout</label>
-                  <span>Linien und Zebra-Muster trennen Buchungen optisch.</span>
-                </div>
-                <select id="select-row-style" className="input" value={journalRowStyle} onChange={(e) => setJournalRowStyle(e.target.value as any)}>
-                  <option value="both">Linien + Zebra</option>
-                  <option value="lines">Nur Linien</option>
-                  <option value="zebra">Nur Zebra</option>
-                  <option value="none">Ohne Linien/Zebra</option>
-                </select>
-              </div>
-            </div>
-          </section>
-
-
         </div>
-      </div>
+      </SettingsSection>
 
-      {/* Cluster 2: Anzeige & Lesbarkeit */}
-      <div className="card settings-card settings-pane-card">
-        <div className="settings-title">
-          <span aria-hidden="true">🔎</span> <strong>Anzeige & Lesbarkeit</strong>
-        </div>
-        <div className="settings-sub">Kontrolliere Anzahl und Darstellung zentraler Informationen.</div>
-        <div className="settings-row-2col" style={{ marginTop: 12 }}>
-          <div className="field">
-            <label>Buchungen: Anzahl der Einträge</label>
-            <div className="btn-group">
-              <button
-                type="button"
-                className={`btn-option ${journalLimit === 20 ? 'active' : ''}`}
-                onClick={() => setJournalLimit(20)}
-              >
-                20
-              </button>
-              <button
-                type="button"
-                className={`btn-option ${journalLimit === 50 ? 'active' : ''}`}
-                onClick={() => setJournalLimit(50)}
-              >
-                50
-              </button>
-              <button
-                type="button"
-                className={`btn-option ${journalLimit === 100 ? 'active' : ''}`}
-                onClick={() => setJournalLimit(100)}
-              >
-                100
-              </button>
-            </div>
-          </div>
-          <div className="field">
-            <label>Datumsformat</label>
-            <div className="btn-group">
-              {DATE_FORMAT_OPTIONS.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={`btn-option ${dateFmt === option.id ? 'active' : ''}`}
-                  onClick={() => setDateFmt(option.id)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      <details className="settings-disclosure">
+        <summary>Einrichtungsassistent</summary>
+        <p className="helper">Organisation, Darstellung und Tags gemeinsam einrichten.</p>
+        <button className="btn" onClick={() => openSetupWizard?.()}>
+          Setup erneut öffnen…
+        </button>
+      </details>
     </div>
   )
 }
-

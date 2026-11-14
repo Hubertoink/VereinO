@@ -1,3 +1,4 @@
+import { SettingsPageHeader } from '../components/SettingsPageHeader'
 import React from 'react'
 import type { StoragePaneProps } from '../types'
 
@@ -18,11 +19,8 @@ export function DoclingPane({ notify }: Pick<StoragePaneProps, 'notify'>) {
   React.useEffect(() => { void refresh() }, [refresh])
 
   return (
-    <div className="storage-pane docling-pane">
-      <div>
-        <strong>Texterkennung</strong>
-        <div className="helper">Lokale Texterkennung für Rechnungen und Scans.</div>
-      </div>
+    <div className="settings-page storage-pane docling-pane">
+      <SettingsPageHeader title="Texterkennung" description="Lokale Texterkennung für Rechnungen und Scans." meta="Verfügbarkeit auf diesem Gerät" actions={<button className="btn" disabled={busy} onClick={() => void refresh()}>Erneut prüfen</button>} />
 
       <section className="card storage-section docling-settings-card">
         <div className="docling-settings-card__head">
@@ -37,7 +35,7 @@ export function DoclingPane({ notify }: Pick<StoragePaneProps, 'notify'>) {
         {!ocrStatus?.available && ocrStatus?.error && <div className="helper docling-settings-card__error">{ocrStatus.error}</div>}
       </section>
 
-      <button className="btn btn-sm" disabled={busy} onClick={() => void refresh()}>Erneut prüfen</button>
+
     </div>
   )
 }

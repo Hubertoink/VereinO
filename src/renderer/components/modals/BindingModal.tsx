@@ -1,25 +1,10 @@
 import ModalHeader from '../ModalHeader'
-import RandomColorButton from '../common/RandomColorButton'
+import ColorField from '../common/ColorField'
 import React, { useEffect, useRef, useState } from 'react'
-import { IconTrash } from '@tabler/icons-react'
+import { IconTrash, IconBookmark } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
 import DatePickerButton from '../common/DatePickerButton'
 import BookingPopupFrame from './BookingPopupFrame'
-
-// Local contrast helper (kept self-contained)
-function contrastText(bg?: string | null) {
-  if (!bg) return '#000'
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(bg.trim())
-  if (!m) return '#000'
-  const hex = m[1]
-  const r = parseInt(hex.slice(0, 2), 16)
-  const g = parseInt(hex.slice(2, 4), 16)
-  const b = parseInt(hex.slice(4, 6), 16)
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.6 ? '#000' : '#fff'
-}
-
-const EARMARK_PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
 
 export type BindingModalValue = {
   id?: number
@@ -37,13 +22,10 @@ export type BindingModalValue = {
 export default function BindingModal({ value, onClose, onSaved }: { value: BindingModalValue; onClose: () => void; onSaved: () => void }) {
   const [v, setV] = useState(value)
   const [requiredTouched, setRequiredTouched] = useState(false)
-  const [showColorPicker, setShowColorPicker] = useState(false)
-  const [draftColor, setDraftColor] = useState<string>(value.color || '#00C853')
-  const [draftError, setDraftError] = useState<string>('')
   const [askDelete, setAskDelete] = useState(false)
   const startDateRef = useRef<HTMLInputElement | null>(null)
   const endDateRef = useRef<HTMLInputElement | null>(null)
-  useEffect(() => { setV(value); setRequiredTouched(false); setDraftColor(value.color || '#00C853'); setDraftError(''); setAskDelete(false) }, [value])
+  useEffect(() => { setV(value); setRequiredTouched(false); setAskDelete(false) }, [value])
 
   async function save() {
     setRequiredTouched(true)
@@ -67,24 +49,28 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if (e.defaultPrevented || document.querySelector('.master-data-dialog')) return
+      if (askDelete) { if (e.key === 'Escape') { setAskDelete(false); e.preventDefault() }; return }
       if (e.key === 'Escape') { onClose(); e.preventDefault(); return }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { save(); e.preventDefault(); return }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [v])
+  }, [v, askDelete])
 
   return (
     <BookingPopupFrame
       title={v.id ? 'Zweckbindung bearbeiten' : 'Zweckbindung anlegen'}
+      subtitle="Lege fest, wofür zweckgebundene Mittel verwendet werden dürfen."
+      icon={<IconBookmark size={22} />}
       onClose={onClose}
       variant="compact"
       anchorAlign="end"
-      className="standard-floating-modal binding-floating-modal"
+      className="master-data-popup binding-floating-modal"
     >
       <div className="binding-modal-content">
         <div className="row">
-          <div className={`field standard-floating-field${v.code.trim() ? ' standard-floating-field--filled' : ''}`}>
+          <div className="field">
             <label htmlFor="binding-code">Code <span className="req-asterisk" aria-hidden="true">*</span></label>
             <input
               id="binding-code"
@@ -97,7 +83,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
               <div className="helper" style={{ color: 'var(--danger)' }}>Bitte Code angeben</div>
             )}
           </div>
-          <div className={`field standard-floating-field${v.name.trim() ? ' standard-floating-field--filled' : ''}`}>
+          <div className="field">
             <label htmlFor="binding-name">Name <span className="req-asterisk" aria-hidden="true">*</span></label>
             <input
               id="binding-name"
@@ -110,19 +96,19 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
               <div className="helper" style={{ color: 'var(--danger)' }}>Bitte Namen angeben</div>
             )}
           </div>
-          <div className={`field field-full-width standard-floating-field${(v.description || '').trim() ? ' standard-floating-field--filled' : ''}`}>
+          <div className="field field-full-width">
             <label htmlFor="binding-description">Beschreibung</label>
             <input id="binding-description" className="input" value={v.description ?? ''} onChange={(e) => setV({ ...v, description: e.target.value })} placeholder="Optional" />
           </div>
           <div className="date-range-container">
-            <div className="field standard-floating-field standard-floating-field--filled">
+            <div className="field">
               <label htmlFor="binding-start-date">Von</label>
               <span className="booking-date-input-wrap">
                 <input id="binding-start-date" ref={startDateRef} className="input" type="date" value={v.startDate ?? ''} onChange={(e) => setV({ ...v, startDate: e.target.value || null })} />
                 <DatePickerButton inputRef={startDateRef} ariaLabel="Kalender zur Auswahl des Beginns öffnen" />
               </span>
             </div>
-            <div className="field standard-floating-field standard-floating-field--filled">
+            <div className="field">
               <label htmlFor="binding-end-date">Bis</label>
               <span className="booking-date-input-wrap">
                 <input id="binding-end-date" ref={endDateRef} className="input" type="date" value={v.endDate ?? ''} onChange={(e) => setV({ ...v, endDate: e.target.value || null })} />
@@ -145,14 +131,14 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
               <div className="helper">Wenn aktiv: Buchungen dürfen diese Zweckbindung nur im Zeitraum Von/Bis nutzen.</div>
             </div>
           )}
-          <div className="field standard-floating-field standard-floating-field--filled">
+          <div className="field">
             <label htmlFor="binding-status">Status</label>
             <select id="binding-status" className="input" value={(v.isActive ?? true) ? '1' : '0'} onChange={(e) => setV({ ...v, isActive: e.target.value === '1' })}>
               <option value="1">aktiv</option>
               <option value="0">inaktiv</option>
             </select>
           </div>
-          <div className={`field standard-floating-field${v.budget != null ? ' standard-floating-field--filled' : ''}`}>
+          <div className="field">
             <label htmlFor="binding-budget">Budget (€)</label>
             <input id="binding-budget" className="input" type="number" step="0.01" value={(v.budget ?? '') as any}
               onChange={(e) => {
@@ -160,21 +146,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
                 setV({ ...v, budget: val === '' ? null : Number(val) })
               }} placeholder="0.00" />
           </div>
-          <div className="field field-full-width">
-            <label>Farbe</label>
-            <div className="color-picker-container">
-              {EARMARK_PALETTE.map((c) => (
-                <button key={c} type="button" className={`btn color-swatch-btn ${v.color === c ? 'color-swatch-selected' : 'color-swatch-unselected'}`} onClick={() => setV({ ...v, color: c })} title={c} style={{ '--swatch-color': c } as React.CSSProperties} aria-label={`Farbe ${c}`}>
-                  <span aria-hidden="true" />
-                </button>
-              ))}
-              <RandomColorButton color={v.color} onChange={(color) => { setV({ ...v, color }); setDraftColor(color) }} size={28} />
-              <button type="button" className="btn custom-color-btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ '--swatch-color': v.color || 'var(--muted)', '--swatch-text': v.color ? contrastText(v.color) : 'var(--text)' } as React.CSSProperties}>
-                Eigene…
-              </button>
-              <button type="button" className="btn custom-color-btn" onClick={() => setV({ ...v, color: null })} title="Keine Farbe">Keine</button>
-            </div>
-          </div>
+          <div className="field field-full-width"><ColorField value={v.color} onChange={color => setV({ ...v, color })} /></div>
         </div>
         <div className="modal-footer">
           <div className="helper m-0">Ctrl+S = Speichern · Esc = Abbrechen</div>
@@ -201,44 +173,6 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
             <div className="delete-modal-actions">
               <button className="btn" onClick={() => setAskDelete(false)}>Abbrechen</button>
               <button className="btn danger" onClick={async () => { await (window as any).api?.bindings.delete?.({ id: v.id as number }); setAskDelete(false); onSaved(); onClose() }}>Ja, löschen</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {showColorPicker && (
-        <div className="modal-overlay" onClick={() => setShowColorPicker(false)} role="dialog" aria-modal="true">
-          <div className="modal color-picker-modal" onClick={(e) => e.stopPropagation()}>
-            <ModalHeader
-              className="color-picker-header"
-              title="Eigene Farbe wählen"
-              onClose={() => setShowColorPicker(false)}
-              closeLabel="Schließen"
-              closeOnEscape={false}
-            />
-            <div className="row">
-              <div className="field">
-                <label htmlFor="color-picker-native">Picker</label>
-                <input id="color-picker-native" className="color-input-native" type="color" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} />
-              </div>
-              <div className="field">
-                <label htmlFor="color-picker-hex">HEX</label>
-                <input id="color-picker-hex" className="input" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} placeholder="#00C853" />
-                {draftError && <div className="helper error-text">{draftError}</div>}
-              </div>
-            </div>
-            <div className="card color-preview-card">
-              <div className="color-preview-swatch" style={{ '--preview-color': draftColor } as React.CSSProperties} />
-              <div className="helper">Kontrast: <span className="contrast-sample" style={{ '--preview-color': draftColor, '--preview-text': contrastText(draftColor) } as React.CSSProperties}>{contrastText(draftColor)}</span></div>
-            </div>
-            <div className="delete-modal-actions">
-              <button className="btn" onClick={() => setShowColorPicker(false)}>Abbrechen</button>
-              <button className="btn primary" onClick={() => {
-                const hex = draftColor.trim()
-                const ok = /^#([0-9a-fA-F]{6})$/.test(hex)
-                if (!ok) { setDraftError('Bitte gültigen HEX-Wert eingeben (z. B. #00C853)'); return }
-                setV({ ...v, color: hex })
-                setShowColorPicker(false)
-              }}>Übernehmen</button>
             </div>
           </div>
         </div>

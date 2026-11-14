@@ -453,7 +453,8 @@ const rendererApi = {
     list: () => invoke('backup.list'),
     openFolder: () => invoke('backup.openFolder'),
     getDir: () => invoke('backup.getDir'),
-    setDir: () => invoke('backup.setDir'),
+    pickDir: () => invoke('backup.pickDir'),
+    setDir: (payload) => invoke('backup.setDir', payload),
     resetDir: () => invoke('backup.resetDir'),
     inspect: (filePath: string) =>
       invokeRaw<RendererResultAt<'backup.inspect'>>('backup.inspect', { filePath }),

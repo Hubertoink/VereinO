@@ -41,7 +41,7 @@ export default function MetaFilterModal({ open, onClose, budgets, earmarks, sphe
             <label>Kategorie</label>
             <select className="input" value={primary ?? ''} onChange={(ev) => setPrimary(ev.target.value ? Number(ev.target.value) : null)}>
               <option value="">Alle</option>
-              {categories.map((category) => <option key={category.id} value={category.id}>{category.icon ? `${category.icon} ` : ''}{category.name}</option>)}
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
             </select>
           </div> : <div className="field">
             <label>Sphäre</label>

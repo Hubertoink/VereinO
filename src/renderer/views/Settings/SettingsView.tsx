@@ -19,6 +19,7 @@ import { UpdatesPane } from './panes/UpdatesPane'
 import { DoclingPane } from './panes/DoclingPane'
 import { ChangelogModal } from '../../components/modals/ChangelogModal'
 import { IconListDetails } from '@tabler/icons-react'
+import './settings.css'
 
 const VALID_SETTINGS_TILES: readonly TileKey[] = [
   'general',
@@ -112,22 +113,16 @@ export function SettingsView(props: SettingsProps) {
       
       <SettingsNav active={activeTile} onSelect={setActiveTile} organizationProfile={props.organizationProfile} />
       
-      <div className="settings-content">
+      <div className="settings-content settings-unified">
         {activeTile === 'general' && (
           <GeneralPane
             organizationProfile={props.organizationProfile}
             navLayout={props.navLayout}
             setNavLayout={props.setNavLayout}
-            sidebarCollapsed={props.sidebarCollapsed}
-            setSidebarCollapsed={props.setSidebarCollapsed}
             navIconColorMode={props.navIconColorMode}
             setNavIconColorMode={props.setNavIconColorMode}
             colorTheme={props.colorTheme}
             setColorTheme={props.setColorTheme}
-            journalRowStyle={props.journalRowStyle}
-            setJournalRowStyle={props.setJournalRowStyle}
-            journalRowDensity={props.journalRowDensity}
-            setJournalRowDensity={props.setJournalRowDensity}
             backgroundImage={props.backgroundImage}
             setBackgroundImage={props.setBackgroundImage}
             backgroundImageVisibility={props.backgroundImageVisibility}
@@ -136,12 +131,7 @@ export function SettingsView(props: SettingsProps) {
             setCustomBackgroundImage={props.setCustomBackgroundImage}
             glassModals={props.glassModals}
             setGlassModals={props.setGlassModals}
-            dateFmt={props.dateFmt}
-            setDateFmt={props.setDateFmt}
-            journalLimit={props.journalLimit}
-            setJournalLimit={props.setJournalLimit}
             notify={props.notify}
-            bumpDataVersion={props.bumpDataVersion}
             openSetupWizard={props.openSetupWizard}
             visibleNavItems={props.visibleNavItems}
             setVisibleNavItems={props.setVisibleNavItems}
@@ -176,6 +166,12 @@ export function SettingsView(props: SettingsProps) {
             setJournalLimit={props.setJournalLimit}
             labelForCol={props.labelForCol}
             allowVoucherDeletion={props.allowVoucherDeletion}
+            journalRowStyle={props.journalRowStyle}
+            setJournalRowStyle={props.setJournalRowStyle}
+            journalRowDensity={props.journalRowDensity}
+            setJournalRowDensity={props.setJournalRowDensity}
+            dateFmt={props.dateFmt}
+            setDateFmt={props.setDateFmt}
           />
         )}
         

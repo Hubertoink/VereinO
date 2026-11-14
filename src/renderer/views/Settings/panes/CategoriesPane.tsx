@@ -1,9 +1,10 @@
+import CategoryIcon from '../../../components/common/CategoryIcon'
+import { SettingsPageHeader } from '../components/SettingsPageHeader'
 import ModalHeader from '../../../components/ModalHeader'
 import React from 'react'
 import type { ClassificationValue, OrganizationProfile } from '../../../../../shared/classification'
 import CategoryModal, { type CategoryValue } from '../../../components/modals/CategoryModal'
-import { IconTrash, ICONS } from '../../../utils/icons'
-import { IconTag } from '@tabler/icons-react'
+import { IconTag, IconPencil, IconArchive, IconArchiveOff } from '@tabler/icons-react'
 import type { OrgPaneProps } from '../types'
 import { dispatchDataChanged } from '../../../utils/refresh'
 
@@ -46,22 +47,17 @@ export function CategoriesPane({ notify }: OrgPaneProps) {
 
   if (profile === 'NONPROFIT') return <div className="card" style={{ padding: 16 }}><strong>Kategorien</strong><div className="helper" style={{ marginTop: 6 }}>Dieses Profil nutzt die festen steuerlichen Sphären. Wechsle unter „Organisation“ zur allgemeinen Budgetverwaltung, um eigene Kategorien anzulegen.</div></div>
 
-  return <div style={{ display: 'grid', gap: 16 }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}><IconTag size={20} aria-hidden="true" /><strong style={{ fontSize: 16 }}>Kategorien</strong><span className="chip" style={{ marginLeft: 8, fontSize: 11 }}>{values.length}</span></div>
-        <div className="helper">Verwalte Namen, Farben und Zeichen. Kategorien gliedern Buchungen und Auswertungen.</div>
-      </div>
-      <button className="btn primary" onClick={() => setEditCategory({ name: '', color: '#00C853', icon: null })} style={{ whiteSpace: 'nowrap' }}>+ Neue Kategorie</button>
-    </div>
+  return <div className="settings-page settings-records-pane">
+    <SettingsPageHeader title="Kategorien" count={values.length} description="Verwalte Namen, Farben und Zeichen zur Gliederung von Buchungen und Auswertungen." meta="Für diese Organisation" actions={<button className="btn primary" onClick={() => setEditCategory({ name: '', color: '#00C853', icon: null })}>+ Neue Kategorie</button>} />
 
-    {values.length === 0 ? <div className="card" style={{ padding: 32, textAlign: 'center' }}><IconTag size={32} aria-hidden="true" style={{ marginBottom: 8 }} /><div className="helper">Noch keine Kategorien vorhanden.</div><div className="helper" style={{ marginTop: 4 }}>Erstelle deine erste Kategorie mit dem Button oben.</div></div> : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+    {values.length === 0 ? <div className="settings-empty"><IconTag size={32} aria-hidden="true" style={{ marginBottom: 8 }} /><div className="helper">Noch keine Kategorien vorhanden.</div><div className="helper" style={{ marginTop: 4 }}>Erstelle deine erste Kategorie mit dem Button oben.</div></div> : <div className="settings-record-list">
       {values.map((category) => {
         const color = category.color || 'var(--muted)'
-        return <div key={category.id} className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, opacity: category.isActive ? 1 : .58, background: category.color ? `${category.color}20` : 'var(--muted)', borderLeft: `4px solid ${color}` }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: color, flexShrink: 0, display: 'grid', placeItems: 'center', fontSize: 16 }} title={category.color || 'Keine Farbe'}>{category.icon || '🏷️'}</div>
+        return <div key={category.id} className="settings-record-row" style={{ opacity: category.isActive ? 1 : .58 }}>
+          <span className="settings-record-color" style={{ background: color }} title={category.color || 'Keine Farbe'} />
+          {category.icon && <CategoryIcon value={category.icon} size={18} />}
           <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{category.name}</div><div className="helper" style={{ fontSize: 11 }}>{category.isActive ? 'Aktiv' : 'Archiviert'}</div></div>
-          <div style={{ display: 'flex', gap: 4 }}><button className="btn btn-edit" onClick={() => setEditCategory({ id: category.id, name: category.name, color: category.color, icon: category.icon })} title="Bearbeiten">{ICONS.EDIT}</button><button className="btn ghost btn-trash" onClick={() => setArchiveConfirm(category)} title={category.isActive ? 'Archivieren' : 'Reaktivieren'} style={{ padding: '6px 8px' }}><IconTrash size={16} /></button></div>
+          <div style={{ display: 'flex', gap: 4 }}><button className="btn btn-edit" onClick={() => setEditCategory({ id: category.id, name: category.name, color: category.color, icon: category.icon })} title="Bearbeiten" aria-label={`${category.name} bearbeiten`}><IconPencil size={16} aria-hidden="true" /></button><button className="btn ghost" onClick={() => setArchiveConfirm(category)} aria-label={`${category.name} ${category.isActive ? 'archivieren' : 'reaktivieren'}`} title={category.isActive ? 'Archivieren' : 'Reaktivieren'} style={{ padding: '6px 8px' }}>{category.isActive ? <IconArchive size={16} aria-hidden="true" /> : <IconArchiveOff size={16} aria-hidden="true" />}</button></div>
         </div>
       })}
     </div>}

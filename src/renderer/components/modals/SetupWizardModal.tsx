@@ -1,910 +1,236 @@
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { IconArrowLeft, IconArrowRight, IconCheck, IconBuildingCommunity, IconLayoutDashboard, IconShieldCheck, IconRocket, IconFolder, IconTags, IconInfoCircle } from '@tabler/icons-react'
 import ModalHeader from '../ModalHeader'
-﻿
-import React, { useEffect, useMemo, useState } from 'react'
-import './setupBookingView.css'
-import { compressImageFileToDataUrl } from '../../utils/imageCompression'
-import { BACKGROUND_IMAGE_OPTIONS, COLOR_THEME_OPTIONS, DATE_FORMAT_OPTIONS } from '../../utils/appearanceOptions'
+import appLogo from '../../../../build/Icon.ico'
+import { COLOR_THEME_OPTIONS } from '../../utils/appearanceOptions'
 import { dispatchDataChanged } from '../../utils/refresh'
-import type {
-    BackgroundImage,
-    BookingEntryPresentation,
-    JournalRowDensity,
-    JournalRowStyle,
-    NavIconColorMode,
-    NavLayout,
-    QuickAddAfterSave
-} from '../../context/UIPreferencesContextCore'
 import type { ColorTheme } from '../../context/uiTheme'
-import type { ColKey, DateFmt } from '../../views/Settings/types'
+import './setupBookingView.css'
+import './setupWizard.css'
 
-type TablePreset = 'standard' | 'minimal' | 'details' | 'custom'
+const STEPS = [
+  { label: 'Willkommen', title: 'Willkommen bei VereinO', description: 'Dein Verein. Deine Finanzen. In wenigen Schritten startklar.', icon: IconBuildingCommunity },
+  { label: 'Deine Ansicht', title: 'So behältst du den Überblick', description: 'Wähle die Ansicht, mit der du dich wohlfühlst. Du kannst sie jederzeit ändern.', icon: IconLayoutDashboard },
+  { label: 'Datensicherung', title: 'Deine Daten gut gesichert', description: 'Bestimme, wie VereinO dich beim Sichern deiner Daten unterstützt.', icon: IconShieldCheck },
+  { label: 'Startklar', title: 'Bereit für deine erste Buchung', description: 'Prüfe deine Auswahl. Danach kannst du direkt loslegen.', icon: IconRocket },
+]
+const BACKUP_MODES = [
+  { value: 'SILENT', title: 'Automatisch sichern', description: 'VereinO erstellt fällige Sicherungen im Hintergrund.' },
+  { value: 'PROMPT', title: 'Vorher nachfragen', description: 'Du erhältst einen Hinweis, wenn eine Sicherung fällig ist.' },
+  { value: 'OFF', title: 'Manuell sichern', description: 'Du startest Sicherungen selbst in den Einstellungen.' },
+] as const
+const COMMON_TAGS = [{ name: 'Material', color: '#8D6E63' }, { name: 'Reise', color: '#AD1457' }, { name: 'Gebühren', color: '#455A64' }, { name: 'Miete', color: '#5D4037' }]
+const VEREIN_TAGS = [{ name: 'Mitgliedsbeitrag', color: '#2E7D32' }, { name: 'Spende', color: '#1565C0' }, { name: 'Sponsor', color: '#6A1B9A' }, { name: 'Event', color: '#00838F' }]
 
-// Toggle button component for binary options
-function ToggleButtons<T extends string>({ value, onChange, options }: {
-    value: T
-    onChange: (v: T) => void
-    options: Array<{ value: T; label: string; icon?: string }>
-}) {
-    return (
-        <div className="toggle-button-group">
-            {options.map(opt => (
-                <button
-                    key={opt.value}
-                    type="button"
-                    className={`toggle-button ${value === opt.value ? 'active' : ''}`}
-                    onClick={() => onChange(opt.value)}
-                >
-                    {opt.icon && <span className="toggle-icon">{opt.icon}</span>}
-                    <span>{opt.label}</span>
-                </button>
-            ))}
-        </div>
-    )
+type Props = {
+  onClose: () => void
+  bookingView: 'classic' | 'plus'
+  setBookingView: (value: 'classic' | 'plus') => void
+  colorTheme: ColorTheme
+  setColorTheme: (value: ColorTheme) => void
+  existingTags: Array<{ name: string; color?: string | null }>
+  notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
 }
 
-export default function SetupWizardModal({
-    onClose,
-    bookingView, setBookingView,
-    navLayout, setNavLayout,
-    navIconColorMode, setNavIconColorMode,
-    colorTheme, setColorTheme,
-    journalRowStyle, setJournalRowStyle,
-    journalRowDensity, setJournalRowDensity,
-    backgroundImage, setBackgroundImage,
-    customBackgroundImage, setCustomBackgroundImage,
-    glassModals, setGlassModals,
-    dateFmt, setDateFmt,
-    showBookingDraftTabs, setShowBookingDraftTabs,
-    showBookingEditTabs, setShowBookingEditTabs,
-    bookingEntryPresentation, setBookingEntryPresentation,
-    allowVoucherDeletion, setAllowVoucherDeletion,
-    quickAddAfterSave, setQuickAddAfterSave,
-    existingTags,
-    notify
-}: {
-    onClose: () => void
-    bookingView: 'classic' | 'plus'
-    setBookingView: (value: 'classic' | 'plus') => void
-    navLayout: NavLayout
-    setNavLayout: (v: NavLayout) => void
-    navIconColorMode: NavIconColorMode
-    setNavIconColorMode: (v: NavIconColorMode) => void
-    colorTheme: ColorTheme
-    setColorTheme: (v: ColorTheme) => void
-    journalRowStyle: JournalRowStyle
-    setJournalRowStyle: (v: JournalRowStyle) => void
-    journalRowDensity: JournalRowDensity
-    setJournalRowDensity: (v: JournalRowDensity) => void
-    backgroundImage: BackgroundImage
-    setBackgroundImage: (v: BackgroundImage) => void
-    customBackgroundImage: string | null
-    setCustomBackgroundImage: (v: string | null) => void
-    glassModals: boolean
-    setGlassModals: (v: boolean) => void
-    dateFmt: DateFmt
-    setDateFmt: (v: DateFmt) => void
-    showBookingDraftTabs: boolean
-    setShowBookingDraftTabs: (v: boolean) => void
-    showBookingEditTabs: boolean
-    setShowBookingEditTabs: (v: boolean) => void
-    bookingEntryPresentation: BookingEntryPresentation
-    setBookingEntryPresentation: (v: BookingEntryPresentation) => void
-    allowVoucherDeletion: boolean
-    setAllowVoucherDeletion: (v: boolean) => void
-    quickAddAfterSave: QuickAddAfterSave
-    setQuickAddAfterSave: (v: QuickAddAfterSave) => void
-    existingTags: Array<{ name: string; color?: string | null }>
-    notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
-}) {
-    const [step, setStep] = useState<number>(0)
-    const [orgName, setOrgName] = useState<string>('')
-    const [cashier, setCashier] = useState<string>('')
-    const [tablePreset, setTablePreset] = useState<TablePreset>('standard')
-    const [colsVisible, setColsVisible] = useState<Record<ColKey, boolean>>({
-        actions: true, date: true, voucherNo: false, type: true, sphere: true, description: true, note: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: false, vat: false, gross: true
-    })
-    const [colsOrder, setColsOrder] = useState<ColKey[]>(['actions', 'date', 'type', 'sphere', 'description', 'note', 'earmark', 'budget', 'paymentMethod', 'attachments', 'gross', 'voucherNo', 'net', 'vat'])
-    const mandatoryCols: ColKey[] = ['actions','date','description','gross']
+export default function SetupWizardModal({ onClose, bookingView, setBookingView, colorTheme, setColorTheme, existingTags, notify }: Props) {
+  const id = useId()
+  const [step, setStep] = useState(0)
+  const [orgName, setOrgName] = useState('')
+  const [cashier, setCashier] = useState('')
+  const [orgId, setOrgId] = useState<string | null>(null)
+  const [generalProfile, setGeneralProfile] = useState(false)
+  const [draftView, setDraftView] = useState(bookingView)
+  const [draftTheme, setDraftTheme] = useState(colorTheme)
+  const [backupMode, setBackupMode] = useState<'SILENT' | 'PROMPT' | 'OFF'>('PROMPT')
+  const [intervalDays, setIntervalDays] = useState(7)
+  const [backupDir, setBackupDir] = useState('')
+  const [chosenDir, setChosenDir] = useState<string | null>(null)
+  const [pickingDir, setPickingDir] = useState(false)
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [customTag, setCustomTag] = useState('')
+  const [customTags, setCustomTags] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const [loadError, setLoadError] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveStarted, setSaveStarted] = useState(false)
+  const busyRef = useRef(false)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const titleRef = useRef<HTMLHeadingElement>(null)
+  const previousFocus = useRef(document.activeElement as HTMLElement | null)
+  const existingSet = useMemo(() => new Set(existingTags.map(tag => tag.name.trim().toLocaleLowerCase('de'))), [existingTags])
+  const suggestions = generalProfile ? COMMON_TAGS : [...VEREIN_TAGS, ...COMMON_TAGS]
+  const tagNames = [...selectedTags, ...customTags].filter(name => !existingSet.has(name.toLocaleLowerCase('de')))
 
-    // The wizard shows current values and marks setup completed on "Fertig".
+  useEffect(() => {
+    let alive = true
+    setLoading(true); setLoadError('')
+    Promise.all([
+      window.api.settings.get({ key: 'org.name' }), window.api.settings.get({ key: 'org.cashier' }),
+      window.api.settings.get({ key: 'backup.auto' }), window.api.settings.get({ key: 'backup.intervalDays' }),
+      window.api.backup.getDir(), window.api.organizations.active(),
+    ]).then(([name, person, mode, interval, dir, active]) => {
+      if (!alive) return
+      if (!dir.ok) throw new Error(dir.error || 'Sicherungsordner konnte nicht geladen werden.')
+      setOrgName(String(name.value || active.organization?.name || ''))
+      setCashier(String(person.value || ''))
+      setOrgId(active.organization?.id || null)
+      setGeneralProfile(active.organization?.profile === 'GENERAL')
+      setBackupMode(mode.value === 'OFF' || mode.value === 'SILENT' ? mode.value : 'PROMPT')
+      const days = Number(interval.value ?? 7)
+      setIntervalDays(Number.isInteger(days) && days > 0 ? days : 7)
+      setBackupDir(dir.dir || '')
+    }).catch(e => { if (alive) setLoadError(e?.message || String(e)) }).finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [loadAttempt])
 
-    // Load existing values to prefill
-    useEffect(() => {
-        let alive = true
-        ;(async () => {
-            try {
-                const on = await (window as any).api?.settings?.get?.({ key: 'org.name' })
-                const cn = await (window as any).api?.settings?.get?.({ key: 'org.cashier' })
-                if (!alive) return
-                setOrgName((on?.value as any) || '')
-                setCashier((cn?.value as any) || '')
-            } catch {}
-        })()
-        return () => { alive = false }
-    }, [])
+  useEffect(() => {
+    if (!loading) titleRef.current?.focus()
+    if (bodyRef.current) bodyRef.current.scrollTop = 0
+  }, [step, loading])
+  useEffect(() => { const previous = previousFocus.current; return () => { if (previous?.isConnected) previous.focus() } }, [])
 
-    const suggestedTags = useMemo(() => [
-        // Einnahmen
-        { name: 'Mitgliedsbeitrag', color: '#2E7D32' },
-        { name: 'Spende', color: '#1565C0' },
-        { name: 'Sponsor', color: '#6A1B9A' },
-        { name: 'Event', color: '#00838F' },
-        // Ausgaben
-        { name: 'Material', color: '#8D6E63' },
-        { name: 'Reise', color: '#AD1457' },
-        { name: 'Gebühren', color: '#455A64' },
-        { name: 'Miete', color: '#5D4037' }
-    ], [])
-    const existingSet = useMemo(() => new Set((existingTags || []).map(t => t.name.trim().toLowerCase())), [existingTags])
-    const [selectedTags, setSelectedTags] = useState<Record<string, boolean>>(() => {
-        const init: Record<string, boolean> = {}
-        for (const t of suggestedTags) init[t.name] = !existingSet.has(t.name.toLowerCase()) // vorselektiert, wenn noch nicht vorhanden
-        return init
-    })
-    const [customTag, setCustomTag] = useState<string>('')
-    const [customTags, setCustomTags] = useState<string[]>([])
-    const [backupDir, setBackupDir] = useState<string>('')
-    const [backupMsg, setBackupMsg] = useState<string>('')
-    const [backupMode, setBackupMode] = useState<'SILENT' | 'PROMPT' | 'OFF'>('PROMPT')
-    const [backupIntervalDays, setBackupIntervalDays] = useState<number>(7)
-    const [showAdvanced, setShowAdvanced] = useState<boolean>(false)
-    const [isSaving, setIsSaving] = useState<boolean>(false)
-
-    const customBgInputRef = React.useRef<HTMLInputElement | null>(null)
-    const [isCustomBgProcessing, setIsCustomBgProcessing] = useState<boolean>(false)
-
-    const openCustomBgPicker = () => {
-        customBgInputRef.current?.click()
+  useEffect(() => {
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || saving || pickingDir) return
+      const dialogs = Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"]'))
+      if (dialogs.at(-1)?.contains(dialogRef.current)) { event.preventDefault(); onClose() }
     }
+    window.addEventListener('keydown', onEscape)
+    return () => window.removeEventListener('keydown', onEscape)
+  }, [onClose, saving, pickingDir])
 
-    const handleCustomBgUpload = async (file: File) => {
-        const MAX_FILE_BYTES = 25 * 1024 * 1024
-        if (file.size > MAX_FILE_BYTES) {
-            notify('error', 'Bitte ein kleineres Bild auswählen (max. 25 MB).')
-            return
+  async function chooseDirectory() {
+    const trigger = document.activeElement as HTMLElement | null
+    setPickingDir(true); setError('')
+    try {
+      const result = await window.api.backup.pickDir()
+      if (result.canceled) return
+      if (!result.ok || !result.dir) throw new Error(result.error || 'Ordner konnte nicht ausgewählt werden.')
+      setChosenDir(result.dir)
+    } catch (e: any) { setError(e?.message || String(e)) }
+    finally { setPickingDir(false); requestAnimationFrame(() => { if (trigger?.isConnected) trigger.focus() }) }
+  }
+
+  async function finish() {
+    if (busyRef.current || loading || loadError) return
+    if (!orgName.trim()) { setStep(0); setError('Bitte gib einen Namen für die Organisation an.'); return }
+    busyRef.current = true; setSaving(true); setSaveStarted(true); setError('')
+    try {
+      const active = await window.api.organizations.active()
+      if (active.organization?.id !== orgId) throw new Error('Die Organisation wurde gewechselt. Bitte öffne das Setup erneut.')
+      if (chosenDir) {
+        const result = await window.api.backup.setDir({ dir: chosenDir })
+        if (!result.ok) throw new Error(result.error || 'Sicherungsordner konnte nicht übernommen werden.')
+        setBackupDir(result.dir || chosenDir); setChosenDir(null)
+        if (result.warning) notify('info', result.warning, 10000)
+      }
+      for (const [key, value] of [['org.name', orgName.trim()], ['org.cashier', cashier.trim()], ['backup.auto', backupMode], ['backup.intervalDays', intervalDays]] as const) {
+        const result = await window.api.settings.set({ key, value })
+        if (!result.ok) throw new Error('Die Einstellungen konnten nicht gespeichert werden.')
+      }
+      if (tagNames.length) {
+        // A previous completion attempt may already have created some tags.
+        const currentTags = await window.api.tags.list()
+        const known = new Set(currentTags.rows.map(tag => tag.name.trim().toLocaleLowerCase('de')))
+        for (const name of tagNames) {
+          if (known.has(name.toLocaleLowerCase('de'))) continue
+          await window.api.tags.upsert({ name, color: suggestions.find(tag => tag.name === name)?.color })
+          known.add(name.toLocaleLowerCase('de'))
         }
+      }
+      if (orgId) {
+        const result = await window.api.organizations.setAppearance({ orgId, colorTheme: draftTheme, bookingView: draftView })
+        if (!result.success) throw new Error('Die Ansicht konnte nicht gespeichert werden.')
+      }
+      const completed = await window.api.settings.set({ key: 'setup.completed', value: true })
+      if (!completed.ok) throw new Error('Die Einrichtung konnte nicht abgeschlossen werden.')
+      setBookingView(draftView); setColorTheme(draftTheme)
+      dispatchDataChanged(['settings', 'organizations', 'tags'])
+      notify('success', 'VereinO ist eingerichtet. Viel Freude beim Start!')
+      onClose()
+    } catch (e: any) { setError(e?.message || String(e)) }
+    finally { busyRef.current = false; setSaving(false) }
+  }
 
-        setIsCustomBgProcessing(true)
-        try {
-            const result = await compressImageFileToDataUrl(file, {
-                maxDimension: 3000,
-                targetBytes: 2 * 1024 * 1024,
-            })
-            setCustomBackgroundImage(result.dataUrl)
-            setBackgroundImage('custom')
-            notify('success', `Eigenes Hintergrundbild gespeichert (${Math.round(result.bytes / 1024)} KB).`)
-        } catch (e: any) {
-            notify('error', `Bild konnte nicht verarbeitet werden: ${String(e?.message || e)}`)
-        } finally {
-            setIsCustomBgProcessing(false)
-        }
+  function changeStep(next: number) {
+    if (saving || loading || loadError) return
+    if (!orgName.trim() && next > 0) { setError('Bitte gib einen Namen für die Organisation an.'); return }
+    setError(''); setStep(next)
+  }
+  function addCustomTag() {
+    const name = customTag.trim()
+    if (name && !existingSet.has(name.toLocaleLowerCase('de')) && ![...selectedTags, ...customTags].some(tag => tag.toLocaleLowerCase('de') === name.toLocaleLowerCase('de'))) setCustomTags(tags => [...tags, name])
+    setCustomTag('')
+  }
+  const selectedTheme = COLOR_THEME_OPTIONS.find(theme => theme.id === draftTheme)
+  const previewMode = selectedTheme?.mode === 'auto' ? document.documentElement.dataset.theme || 'dark' : selectedTheme?.mode || 'dark'
+  const currentStep = STEPS[step]
+  const StepIcon = currentStep.icon
+  return createPortal(<div className="modal-overlay setup-wizard-overlay" role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} onKeyDown={event => {
+    event.stopPropagation()
+    if (event.key === 'Escape') { event.preventDefault(); if (!saving && !pickingDir) onClose() }
+    if (event.key === 'Tab') {
+      const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), summary') || []).filter(el => el.getClientRects().length)
+      const first = controls[0], last = controls[controls.length - 1]
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === titleRef.current)) { event.preventDefault(); last?.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
     }
-
-    const handleRemoveCustomBg = () => {
-        setCustomBackgroundImage(null)
-        if (backgroundImage === 'custom') setBackgroundImage('none')
-        notify('info', 'Eigenes Hintergrundbild entfernt.')
-    }
-
-    function applyTablePreset(preset: TablePreset) {
-        if (preset === 'custom') return // custom handled by direct edits
-        let cols: Record<ColKey, boolean>
-        let order: ColKey[]
-        if (preset === 'standard') {
-            cols = { actions: true, date: true, voucherNo: false, type: true, sphere: true, description: true, note: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: false, vat: false, gross: true }
-            order = ['actions', 'date', 'type', 'sphere', 'description', 'note', 'earmark', 'budget', 'paymentMethod', 'attachments', 'gross', 'voucherNo', 'net', 'vat']
-        } else if (preset === 'minimal') {
-            cols = { actions: true, date: true, voucherNo: false, type: false, sphere: false, description: true, note: false, earmark: false, budget: false, paymentMethod: false, attachments: false, net: false, vat: false, gross: true }
-            order = ['actions', 'date', 'description', 'note', 'gross', 'voucherNo', 'type', 'sphere', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat']
-        } else { // details
-            cols = { actions: true, date: true, voucherNo: true, type: true, sphere: true, description: true, note: true, earmark: true, budget: true, paymentMethod: true, attachments: true, net: true, vat: true, gross: true }
-            order = ['actions', 'date', 'voucherNo', 'type', 'sphere', 'description', 'note', 'earmark', 'budget', 'paymentMethod', 'attachments', 'net', 'vat', 'gross']
-        }
-        setColsVisible(cols)
-        setColsOrder(order)
-    }
-
-    // Apply selected preset when tablePreset changes (excluding custom which modifies directly)
-    useEffect(() => { applyTablePreset(tablePreset) }, [tablePreset])
-
-    function toggleCol(key: ColKey) {
-        if (mandatoryCols.includes(key)) return // keep mandatory columns
-        setColsVisible(v => ({ ...v, [key]: !v[key] }))
-        setTablePreset('custom')
-    }
-    function moveCol(key: ColKey, dir: -1 | 1) {
-        setColsOrder(order => {
-            const idx = order.indexOf(key)
-            if (idx < 0) return order
-            const newIdx = idx + dir
-            if (newIdx < 0 || newIdx >= order.length) return order
-            const copy = [...order]
-            const [item] = copy.splice(idx, 1)
-            copy.splice(newIdx, 0, item)
-            return copy
-        })
-        setTablePreset('custom')
-    }
-
-    async function finish(persistAndClose: boolean) {
-        if (isSaving) return
-        setIsSaving(true)
-        try {
-            // Persist org data
-            await (window as any).api?.settings?.set?.({ key: 'org.name', value: orgName })
-            await (window as any).api?.settings?.set?.({ key: 'org.cashier', value: cashier })
-
-            // Persist UI preferences
-            setBookingView(bookingView)
-            try { localStorage.setItem('ui.navLayout', navLayout) } catch {}
-            try { localStorage.setItem('ui.navIconColorMode', navIconColorMode) } catch {}
-            try { localStorage.setItem('ui.colorTheme', colorTheme) } catch {}
-            try { localStorage.setItem('ui.journalRowStyle', journalRowStyle) } catch {}
-            try { localStorage.setItem('ui.journalRowDensity', journalRowDensity) } catch {}
-            try { localStorage.setItem('ui.glassModals', String(glassModals)) } catch {}
-            try { localStorage.setItem('ui.dateFmt', dateFmt) } catch {}
-            try { localStorage.setItem('ui.showBookingDraftTabs', String(showBookingDraftTabs)) } catch {}
-            try { localStorage.setItem('ui.showBookingEditTabs', String(allowVoucherDeletion && showBookingEditTabs)) } catch {}
-            try { localStorage.setItem('ui.bookingEntryPresentation', bookingEntryPresentation) } catch {}
-            try { localStorage.setItem('ui.allowVoucherDeletion', String(allowVoucherDeletion)) } catch {}
-            try { localStorage.setItem('ui.quickAddAfterSave', quickAddAfterSave) } catch {}
-            try { document.documentElement.setAttribute('data-color-theme', colorTheme) } catch {}
-            try { document.documentElement.setAttribute('data-journal-row-style', journalRowStyle) } catch {}
-            try { document.documentElement.setAttribute('data-journal-row-density', journalRowDensity) } catch {}
-            try { document.documentElement.setAttribute('data-glass-modals', String(glassModals)) } catch {}
-
-            // Plus does not use configurable columns; preserve the classic settings.
-            if (bookingView === 'classic') {
-                try { localStorage.setItem('journalCols', JSON.stringify(colsVisible)) } catch {}
-                try { localStorage.setItem('journalColsOrder', JSON.stringify(colsOrder)) } catch {}
-            }
-
-            // Tags upsert
-            const toCreate: Array<{ name: string; color?: string }> = []
-            for (const t of suggestedTags) {
-                if (selectedTags[t.name] && !existingSet.has(t.name.toLowerCase())) toCreate.push({ name: t.name, color: t.color })
-            }
-            for (const n of customTags) {
-                const nm = n.trim()
-                if (!nm) continue
-                if (existingSet.has(nm.toLowerCase())) continue
-                if (toCreate.find(x => x.name.toLowerCase() === nm.toLowerCase())) continue
-                toCreate.push({ name: nm })
-            }
-            for (const t of toCreate) {
-                try { await (window as any).api?.tags?.upsert?.({ name: t.name, color: t.color }) } catch {}
-            }
-
-            // Persist backup preferences (dir handled by choose/reset actions)
-            try { await (window as any).api?.settings?.set?.({ key: 'backup.auto', value: backupMode }) } catch {}
-            try { await (window as any).api?.settings?.set?.({ key: 'backup.intervalDays', value: Number(backupIntervalDays) }) } catch {}
-
-            // Mark setup completed
-            await (window as any).api?.settings?.set?.({ key: 'setup.completed', value: true })
-            dispatchDataChanged(['settings', 'organizations', 'tags'])
-            notify('success', 'Setup gespeichert. Du kannst alles später unter „Einstellungen“ ändern.')
-        } catch (e: any) {
-            notify('error', e?.message || String(e))
-        } finally {
-            setIsSaving(false)
-            if (persistAndClose) onClose()
-        }
-    }
-
-    const setupSteps = ['Start', 'Organisation', 'Darstellung', 'Workflow', 'Buchungen', 'Tags', 'Backup'] as const
-    const LAST_STEP = setupSteps.length - 1
-
-    function Header() {
-        return <ModalHeader title="Erste Schritte" subtitle={setupSteps[step]} />
-    }
-
-    function MiniNavPreview() {
-        const top = navLayout === 'top'
-        return (
-            <div className="card" style={{ padding: 10 }}>
-                <div className="helper">Vorschau</div>
-                <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                    {top ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, padding: 6, borderBottom: '1px solid var(--border)' }}>
-                            {['🏠','📒','📑'].map((i, idx) => (
-                                <div key={idx} style={{ textAlign: 'center', opacity: 0.9, color: navIconColorMode === 'color' ? (idx===0?'#7C4DFF':idx===1?'#2962FF':'#00B8D4') : undefined }}>{i}</div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr' }}>
-                            <div style={{ borderRight: '1px solid var(--border)', padding: 6, display: 'grid', gap: 6 }}>
-                                {['🏠','📒','📑'].map((i, idx) => (
-                                    <div key={idx} style={{ textAlign: 'center', opacity: 0.9, color: navIconColorMode === 'color' ? (idx===0?'#7C4DFF':idx===1?'#2962FF':'#00B8D4') : undefined }}>{i}</div>
-                                ))}
-                            </div>
-                            <div style={{ padding: 6 }}>
-                                <div className="helper">Inhalt</div>
-                            </div>
-                        </div>
-                    )}
-                </div>
+  }}>
+    <div ref={dialogRef} className="modal setup-wizard" aria-busy={saving || loading}>
+      <ModalHeader title="Erste Schritte" subtitle="VereinO einrichten" icon={<img src={appLogo} width="27" height="27" alt="" />} />
+      <nav className="setup-steps" aria-label="Einrichtungsschritte"><ol>{STEPS.map((item, index) => <li key={item.label}><button type="button" disabled={index > step || saving || loading || !!loadError} aria-current={step === index ? 'step' : undefined} onClick={() => changeStep(index)}><span className="setup-step-number">{index < step ? <IconCheck size={15} /> : index + 1}</span><span>{item.label}</span></button></li>)}</ol></nav>
+      <div className="setup-wizard-body" ref={bodyRef}>
+        <div className="setup-step-intro"><span className="setup-step-icon"><StepIcon size={23} aria-hidden="true" /></span><div><h2 id={`${id}-title`} ref={titleRef} tabIndex={-1}>{currentStep.title}</h2><p>{currentStep.description}</p></div></div>
+        {loading ? <p role="status">Deine Einstellungen werden geladen …</p> : loadError ? <div role="alert" className="setup-error">{loadError}<button type="button" className="btn" onClick={() => setLoadAttempt(value => value + 1)}>Erneut laden</button></div> : <fieldset className="setup-step-content" disabled={saving || pickingDir}>
+          {step === 0 && <>
+            <div className="setup-welcome-note"><IconShieldCheck size={20} aria-hidden="true" /><span>Deine Buchhaltung bleibt auf deinem Rechner. Du kannst alle Einstellungen später anpassen.</span></div>
+            <div className="dialog-form-grid">
+              <div className="field"><label htmlFor={`${id}-name`}>Name der Organisation <span className="req-asterisk">*</span></label><input id={`${id}-name`} className="input" value={orgName} onChange={e => setOrgName(e.target.value)} placeholder="z. B. Förderverein Musterstadt" required /></div>
+              <div className="field"><label htmlFor={`${id}-cashier`}>Verantwortliche Person <span className="setup-optional">Optional</span></label><input id={`${id}-cashier`} className="input" value={cashier} onChange={e => setCashier(e.target.value)} placeholder="Vor- und Nachname" /><span className="helper">Zum Beispiel Kassiererin, Kassier oder Nutzer.</span></div>
             </div>
-        )
-    }
-
-    function MiniTablePreview() {
-        const demoRows = [
-            { a: '11 Sep 2025', b: 'Mitgliedsbeitrag', g: '+ 50,00 €' },
-            { a: '12 Sep 2025', b: 'Material', g: '− 12,90 €' },
-        ]
-        const density = journalRowDensity === 'compact' ? 4 : 8
-        // Preview should mirror the real table behavior:
-        // 'both' means zebra background AND separator lines
-        const zebra = journalRowStyle === 'zebra' || journalRowStyle === 'both'
-        const lines = journalRowStyle === 'lines' || journalRowStyle === 'both'
-        return (
-            <div className="card" style={{ padding: 10 }}>
-                <div className="helper">Vorschau Buchungen</div>
-                <table cellPadding={6} style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0 }}>
-                    <thead>
-                        <tr>
-                            <th align="left" style={{ borderBottom: lines ? '1px solid var(--border)' : '0', padding: `${density}px 8px` }}>Datum</th>
-                            <th align="left" style={{ borderBottom: lines ? '1px solid var(--border)' : '0', padding: `${density}px 8px` }}>Beschreibung</th>
-                            <th align="right" style={{ borderBottom: lines ? '1px solid var(--border)' : '0', padding: `${density}px 8px` }}>Brutto</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {demoRows.map((r, i) => (
-                            <tr key={i} style={{ background: zebra && i % 2 === 1 ? 'var(--table-row-alt)' : undefined }}>
-                                <td style={{ padding: `${density}px 8px`, borderBottom: lines ? '1px solid var(--border)' : '0' }}>{r.a}</td>
-                                <td style={{ padding: `${density}px 8px`, borderBottom: lines ? '1px solid var(--border)' : '0' }}>{r.b}</td>
-                                <td style={{ padding: `${density}px 8px`, borderBottom: lines ? '1px solid var(--border)' : '0' }} align="right">{r.g}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        )
-    }
-
-    // Load backup dir when entering the backup step
-    useEffect(() => {
-        let alive = true
-        if (step === 6) {
-            (async () => {
-                try {
-                    const res = await (window as any).api?.backup?.getDir?.()
-                    if (alive && res?.ok) setBackupDir(String(res.dir || ''))
-                } catch {}
-                try {
-                    const m = await (window as any).api?.settings?.get?.({ key: 'backup.auto' })
-                    const v = String((m?.value as any) || 'PROMPT').toUpperCase()
-                    if (alive) setBackupMode((['SILENT','PROMPT','OFF'] as const).includes(v as any) ? (v as any) : 'PROMPT')
-                } catch {}
-                try {
-                    const i = await (window as any).api?.settings?.get?.({ key: 'backup.intervalDays' })
-                    const n = Number((i?.value as any) ?? 7)
-                    if (alive) setBackupIntervalDays(Number.isFinite(n) && n > 0 ? n : 7)
-                } catch {}
-            })()
-        }
-        return () => { alive = false }
-    }, [step])
-
-    async function chooseBackupDir() {
-        try {
-            const res = await (window as any).api?.backup?.setDir?.()
-            if (res?.ok) {
-                setBackupDir(String(res.dir || ''))
-                const moved = Number(res.moved || 0)
-                setBackupMsg(moved > 0 ? `${moved} vorhandene Sicherung(en) übernommen.` : 'Sicherungsordner aktualisiert.')
-                notify('success', moved > 0 ? `Backup-Ordner gesetzt – ${moved} Datei(en) übernommen.` : 'Backup-Ordner gesetzt.')
-            } else if (res?.error) {
-                notify('error', String(res.error))
-            }
-        } catch (e: any) { notify('error', e?.message || String(e)) }
-    }
-    async function useDefaultBackupDir() {
-        try {
-            const res = await (window as any).api?.backup?.resetDir?.()
-            if (res?.ok) {
-                setBackupDir(String(res.dir || ''))
-                const moved = Number(res.moved || 0)
-                setBackupMsg(moved > 0 ? `${moved} vorhandene Sicherung(en) übernommen.` : 'Standardordner aktiv.')
-                notify('success', moved > 0 ? `Standardordner aktiv – ${moved} Datei(en) übernommen.` : 'Backup auf Standardordner zurückgesetzt.')
-            } else if (res?.error) {
-                notify('error', String(res.error))
-            }
-        } catch (e: any) { notify('error', e?.message || String(e)) }
-    }
-
-    const formatSummaryValue = (value: string | null | undefined) => {
-        const text = String(value || '').trim()
-        return text || 'Nicht gesetzt'
-    }
-
-    function renderStep() {
-        if (step === 0) {
-            return (
-                <div className="card" style={{ padding: 12 }}>
-                    <div className="helper">Willkommen! Dieses kurze Setup richtet die wichtigsten Dinge ein. Du kannst jederzeit abbrechen und später in den Einstellungen alles ändern.</div>
-                    <ul style={{ margin: '8px 0 0 18px', display: 'grid', gap: 6 }}>
-                        <li>Organisation: Name und Kassier/Nutzer</li>
-                        <li>Darstellung: Menü, Farben, Hintergrund, Glaseffekt und Datumsformat</li>
-                        <li>Workflow: Buchungsreiter, eigenes Buchungsfenster, Speichern-Verhalten und Storno/Löschen</li>
-                        <li>Buchungsansicht: Plus oder klassisch wählen; Spalten und Zeilenlayout für die klassische Tabelle anpassen</li>
-                        <li>Tags und Backups: Startwerte und Sicherungsmodus</li>
-                    </ul>
-                </div>
-            )
-        }
-        if (step === 1) {
-            return (
-                <div className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
-                    <div className="helper">Diese Angaben erscheinen z. B. in der Titelleiste und in Exporten.</div>
-                    <div className="row">
-                        <div className="field" style={{ minWidth: 260 }}>
-                            <label>Organisationsname</label>
-                            <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="z. B. Sportverein Musterstadt e.V." />
-                        </div>
-                        <div className="field" style={{ minWidth: 220 }}>
-                            <label>Kassier / Nutzer</label>
-                            <input className="input" value={cashier} onChange={(e) => setCashier(e.target.value)} placeholder="z. B. Max Mustermann" />
-                        </div>
-                    </div>
-                </div>
-            )
-        }
-        if (step === 2) {
-            return (
-                <div className="card setup-appearance-card">
-                    {/* Row 1: Binary toggles */}
-                    <div className="setup-toggle-row">
-                        <div className="setup-field">
-                            <label>Menü-Layout</label>
-                            <ToggleButtons
-                                value={navLayout}
-                                onChange={setNavLayout}
-                                options={[
-                                    { value: 'left', label: 'Links', icon: '' },
-                                    { value: 'top', label: 'Oben', icon: '' }
-                                ]}
-                            />
-                        </div>
-                        <div className="setup-field">
-                            <label>Menü-Icons</label>
-                            <ToggleButtons
-                                value={navIconColorMode}
-                                onChange={setNavIconColorMode}
-                                options={[
-                                    { value: 'mono', label: 'Mono', icon: '' },
-                                    { value: 'color', label: 'Farbig', icon: '' }
-                                ]}
-                            />
-                        </div>
-                        <div className="setup-field">
-                            <label>Datumsformat</label>
-                            <ToggleButtons
-                                value={dateFmt}
-                                onChange={setDateFmt}
-                                options={DATE_FORMAT_OPTIONS.map((option) => ({ value: option.id, label: option.label }))}
-                            />
-                        </div>
-                        <div className="setup-field">
-                            <label>Glaseffekt</label>
-                            <ToggleButtons
-                                value={glassModals ? 'on' : 'off'}
-                                onChange={(value) => setGlassModals(value === 'on')}
-                                options={[
-                                    { value: 'off', label: 'Aus' },
-                                    { value: 'on', label: 'Ein' }
-                                ]}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Row 2: Theme selection */}
-                    <div className="setup-section">
-                        <label>Farb-Theme</label>
-                        <div className="theme-picker">
-                            {COLOR_THEME_OPTIONS.map(t => (
-                                <button
-                                    key={t.id}
-                                    type="button"
-                                    className={`theme-chip ${colorTheme === t.id ? 'active' : ''}`}
-                                    onClick={() => setColorTheme(t.id)}
-                                    data-theme={t.id}
-                                >
-                                    <span className="theme-swatch" data-theme={t.id} />
-                                    <span>{t.name}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Row 3: Background image */}
-                    <div className="setup-section">
-                        <label>Hintergrundbild</label>
-                        <div className="background-picker">
-                            {BACKGROUND_IMAGE_OPTIONS.map(bg => (
-                                <button
-                                    key={bg.id}
-                                    type="button"
-                                    className={`background-chip ${backgroundImage === bg.id ? 'active' : ''}`}
-                                    onClick={() => {
-                                        if (bg.id !== 'custom') {
-                                            setBackgroundImage(bg.id)
-                                            return
-                                        }
-                                        // Custom: if we already have an image, just select; otherwise open picker
-                                        if (customBackgroundImage) {
-                                            setBackgroundImage('custom')
-                                        } else {
-                                            openCustomBgPicker()
-                                        }
-                                    }}
-                                >
-                                    {bg.id === 'custom' ? (
-                                        <span
-                                            className={`background-preview bg-custom${customBackgroundImage ? '' : ' custom-bg-preview--empty'}`}
-                                            style={customBackgroundImage ? { backgroundImage: `url(${customBackgroundImage})` } : undefined}
-                                        >
-                                            {!customBackgroundImage ? '+' : null}
-                                        </span>
-                                    ) : (
-                                        <span className={`background-preview bg-${bg.id}`} />
-                                    )}
-                                    <span>{bg.compactName}</span>
-                                </button>
-                            ))}
-                        </div>
-
-                        <input
-                            ref={customBgInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="sr-only"
-                            onChange={(e) => {
-                                const f = e.target.files?.[0]
-                                e.target.value = ''
-                                if (f) void handleCustomBgUpload(f)
-                            }}
-                        />
-
-                        {(backgroundImage === 'custom' || !!customBackgroundImage) && (
-                            <div className="custom-bg-controls">
-                                <div className="custom-bg-row">
-                                    <div
-                                        className={`custom-bg-preview ${customBackgroundImage ? '' : 'custom-bg-preview--empty'}`}
-                                        style={customBackgroundImage ? { backgroundImage: `url(${customBackgroundImage})` } : undefined}
-                                        aria-label={customBackgroundImage ? 'Eigenes Hintergrundbild' : 'Kein eigenes Hintergrundbild'}
-                                    />
-                                    <div className="custom-bg-actions">
-                                        <button className="btn" type="button" onClick={openCustomBgPicker} disabled={isCustomBgProcessing}>
-                                            {customBackgroundImage ? 'Bild ersetzen…' : 'Bild auswählen…'}
-                                        </button>
-                                        <button className="btn danger" type="button" onClick={handleRemoveCustomBg} disabled={!customBackgroundImage || isCustomBgProcessing}>
-                                            Entfernen
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="helper">
-                                    {isCustomBgProcessing ? 'Bild wird verarbeitet…' : 'Tipp: Große Fotos werden automatisch komprimiert.'}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Preview row */}
-                    <div className="setup-preview-row">
-                        <MiniNavPreview />
-                        {bookingView === 'classic' && <MiniTablePreview />}
-                    </div>
-                </div>
-            )
-        }
-        if (step === 3) {
-            return (
-                <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
-                    <div className="helper">Lege fest, wie sich das Buchungsfenster im Alltag verhält.</div>
-                    <div className="settings-layout-grid settings-layout-grid--wide">
-                        <label className="settings-toggle-card" htmlFor="setup-booking-draft-tabs">
-                            <span className="settings-toggle-card__copy">
-                                <strong>Buchungsreiter</strong>
-                                <span>
-                                    {bookingEntryPresentation === 'flyout'
-                                        ? 'Flyouts parken, über Reiter wieder öffnen und mit + Buchung parallel weiterarbeiten.'
-                                        : 'Mehrere offene Buchungsentwürfe im Hauptfenster halten.'}
-                                </span>
-                            </span>
-                            <input
-                                id="setup-booking-draft-tabs"
-                                role="switch"
-                                aria-checked={showBookingDraftTabs}
-                                className="toggle"
-                                type="checkbox"
-                                checked={showBookingDraftTabs}
-                                onChange={(e) => setShowBookingDraftTabs(e.target.checked)}
-                            />
-                        </label>
-                        <label className={`settings-toggle-card ${!allowVoucherDeletion ? 'is-disabled' : ''}`} htmlFor="setup-booking-edit-tabs">
-                            <span className="settings-toggle-card__copy">
-                                <strong>Bearbeitungen als Reiter</strong>
-                                <span>{allowVoucherDeletion ? 'Mehrere geöffnete Bearbeitungen als eigene Reiter halten.' : 'Verfügbar, wenn endgültiges Löschen erlaubt ist.'}</span>
-                            </span>
-                            <input
-                                id="setup-booking-edit-tabs"
-                                role="switch"
-                                aria-checked={allowVoucherDeletion && showBookingEditTabs}
-                                className="toggle"
-                                type="checkbox"
-                                checked={allowVoucherDeletion && showBookingEditTabs}
-                                disabled={!allowVoucherDeletion}
-                                onChange={(e) => setShowBookingEditTabs(e.target.checked)}
-                            />
-                        </label>
-                        <div className="settings-layout-control settings-booking-presentation">
-                            <div className="settings-layout-label-row">
-                                <label>Buchungserfassung</label>
-                                <span>Wie neue Buchungen geöffnet werden.</span>
-                            </div>
-                            <div className="btn-group" role="group" aria-label="Darstellung der Buchungserfassung im Setup">
-                                <button type="button" className={`btn-option ${bookingEntryPresentation === 'modal' ? 'active' : ''}`} onClick={() => setBookingEntryPresentation('modal')}>Dialog</button>
-                                <button type="button" className={`btn-option ${bookingEntryPresentation === 'flyout' ? 'active' : ''}`} onClick={() => setBookingEntryPresentation('flyout')}>Kompakt-Flyout</button>
-                                <button type="button" className={`btn-option ${bookingEntryPresentation === 'detached' ? 'active' : ''}`} onClick={() => setBookingEntryPresentation('detached')}>Eigenes Fenster</button>
-                            </div>
-                        </div>
-                        <div className="settings-layout-control">
-                            <div className="settings-layout-label-row">
-                                <label>Nach Speichern</label>
-                                <span>Standardaktion nach einer gespeicherten Buchung.</span>
-                            </div>
-                            <div className="btn-group">
-                                <button type="button" className={`btn-option ${quickAddAfterSave === 'close' ? 'active' : ''}`} onClick={() => setQuickAddAfterSave('close')}>Schließen</button>
-                                <button type="button" className={`btn-option ${quickAddAfterSave === 'new' ? 'active' : ''}`} onClick={() => setQuickAddAfterSave('new')}>Neue Buchung</button>
-                            </div>
-                        </div>
-                        <label className="settings-toggle-card" htmlFor="setup-voucher-delete-mode">
-                            <span className="settings-toggle-card__copy">
-                                <strong>Buchungen endgültig löschen</strong>
-                                <span>Aus nutzt Storno, Ein erlaubt dauerhaftes Entfernen.</span>
-                            </span>
-                            <input
-                                id="setup-voucher-delete-mode"
-                                role="switch"
-                                aria-checked={allowVoucherDeletion}
-                                className="toggle"
-                                type="checkbox"
-                                checked={allowVoucherDeletion}
-                                onChange={(e) => {
-                                    setAllowVoucherDeletion(e.target.checked)
-                                    if (!e.target.checked) setShowBookingEditTabs(false)
-                                }}
-                            />
-                        </label>
-                    </div>
-                </div>
-            )
-        }
-        if (step === 4) {
-            const baseDensity = journalRowDensity === 'compact' ? 4 : 8
-            const density = Math.max(2, Math.round(baseDensity * 0.7)) // etwas kompakter für die Vorschau
-            const zebra = journalRowStyle === 'zebra' || journalRowStyle === 'both'
-            const lines = journalRowStyle === 'lines' || journalRowStyle === 'both'
-            const demoRows = [
-                { actions: '✏️', date: '11 Sep', voucherNo: 'V001', type: 'IN', sphere: 'IDEELL', description: 'Mitgliedsbeitrag', note: '', earmark: '—', budget: '2025', paymentMethod: 'BANK', attachments: '📎', net: '+50,00 €', vat: '0,00 €', gross: '+50,00 €' },
-                { actions: '✏️', date: '12 Sep', voucherNo: 'V002', type: 'OUT', sphere: 'IDEELL', description: 'Material', note: '', earmark: '—', budget: '2025', paymentMethod: 'BANK', attachments: '📎', net: '−12,90 €', vat: '0,00 €', gross: '−12,90 €' }
-            ]
-            const headerLabels: Record<ColKey, string> = {
-                actions: 'Aktionen', date: 'Datum', voucherNo: 'Nr.', type: 'Art', sphere: 'Sphäre', description: 'Beschreibung', note: 'Kommentar', earmark: 'Zw.', budget: 'Budget', paymentMethod: 'Zahlweg', attachments: 'Anh.', net: 'Netto', vat: 'MwSt', gross: 'Brutto'
-            }
-            return (
-                <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
-                    <div className="helper">Wie möchtest du deine Buchungen ansehen? Du kannst die Ansicht später unter Einstellungen → Darstellung → Arbeitsweise wechseln.</div>
+            <p className="setup-note">Diese Angaben erscheinen in der App und in Exporten.</p>
+          </>}
+          {step === 1 && <>
                     <fieldset className="setup-booking-views">
                         <legend>Buchungsansicht wählen</legend>
                         {(['plus', 'classic'] as const).map(view => (
-                            <label key={view} className={`setup-booking-choice${bookingView === view ? ' is-selected' : ''}`}>
-                                <span className="setup-booking-choice__heading"><input type="radio" name="setup-booking-view" value={view} checked={bookingView === view} onChange={() => setBookingView(view)} /><strong>{view === 'plus' ? 'Buchungen Plus' : 'Buchungen klassisch'}</strong></span>
+                            <label key={view} className={`setup-booking-choice${draftView === view ? ' is-selected' : ''}`}>
+                                <span className="setup-booking-choice__heading"><input type="radio" name="setup-booking-view" value={view} checked={draftView === view} onChange={() => setDraftView(view)} /><strong>{view === 'plus' ? 'Buchungen Plus' : 'Buchungen klassisch'}</strong></span>
                                 <span className="setup-booking-choice__description">{view === 'plus' ? 'Kalender, schnelle Filter und Buchungsdetails nebeneinander.' : 'Tabellenübersicht mit frei wählbaren Spalten und Zeilenlayout.'}</span>
-                                <span className={`setup-booking-preview setup-booking-preview--${view}`} aria-hidden="true">
+                                <span className={`setup-booking-preview setup-theme-preview setup-booking-preview--${view}`} data-color-theme={draftTheme} data-theme={previewMode} aria-hidden="true">
                                     {view === 'plus' ? <>
                                         <span className="setup-booking-preview__sidebar"><b>September</b><span className="setup-booking-preview__calendar">{Array.from({ length: 21 }, (_, index) => <span key={index} className={index === 10 ? 'is-selected' : undefined}>{index + 1}</span>)}</span><b>Filter</b><span className="setup-booking-preview__tag">Spende</span></span>
-                                        <span className="setup-booking-preview__list"><b>Buchungen</b><span className="setup-booking-preview__row is-selected"><span>11 Sep<strong>Mitgliedsbeitrag</strong><small>Ideell · Bank</small></span><b>+50,00 €</b></span><span className="setup-booking-preview__row"><span>12 Sep<strong>Material</strong><small>Vereinsbedarf</small></span><b>−12,90 €</b></span></span>
-                                        <span className="setup-booking-preview__details"><b>Details</b><span>Mitgliedsbeitrag</span><strong>+50,00 €</strong><span>Bank</span><span className="setup-booking-preview__tag">Mitgliedschaft</span></span>
-                                    </> : <span className="setup-booking-preview__table"><span><b>Datum</b><b>Beschreibung</b><b>Zahlweg</b><b>Betrag</b></span><span><span>11 Sep</span><span>Mitgliedsbeitrag</span><span>Bank</span><b>+50,00 €</b></span><span><span>12 Sep</span><span>Material</span><span>Bank</span><b>−12,90 €</b></span><span><span>13 Sep</span><span>Spende</span><span>Bank</span><b>+25,00 €</b></span></span>}
+                                        <span className="setup-booking-preview__list"><b>Buchungen</b><span className="setup-booking-preview__row is-selected"><span>11 Sep<strong>Mitgliedsbeitrag</strong><small>Ideell · Bank</small></span><b className="setup-preview-income">+50,00 €</b></span><span className="setup-booking-preview__row"><span>12 Sep<strong>Material</strong><small>Vereinsbedarf</small></span><b className="setup-preview-expense">−12,90 €</b></span></span>
+                                        <span className="setup-booking-preview__details"><b>Details</b><span>Mitgliedsbeitrag</span><strong className="setup-preview-income">+50,00 €</strong><span>Bank</span><span className="setup-booking-preview__tag">Mitgliedschaft</span></span>
+                                    </> : <span className="setup-booking-preview__table"><span><b>Datum</b><b>Beschreibung</b><b>Zahlweg</b><b>Betrag</b></span><span><span>11 Sep</span><span>Mitgliedsbeitrag</span><span>Bank</span><b className="setup-preview-income">+50,00 €</b></span><span><span>12 Sep</span><span>Material</span><span>Bank</span><b className="setup-preview-expense">−12,90 €</b></span><span><span>13 Sep</span><span>Spende</span><span>Bank</span><b className="setup-preview-income">+25,00 €</b></span></span>}
                                 </span>
                             </label>
                         ))}
                     </fieldset>
-                    {bookingView === 'plus' ? <div className="helper">Buchungen Plus ist direkt einsatzbereit. Kalender und Filter grenzen die Liste ein; ein Klick auf eine Buchung zeigt ihre Details. Tags und Budgets lassen sich direkt als Filter anklicken.</div> : <>
-                    <div className="helper">Passe Zeilenhöhe, Zeilenlayout und sichtbare Spalten für Buchungen klassisch an.</div>
-                    <div className="setup-toggle-row">
-                        <div className="setup-field">
-                            <label>Zeilenhöhe</label>
-                            <ToggleButtons
-                                value={journalRowDensity}
-                                onChange={setJournalRowDensity}
-                                options={[
-                                    { value: 'normal', label: 'Normal' },
-                                    { value: 'compact', label: 'Kompakt' }
-                                ]}
-                            />
-                        </div>
-                        <div className="setup-field">
-                            <label>Zeilenlayout</label>
-                            <select className="input" value={journalRowStyle} onChange={(e) => setJournalRowStyle(e.target.value as JournalRowStyle)}>
-                                <option value="both">Linien + Zebra</option>
-                                <option value="lines">Nur Linien</option>
-                                <option value="zebra">Nur Zebra</option>
-                                <option value="none">Ohne</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="field" style={{ minWidth: 300 }}>
-                        <label>Spalten-Preset</label>
-                        <select className="input" value={tablePreset} onChange={(e) => setTablePreset(e.target.value as TablePreset)}>
-                            <option value="standard">Voreinstellung: Standard</option>
-                            <option value="minimal">Voreinstellung: Minimal</option>
-                            <option value="details">Voreinstellung: Details</option>
-                            <option value="custom">Benutzerdefiniert (eigene Auswahl)</option>
-                        </select>
-                        <div className="helper" style={{ marginTop: 6 }}>
-                            {tablePreset === 'standard' && 'Standard: Häufig genutzte Spalten'}
-                            {tablePreset === 'minimal' && 'Minimal: nur Kernspalten'}
-                            {tablePreset === 'details' && 'Details: alle Spalten sichtbar'}
-                            {tablePreset === 'custom' && 'Benutzerdefiniert: unten angepasst'}
-                        </div>
-                    </div>
-                    <button className="btn ghost hover-highlight" style={{ justifySelf: 'flex-start' }} onClick={() => setShowAdvanced(s => !s)}>Erweitert: Spalten individuell {showAdvanced ? 'ausblenden' : 'anpassen'}</button>
-                    {showAdvanced && (
-                        <div className="card" style={{ padding: 10, display: 'grid', gap: 8 }}>
-                            <div className="helper">Sichtbarkeit & Reihenfolge (Pflichtspalten sind fixiert)</div>
-                            <div style={{ display: 'grid', gap: 6 }}>
-                                {colsOrder.map(key => (
-                                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
-                                            <input type="checkbox" disabled={mandatoryCols.includes(key)} checked={!!colsVisible[key]} onChange={() => toggleCol(key)} /> {headerLabels[key]} {mandatoryCols.includes(key) && <span className="helper" style={{ fontSize: 11 }}>(Pflicht)</span>}
-                                        </label>
-                                        <div style={{ display: 'flex', gap: 4 }}>
-                                            <button className="btn ghost hover-highlight" style={{ padding: '2px 6px' }} disabled={colsOrder.indexOf(key) === 0} onClick={() => moveCol(key, -1)}>↑</button>
-                                            <button className="btn ghost hover-highlight" style={{ padding: '2px 6px' }} disabled={colsOrder.indexOf(key) === colsOrder.length - 1} onClick={() => moveCol(key, 1)}>↓</button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    <div className="card" style={{ padding: 10 }}>
-                        <div className="helper">Vorschau: Buchungen klassisch</div>
-                        <div style={{ overflowX: 'auto' }}>
-                            <table cellPadding={4} style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, minWidth:  colsOrder.length * 80, fontSize: 12 }}>
-                                <thead>
-                                    <tr>
-                                        {colsOrder.filter(c => colsVisible[c]).map(col => (
-                                            <th key={col} align={['net','vat','gross'].includes(col) ? 'right' : col === 'attachments' ? 'center' : 'left'} style={{ borderBottom: lines ? '1px solid var(--border)' : '0', padding: `${density}px 6px` }}>{headerLabels[col]}</th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {demoRows.map((r, i) => (
-                                        <tr key={i} style={{ background: zebra && i % 2 === 1 ? 'var(--table-row-alt)' : undefined }}>
-                                            {colsOrder.filter(c => colsVisible[c]).map(col => (
-                                                <td key={col} align={['net','vat','gross'].includes(col) ? 'right' : col === 'attachments' ? 'center' : 'left'} style={{ padding: `${density}px 6px`, borderBottom: lines ? '1px solid var(--border)' : '0' }}>{(r as any)[col]}</td>
-                                            ))}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    </>}
-                </div>
-            )
-        }
-        if (step === 5) {
-            const all = suggestedTags
-            return (
-                <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
-                    <div className="helper">Wähle häufige Stichwörter. Du kannst später jederzeit weitere Tags anlegen.</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                        {all.map(t => (
-                            <label key={t.name} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                                <input type="checkbox" checked={!!selectedTags[t.name]} onChange={(e) => setSelectedTags({ ...selectedTags, [t.name]: e.currentTarget.checked })} />
-                                <span style={{ width: 12, height: 12, borderRadius: 4, background: t.color || 'var(--border)' }} aria-hidden />
-                                <span>{t.name}</span>
-                                {existingSet.has(t.name.toLowerCase()) && <span className="helper">(vorhanden)</span>}
-                            </label>
-                        ))}
-                    </div>
-                    <div className="row">
-                        <div className="field" style={{ minWidth: 260 }}>
-                            <label>Eigener Tag</label>
-                            <div style={{ display: 'flex', gap: 8 }}>
-                                <input className="input" value={customTag} onChange={(e) => setCustomTag(e.target.value)} placeholder="z. B. Projekt ABC" />
-                                <button className="btn hover-highlight" onClick={() => { const v = customTag.trim(); if (v) { setCustomTags([...customTags, v]); setCustomTag('') } }}>Hinzufügen</button>
-                            </div>
-                        </div>
-                    </div>
-                    {customTags.length > 0 && (
-                        <div className="helper">Eigene Tags: {customTags.join(', ')}</div>
-                    )}
-                </div>
-            )
-        }
-    // step === 6 Backup
-    return (
-            <div className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
-                <div className="helper">Sicherungen enthalten u. a. die Datenbank (.sqlite) und werden im gewählten Ordner abgelegt. Beim Ordnerwechsel werden vorhandene .sqlite-Backups automatisch übernommen.</div>
-                <div className="setup-summary-grid">
-                    <div><span>Organisation</span><strong>{formatSummaryValue(orgName)}</strong></div>
-                    <div><span>Darstellung</span><strong>{COLOR_THEME_OPTIONS.find((theme) => theme.id === colorTheme)?.name || colorTheme}</strong></div>
-                    <div><span>Buchungserfassung</span><strong>{{ modal: 'Dialog', flyout: 'Kompakt-Flyout', detached: 'Eigenes Fenster' }[bookingEntryPresentation]}</strong></div>
-                    <div><span>Buchungsansicht</span><strong>{bookingView === 'plus' ? 'Buchungen Plus' : 'Buchungen klassisch'}</strong></div>
-                    <div><span>Nach Speichern</span><strong>{quickAddAfterSave === 'new' ? 'Neue Buchung' : 'Schließen'}</strong></div>
-                </div>
-                <div className="row">
-                    <div className="field" style={{ minWidth: 420 }}>
-                        <label>Aktueller Sicherungsordner</label>
-                        <input className="input" value={backupDir} readOnly />
-                        {backupMsg && <div className="helper">{backupMsg}</div>}
-                    </div>
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button className="btn hover-highlight" onClick={chooseBackupDir}>Ordner wählen…</button>
-                    <button className="btn ghost hover-highlight" onClick={useDefaultBackupDir}>Standard verwenden</button>
-                    <button className="btn ghost hover-highlight" onClick={async() => { try { await (window as any).api?.backup?.openFolder?.() } catch {} }}>Ordner öffnen</button>
-                </div>
-                <div className="row">
-                    <div className="field" style={{ minWidth: 260 }}>
-                        <label>Sicherungsmodus</label>
-                        <div style={{ display: 'grid', gap: 6 }}>
-                            <label className="chip" style={{ cursor: 'pointer' }}>
-                                <input type="radio" name="backupMode" checked={backupMode === 'SILENT'} onChange={() => setBackupMode('SILENT')} /> Automatisch im Hintergrund
-                            </label>
-                            <label className="chip" style={{ cursor: 'pointer' }}>
-                                <input type="radio" name="backupMode" checked={backupMode === 'PROMPT'} onChange={() => setBackupMode('PROMPT')} /> Nachfragen (Hinweis anzeigen)
-                            </label>
-                            <label className="chip" style={{ cursor: 'pointer' }}>
-                                <input type="radio" name="backupMode" checked={backupMode === 'OFF'} onChange={() => setBackupMode('OFF')} /> Aus
-                            </label>
-                        </div>
-                    </div>
-                    <div className="field" style={{ minWidth: 220 }}>
-                        <label>Intervall</label>
-                        <select className="input" value={backupIntervalDays} onChange={(e) => setBackupIntervalDays(Number(e.target.value))} disabled={backupMode === 'OFF'}>
-                            {[1,3,7,14,30].map(d => <option key={d} value={d}>{d} Tag{d>1?'e':''}</option>)}
-                        </select>
-                        <div className="helper">Wie oft überprüft wird, ob eine Sicherung fällig ist.</div>
-                    </div>
-                </div>
-                <div className="helper">Empfehlung: Lege den Ordner in einem Cloud-Sync-Verzeichnis (z. B. OneDrive) ab, damit Backups zusätzlich gesichert sind.</div>
-            </div>
-        )
-    }
 
-    return (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => { /* avoid closing by overlay */ }}>
-            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(1400px, 92vw)', display: 'grid', gap: 12 }}>
-                <Header />
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    {setupSteps.map((label, i) => (
-                        <div key={label} title={label} style={{ width: 26, height: 6, borderRadius: 4, background: i <= step ? 'var(--accent)' : 'var(--border)' }} />
-                    ))}
-                </div>
-                {renderStep()}
-                <div style={{ display: 'flex', justifyContent: step > 0 ? 'space-between' : 'flex-end', gap: 8 }}>
-                    {step > 0 && (
-                            <button className="btn hover-highlight" disabled={isSaving} onClick={() => setStep(s => Math.max(0, s - 1))}>Zurück</button>
-                    )}
-                    {step < LAST_STEP ? (
-                        <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn hover-highlight" disabled={isSaving} onClick={() => setStep(s => Math.min(LAST_STEP, s + 1))}>Weiter</button>
-                            <button className="btn ghost hover-highlight" disabled={isSaving} onClick={onClose}>Später</button>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn ghost hover-highlight" disabled={isSaving} onClick={onClose}>Später</button>
-                            <button className="btn primary hover-highlight" disabled={isSaving} onClick={() => finish(true)}>{isSaving ? 'Speichere...' : 'Fertig'}</button>
-                        </div>
-                    )}
-                </div>
+            <details className="setup-optional-section"><summary>Farbschema anpassen <span>{COLOR_THEME_OPTIONS.find(theme => theme.id === draftTheme)?.name}</span></summary><div className="setup-theme-options">{COLOR_THEME_OPTIONS.map(theme => <button key={theme.id} type="button" className={`theme-chip${draftTheme === theme.id ? ' active' : ''}`} aria-pressed={draftTheme === theme.id} onClick={() => setDraftTheme(theme.id)}><span className="theme-swatch" data-theme={theme.id} aria-hidden="true" />{theme.name}</button>)}</div><p className="setup-note">Die Buchungsvorschauen zeigen dein gewähltes Farbschema. Die App übernimmt es erst beim Abschluss.</p></details>
+            <p className="setup-note">Spalten, Darstellung und Buchungsabläufe passt du später unter Einstellungen an.</p>
+          </>}
+          {step === 2 && <>
+            <div className="setup-backup-options" role="radiogroup" aria-label="Sicherungsmodus">{BACKUP_MODES.map(mode => <label key={mode.value} className={`setup-backup-choice${backupMode === mode.value ? ' is-selected' : ''}`}><input type="radio" name={`${id}-backup`} value={mode.value} checked={backupMode === mode.value} onChange={() => setBackupMode(mode.value)} /><span><strong>{mode.title}</strong><small>{mode.description}</small></span></label>)}</div>
+            <div className="setup-backup-fields"><div className="field"><label htmlFor={`${id}-dir`}><IconFolder size={15} aria-hidden="true" /> Sicherungsordner</label><input id={`${id}-dir`} className="input" value={chosenDir || backupDir} readOnly title={chosenDir || backupDir} /><div className="setup-folder-actions"><button type="button" className="btn" onClick={() => void chooseDirectory()}>Ordner wählen…</button>{chosenDir && <button type="button" className="btn ghost" onClick={() => setChosenDir(null)}>Auswahl zurücksetzen</button>}</div><span className="helper">{chosenDir ? 'Wird erst beim Abschluss übernommen. Vorhandene Sicherungen werden dann kopiert.' : 'Dieser Ordner wird auch für manuell gestartete Sicherungen verwendet.'}</span></div>
+              {backupMode !== 'OFF' && <div className="field"><label htmlFor={`${id}-interval`}>Intervall</label><select id={`${id}-interval`} className="input" value={intervalDays} onChange={e => setIntervalDays(Number(e.target.value))}>{Array.from(new Set([1, 3, 7, 14, 30, intervalDays])).sort((a, b) => a - b).map(days => <option key={days} value={days}>{days === 1 ? 'Täglich' : `Alle ${days} Tage`}</option>)}</select><span className="helper">Wird geprüft, während VereinO läuft.</span></div>}
             </div>
-        </div>
-    )
+            <p className="setup-note"><IconInfoCircle size={16} aria-hidden="true" />Ein anderes Laufwerk oder ein synchronisierter Ordner schützt zusätzlich bei einem Geräteausfall.</p>
+          </>}
+          {step === 3 && <>
+            <dl className="setup-review"><div><dt>Organisation</dt><dd>{orgName}</dd></div><div><dt>Buchungsansicht</dt><dd>{draftView === 'plus' ? 'Buchungen Plus' : 'Buchungen klassisch'}</dd></div><div><dt>Farbschema</dt><dd>{COLOR_THEME_OPTIONS.find(theme => theme.id === draftTheme)?.name}</dd></div><div><dt>Datensicherung</dt><dd>{BACKUP_MODES.find(mode => mode.value === backupMode)?.title}{backupMode !== 'OFF' && ` · ${intervalDays === 1 ? 'täglich' : `alle ${intervalDays} Tage`}`}</dd></div><div className="setup-review-wide"><dt>Sicherungsordner</dt><dd>{chosenDir || backupDir}</dd></div></dl>
+            <details className="setup-optional-section"><summary><IconTags size={17} aria-hidden="true" />Starter-Tags hinzufügen <span>{tagNames.length ? `${tagNames.length} ausgewählt` : 'Optional'}</span></summary><p className="setup-note">Tags helfen dir, Buchungen später wiederzufinden. Wähle nur, was du brauchst.</p><div className="setup-tag-options">{suggestions.map(tag => <label key={tag.name}><input type="checkbox" disabled={existingSet.has(tag.name.toLocaleLowerCase('de'))} checked={existingSet.has(tag.name.toLocaleLowerCase('de')) || selectedTags.includes(tag.name)} onChange={e => setSelectedTags(names => e.target.checked ? [...names, tag.name] : names.filter(name => name !== tag.name))} /><span>{tag.name}{existingSet.has(tag.name.toLocaleLowerCase('de')) && ' (vorhanden)'}</span></label>)}</div><div className="setup-custom-tag"><label htmlFor={`${id}-tag`}>Eigener Tag</label><div><input id={`${id}-tag`} className="input" value={customTag} onChange={e => setCustomTag(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomTag() } }} placeholder="z. B. Sommerfest" /><button type="button" className="btn" disabled={!customTag.trim()} onClick={addCustomTag}>Hinzufügen</button></div></div>{customTags.length > 0 && <div className="setup-tag-options">{customTags.map(name => <button type="button" key={name} className="btn" aria-label={`Tag ${name} entfernen`} onClick={() => setCustomTags(tags => tags.filter(tag => tag !== name))}>{name} ×</button>)}</div>}</details>
+            <p className="setup-note">Weitere Optionen für Darstellung und Arbeitsweise findest du jederzeit in den Einstellungen.</p>
+          </>}
+        </fieldset>}
+        {error && <div className="setup-error" role="alert">{error}{saveStarted && <p>Die Einrichtung ist noch nicht abgeschlossen. Bereits gespeicherte Angaben bleiben erhalten. Du kannst den Abschluss erneut versuchen.</p>}</div>}
+      </div>
+      <footer className="setup-wizard-footer"><button type="button" className="btn ghost" onClick={onClose} disabled={saving || pickingDir}>{saveStarted ? 'Schließen' : 'Später einrichten'}</button><div><span className="setup-step-count">Schritt {step + 1} von {STEPS.length}</span>{step > 0 && <button type="button" className="btn" onClick={() => changeStep(step - 1)} disabled={saving || pickingDir}><IconArrowLeft size={16} aria-hidden="true" />Zurück</button>}{step < STEPS.length - 1 ? <button type="button" className="btn primary" disabled={loading || !!loadError || pickingDir} onClick={() => changeStep(step + 1)}>Weiter<IconArrowRight size={16} aria-hidden="true" /></button> : <button type="button" className="btn primary" disabled={saving || pickingDir} onClick={() => void finish()}>{saving ? 'Wird eingerichtet …' : 'VereinO starten'}{!saving && <IconArrowRight size={16} aria-hidden="true" />}</button>}</div></footer>
+    </div>
+  </div>, document.body)
 }

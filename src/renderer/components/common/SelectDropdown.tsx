@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 export type SelectDropdownOption = {
   value: string
   label: string
+  icon?: React.ReactNode
   description?: string
   color?: string
   disabled?: boolean
@@ -129,7 +130,7 @@ export default function SelectDropdown({ value, options, onChange, id, ariaLabel
           style={selected?.color ? { color: selected.color } : undefined}
           title={selected?.description || selected?.label || placeholder}
         >
-          {selected?.label || placeholder}
+          {selected?.icon}{selected?.label || placeholder}
         </span>
         <span className="select-dropdown__chevron" aria-hidden="true" />
       </button>
@@ -146,7 +147,7 @@ export default function SelectDropdown({ value, options, onChange, id, ariaLabel
               title={option.description || option.label}
               onClick={() => choose(option.value)}
             >
-              <span style={option.color ? { color: option.color } : undefined}><strong>{option.label}</strong>{option.description ? <small>{option.description}</small> : null}</span>
+              <span style={option.color ? { color: option.color } : undefined}><strong>{option.icon}{option.label}</strong>{option.description ? <small>{option.description}</small> : null}</span>
             </button>
           ))}
         </div>,

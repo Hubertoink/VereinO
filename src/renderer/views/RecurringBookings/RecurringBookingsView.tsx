@@ -1,3 +1,4 @@
+import CategoryIcon from '../../components/common/CategoryIcon'
 import ResponsiveSearch from '../../components/common/ResponsiveSearch'
 import ModalHeader from '../../components/ModalHeader'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
@@ -347,7 +348,7 @@ function RecurringBookingModal({
                   {isGeneralProfile ? <SelectDropdown id="recurring-sphere" value={String(draft.primaryClassificationValueId ?? '')} placeholder="Kategorie wählen" onChange={(value) => {
                     const category = categories.find((entry) => entry.id === Number(value))
                     setDraft({ ...draft, primaryClassificationValueId: value ? Number(value) : null, primaryClassificationName: category?.name || null, primaryClassificationColor: category?.color || null, primaryClassificationIcon: category?.icon || null })
-                  }} ariaLabel="Kategorie der Dauerbuchung" options={categories.map((category) => ({ value: String(category.id), label: `${category.icon ? `${category.icon} ` : ''}${category.name}`, color: category.color || undefined }))} /> : <SelectDropdown id="recurring-sphere" value={draft.sphere} onChange={(value) => setDraft({ ...draft, sphere: value as Sphere })} ariaLabel="Bereich der Dauerbuchung" options={Object.entries(SPHERE_LABELS).map(([value, label]) => ({ value, label }))} />}
+                  }} ariaLabel="Kategorie der Dauerbuchung" options={categories.map((category) => ({ value: String(category.id), label: category.name, icon: <CategoryIcon value={category.icon} />, color: category.color || undefined }))} /> : <SelectDropdown id="recurring-sphere" value={draft.sphere} onChange={(value) => setDraft({ ...draft, sphere: value as Sphere })} ariaLabel="Bereich der Dauerbuchung" options={Object.entries(SPHERE_LABELS).map(([value, label]) => ({ value, label }))} />}
                 </div>
                 <div className="field booking-floating-field booking-floating-field--filled">
                   <label htmlFor="recurring-account">Konto</label>
@@ -613,7 +614,7 @@ export default function RecurringBookingsView({ notify, initialTask }: { notify:
                 <tr key={row.id} className={row.dueCount > 0 ? 'recurring-row-due' : undefined}>
                   <td>
                     <strong>{row.name}</strong>
-                    <small>{[row.counterparty, row.primaryClassificationName ? `${row.primaryClassificationIcon ? `${row.primaryClassificationIcon} ` : ''}${row.primaryClassificationName}` : SPHERE_LABELS[row.sphere], row.budgetLabel, row.earmarkLabel].filter(Boolean).join(' · ') || row.description || '—'}</small>
+                    <small>{[row.counterparty, row.primaryClassificationName ? row.primaryClassificationName : SPHERE_LABELS[row.sphere], row.budgetLabel, row.earmarkLabel].filter(Boolean).join(' · ') || row.description || '—'}</small>
                   </td>
                   <td>{FREQUENCY_LABELS[row.frequency]}</td>
                   <td>
@@ -700,7 +701,7 @@ export default function RecurringBookingsView({ notify, initialTask }: { notify:
             <div className="recurring-book-summary">
               <label className="field"><span>Buchungsdatum</span><span className="booking-date-input-wrap"><input ref={bookingDateInputRef} className="input" type="date" value={bookingDate} onChange={(event) => setBookingDate(event.target.value)} /><DatePickerButton inputRef={bookingDateInputRef} ariaLabel="Kalender zur Auswahl des Buchungsdatums öffnen" /></span></label>
               <label className="field"><span>{booking.amountMode === 'NET' ? 'Nettobetrag' : 'Bruttobetrag'} (€)</span><input className="input" type="number" min="0.01" step="0.01" value={bookingAmount} onChange={(event) => setBookingAmount(Number(event.target.value || 0))} /></label>
-              <div className="card recurring-book-preview"><span>{booking.type === 'IN' ? 'Einnahme' : 'Ausgabe'} · {booking.primaryClassificationName ? `${booking.primaryClassificationIcon ? `${booking.primaryClassificationIcon} ` : ''}${booking.primaryClassificationName}` : SPHERE_LABELS[booking.sphere]}</span><strong>{eurFmt.format(bookingAmount || 0)}</strong></div>
+              <div className="card recurring-book-preview"><span>{booking.type === 'IN' ? 'Einnahme' : 'Ausgabe'} · {booking.primaryClassificationName ? booking.primaryClassificationName : SPHERE_LABELS[booking.sphere]}</span><strong>{eurFmt.format(bookingAmount || 0)}</strong></div>
             </div>
             <div className="modal-footer"><div className="helper">{booking.suggestedVoucherId ? `Hinweis: ${booking.suggestedVoucherNo || 'Eine bestehende Buchung'} wurde als möglicher Treffer erkannt. Eine neue Buchung kann eine Doppelung erzeugen.` : 'Es entsteht eine nachvollziehbare Buchung.'}</div><div className="recurring-modal-actions"><button className="btn" onClick={() => setBooking(null)}>Abbrechen</button><button className="btn primary" onClick={() => void confirmBooking()} disabled={actionBusy || !bookingDate || !(bookingAmount > 0)}>{actionBusy ? 'Bucht…' : booking.suggestedVoucherId ? 'Trotzdem buchen' : 'Buchen'}</button></div></div>
           </div>

@@ -1,4 +1,5 @@
 import ModalHeader from '../ModalHeader'
+import { IconUsers } from '@tabler/icons-react'
 import React from 'react'
 import { createPortal } from 'react-dom'
 
@@ -48,7 +49,6 @@ export function PartyEditorModal({ initial, onClose, onSaved }: PartyEditorModal
   const set = <K extends keyof TPartyUpsertInput>(key: K, value: TPartyUpsertInput[K]) => {
     setDraft((current) => ({ ...current, [key]: value }))
   }
-  const floatingClass = (value: unknown, alwaysFilled = false) => `field party-floating-field${alwaysFilled || String(value ?? '').trim() ? ' party-floating-field--filled' : ''}`
 
   const save = async () => {
     if (!draft.name.trim() || busy) {
@@ -96,6 +96,7 @@ export function PartyEditorModal({ initial, onClose, onSaved }: PartyEditorModal
         <ModalHeader
           className="party-editor-modal__header"
           title={<>{initial?.id ? 'Geschäftspartner bearbeiten' : 'Geschäftspartner anlegen'}</>}
+          icon={<IconUsers size={22} />}
           subtitle="Name und Rolle genügen. Weitere Angaben sind optional."
           onClose={onClose}
           closeLabel="Schließen"
@@ -105,40 +106,40 @@ export function PartyEditorModal({ initial, onClose, onSaved }: PartyEditorModal
           <section className="party-editor-section" aria-labelledby="party-editor-master-data">
             <h3 id="party-editor-master-data">Stammdaten</h3>
             <div className="party-editor-grid">
-              <label className={floatingClass(draft.name)}><span>Name *</span><input className="input" value={draft.name} onChange={(e) => set('name', e.target.value)} autoFocus /></label>
-              <label className={floatingClass(draft.role, true)}><span>Rolle</span><select className="input" value={draft.role} onChange={(e) => set('role', e.target.value as TPartyRole)}>{Object.entries(PARTY_ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <label className="field dialog-stacked-field"><span>Name *</span><input className="input" value={draft.name} onChange={(e) => set('name', e.target.value)} autoFocus /></label>
+              <label className="field dialog-stacked-field"><span>Rolle</span><select className="input" value={draft.role} onChange={(e) => set('role', e.target.value as TPartyRole)}>{Object.entries(PARTY_ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             </div>
           </section>
 
           <details className="party-editor-section party-editor-extra">
             <summary>Kontakt & Anschrift</summary>
             <div className="party-editor-grid">
-              <label className={`${floatingClass(draft.legalName)} party-editor-grid__full`}><span>Rechtlicher Name</span><input className="input" value={draft.legalName || ''} onChange={(e) => set('legalName', e.target.value)} /></label>
-              <label className={`${floatingClass(draft.contactName)} party-editor-grid__full`}><span>Ansprechperson</span><input className="input" value={draft.contactName || ''} onChange={(e) => set('contactName', e.target.value)} /></label>
+              <label className={`field dialog-stacked-field party-editor-grid__full`}><span>Rechtlicher Name</span><input className="input" value={draft.legalName || ''} onChange={(e) => set('legalName', e.target.value)} /></label>
+              <label className={`field dialog-stacked-field party-editor-grid__full`}><span>Ansprechperson</span><input className="input" value={draft.contactName || ''} onChange={(e) => set('contactName', e.target.value)} /></label>
 
-              <label className={floatingClass(draft.email)}><span>E-Mail</span><input className="input" type="email" value={draft.email || ''} onChange={(e) => set('email', e.target.value)} /></label>
-              <label className={floatingClass(draft.phone)}><span>Telefon</span><input className="input" value={draft.phone || ''} onChange={(e) => set('phone', e.target.value)} /></label>
-              <label className={`${floatingClass(draft.street)} party-editor-grid__full`}><span>Straße</span><input className="input" value={draft.street || ''} onChange={(e) => set('street', e.target.value)} /></label>
-              <label className={floatingClass(draft.postalCode)}><span>PLZ</span><input className="input" value={draft.postalCode || ''} onChange={(e) => set('postalCode', e.target.value)} /></label>
-              <label className={floatingClass(draft.city)}><span>Ort</span><input className="input" value={draft.city || ''} onChange={(e) => set('city', e.target.value)} /></label>
-              <label className={floatingClass(draft.country, true)}><span>Land</span><input className="input" value={draft.country || ''} onChange={(e) => set('country', e.target.value)} /></label>
+              <label className="field dialog-stacked-field"><span>E-Mail</span><input className="input" type="email" value={draft.email || ''} onChange={(e) => set('email', e.target.value)} /></label>
+              <label className="field dialog-stacked-field"><span>Telefon</span><input className="input" value={draft.phone || ''} onChange={(e) => set('phone', e.target.value)} /></label>
+              <label className={`field dialog-stacked-field party-editor-grid__full`}><span>Straße</span><input className="input" value={draft.street || ''} onChange={(e) => set('street', e.target.value)} /></label>
+              <label className="field dialog-stacked-field"><span>PLZ</span><input className="input" value={draft.postalCode || ''} onChange={(e) => set('postalCode', e.target.value)} /></label>
+              <label className="field dialog-stacked-field"><span>Ort</span><input className="input" value={draft.city || ''} onChange={(e) => set('city', e.target.value)} /></label>
+              <label className="field dialog-stacked-field"><span>Land</span><input className="input" value={draft.country || ''} onChange={(e) => set('country', e.target.value)} /></label>
             </div>
           </details>
 
           <details className="party-editor-section party-editor-extra" open={Boolean(initial?.iban)}>
             <summary>Zahlung & Steuer</summary>
             <div className="party-editor-grid">
-              <label className={floatingClass(draft.iban)}><span>IBAN</span><input className="input" value={draft.iban || ''} onChange={(e) => set('iban', e.target.value)} /></label>
-              <label className={floatingClass(draft.bic)}><span>BIC</span><input className="input" value={draft.bic || ''} onChange={(e) => set('bic', e.target.value)} /></label>
-              <label className={floatingClass(draft.taxNumber)}><span>Steuernummer</span><input className="input" value={draft.taxNumber || ''} onChange={(e) => set('taxNumber', e.target.value)} /></label>
-              <label className={floatingClass(draft.vatId)}><span>USt-IdNr.</span><input className="input" value={draft.vatId || ''} onChange={(e) => set('vatId', e.target.value)} /></label>
-              <label className={floatingClass(draft.paymentTermDays)}><span>Zahlungsziel (Tage)</span><input className="input" type="number" min="0" value={draft.paymentTermDays ?? ''} onChange={(e) => set('paymentTermDays', e.target.value === '' ? null : Number(e.target.value))} /></label>
-              <label className={floatingClass(draft.isActive, true)}><span>Status</span><select className="input" value={draft.isActive === false ? '0' : '1'} onChange={(e) => set('isActive', e.target.value === '1')}><option value="1">Aktiv</option><option value="0">Archiviert</option></select></label>
+              <label className="field dialog-stacked-field"><span>IBAN</span><input className="input" value={draft.iban || ''} onChange={(e) => set('iban', e.target.value)} /></label>
+              <label className="field dialog-stacked-field"><span>BIC</span><input className="input" value={draft.bic || ''} onChange={(e) => set('bic', e.target.value)} /></label>
+              <label className="field dialog-stacked-field"><span>Steuernummer</span><input className="input" value={draft.taxNumber || ''} onChange={(e) => set('taxNumber', e.target.value)} /></label>
+              <label className="field dialog-stacked-field"><span>USt-IdNr.</span><input className="input" value={draft.vatId || ''} onChange={(e) => set('vatId', e.target.value)} /></label>
+              <label className="field dialog-stacked-field"><span>Zahlungsziel (Tage)</span><input className="input" type="number" min="0" value={draft.paymentTermDays ?? ''} onChange={(e) => set('paymentTermDays', e.target.value === '' ? null : Number(e.target.value))} /></label>
+              <label className="field dialog-stacked-field"><span>Status</span><select className="input" value={draft.isActive === false ? '0' : '1'} onChange={(e) => set('isActive', e.target.value === '1')}><option value="1">Aktiv</option><option value="0">Archiviert</option></select></label>
             </div>
           </details>
 
           <details className="party-editor-section party-editor-extra"><summary>Notiz</summary>
-          <label className={`${floatingClass(draft.note)} party-editor-grid__full party-floating-field--textarea`}><span>Notiz</span><textarea className="input" rows={3} value={draft.note || ''} onChange={(e) => set('note', e.target.value)} /></label>
+          <label className={`field dialog-stacked-field party-editor-grid__full party-floating-field--textarea`}><span>Notiz</span><textarea className="input" rows={3} value={draft.note || ''} onChange={(e) => set('note', e.target.value)} /></label>
           </details>
           {error && <div className="helper error-text">{error}</div>}
         </div>

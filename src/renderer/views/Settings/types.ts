@@ -186,16 +186,10 @@ export interface GeneralPaneProps {
   organizationProfile: OrganizationProfile
   navLayout: NavLayout
   setNavLayout: (v: NavLayout) => void
-  sidebarCollapsed: boolean
-  setSidebarCollapsed: (b: boolean) => void
   navIconColorMode: NavIconColorMode
   setNavIconColorMode: (v: NavIconColorMode) => void
   colorTheme: ColorTheme
   setColorTheme: (v: ColorTheme) => void
-  journalRowStyle: JournalRowStyle
-  setJournalRowStyle: (v: JournalRowStyle) => void
-  journalRowDensity: JournalRowDensity
-  setJournalRowDensity: (v: JournalRowDensity) => void
   backgroundImage: BackgroundImage
   setBackgroundImage: (v: BackgroundImage) => void
   backgroundImageVisibility: number
@@ -204,12 +198,7 @@ export interface GeneralPaneProps {
   setCustomBackgroundImage: (v: string | null) => void
   glassModals: boolean
   setGlassModals: (v: boolean) => void
-  dateFmt: DateFmt
-  setDateFmt: (v: DateFmt) => void
-  journalLimit: number
-  setJournalLimit: (n: number) => void
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
-  bumpDataVersion: () => void
   openSetupWizard?: () => void
   visibleNavItems: NavKey[]
   setVisibleNavItems: (v: NavKey[]) => void
@@ -232,6 +221,12 @@ export interface WorkflowPaneProps {
 }
 
 export interface TablePaneProps {
+  journalRowStyle: JournalRowStyle
+  setJournalRowStyle: (v: JournalRowStyle) => void
+  journalRowDensity: JournalRowDensity
+  setJournalRowDensity: (v: JournalRowDensity) => void
+  dateFmt: DateFmt
+  setDateFmt: (v: DateFmt) => void
   cols: Record<ColKey, boolean>
   setCols: (c: Record<ColKey, boolean>) => void
   order: ColKey[]

@@ -161,7 +161,7 @@ export function CandidateEditor({
             <span>{classificationState?.profile === 'GENERAL' ? 'Kategorie' : 'Sphäre'}</span>
             {classificationState?.profile === 'GENERAL' ? <select className="input" disabled={isApproved} value={String(candidate.primaryClassificationValueId ?? '')} onChange={(event) => update('primaryClassificationValueId', (event.target.value ? Number(event.target.value) : null) as TAiBookingCandidate['primaryClassificationValueId'])}>
               <option value="">Kategorie wählen</option>
-              {classificationState.values.map((category) => <option key={category.id} value={category.id}>{category.icon ? `${category.icon} ` : ''}{category.name}</option>)}
+              {classificationState.values.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
             </select> : <select className="input" disabled={isApproved} value={candidate.sphere} onChange={(event) => update('sphere', event.target.value as TAiBookingCandidate['sphere'])}>
               <option value="IDEELL">IDEELL</option><option value="ZWECK">ZWECK</option><option value="VERMOEGEN">VERMÖGEN</option><option value="WGB">WGB</option>
             </select>}

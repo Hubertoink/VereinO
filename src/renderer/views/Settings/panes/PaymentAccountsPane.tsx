@@ -1,8 +1,10 @@
+import { SettingsPageHeader } from '../components/SettingsPageHeader'
 import ModalHeader from '../../../components/ModalHeader'
-import RandomColorButton from '../../../components/common/RandomColorButton'
+import MasterDataDialog, { FieldLabel } from '../../../components/common/MasterDataDialog'
+import ColorField from '../../../components/common/ColorField'
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { IconPencil } from '@tabler/icons-react'
+import { IconPencil, IconPlus, IconUser, IconBuildingBank, IconCreditCard, IconListNumbers, IconCircleDot } from '@tabler/icons-react'
 import { PaymentAccountsPaneProps } from '../types'
 import { IconTrash } from '../../../utils/icons'
 import AppIcon from '../../../components/common/AppIcon'
@@ -25,20 +27,6 @@ const KIND_LABELS: Record<PaymentAccountDraft['kind'], string> = {
   OTHER: 'Sonstiges'
 }
 
-const ACCOUNT_PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
-
-function contrastText(bg?: string | null) {
-  if (!bg) return '#000'
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(bg.trim())
-  if (!m) return '#000'
-  const hex = m[1]
-  const r = parseInt(hex.slice(0, 2), 16)
-  const g = parseInt(hex.slice(2, 4), 16)
-  const b = parseInt(hex.slice(4, 6), 16)
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.6 ? '#000' : '#fff'
-}
-
 function emptyDraft(sortOrder: number): PaymentAccountDraft {
   return {
     name: '',
@@ -54,9 +42,8 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
   const [draft, setDraft] = React.useState<PaymentAccountDraft | null>(null)
   const [busy, setBusy] = React.useState(false)
   const [deleteConfirm, setDeleteConfirm] = React.useState<{ id: number; name: string } | null>(null)
-  const [showColorPicker, setShowColorPicker] = React.useState(false)
-  const [draftColor, setDraftColor] = React.useState('#1976D2')
-  const [draftError, setDraftError] = React.useState('')
+  const [saving, setSaving] = React.useState(false)
+  const fieldId = React.useId()
 
   const sortedAccounts = React.useMemo(
     () => [...paymentAccounts].sort((a, b) => (a.sortOrder - b.sortOrder) || a.name.localeCompare(b.name, 'de')),
@@ -79,24 +66,15 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
     void refresh()
   }, [refresh])
 
-  React.useEffect(() => {
-    if (!draft) return
-    setDraftColor(draft.color || '#1976D2')
-    setDraftError('')
-  }, [draft])
-
-  const closeDraft = () => {
-    setDraft(null)
-    setShowColorPicker(false)
-    setDraftError('')
-  }
+  const closeDraft = () => setDraft(null)
 
   const saveDraft = async () => {
-    if (!draft) return
+    if (!draft || saving) return
     if (!draft.name.trim()) {
       notify('error', 'Bitte gib einen Kontonamen ein.')
       return
     }
+    setSaving(true)
     try {
       await window.api?.paymentAccounts?.upsert?.({
         id: draft.id,
@@ -113,7 +91,7 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
       bumpDataVersion()
     } catch (e: any) {
       notify('error', e?.message || String(e))
-    }
+    } finally { setSaving(false) }
   }
 
   const deleteAccount = async () => {
@@ -130,33 +108,20 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
   }
 
   return (
-    <div className="payment-accounts-pane">
-      <div className="settings-pane-heading">
-        <div>
-          <div className="settings-pane-title-row">
-            <strong>Zahlungskonten</strong>
-            <span className="chip">{paymentAccounts.length}</span>
-          </div>
-          <div className="helper">Verwalte Barkasse, Vereinskonto, PayPal oder weitere Geldkonten für Buchungen und Transfers.</div>
-        </div>
-        <button className="btn primary" onClick={() => setDraft(emptyDraft(sortedAccounts.length + 1))}>
-          + Neues Konto
-        </button>
-      </div>
+    <div className="settings-page settings-records-pane payment-accounts-pane">
+      <SettingsPageHeader title="Zahlungskonten" count={paymentAccounts.length} description="Verwalte Barkasse, Bankkonto, PayPal und weitere Geldkonten für Buchungen und Transfers." meta="Für diese Organisation" actions={<button className="btn primary" onClick={() => setDraft(emptyDraft(sortedAccounts.length + 1))}>+ Neues Konto</button>} />
 
-      <div className="payment-account-grid">
+      <div className="payment-account-grid settings-record-list">
         {sortedAccounts.map((account, index) => (
           <div
             key={account.id}
-            className="payment-account-card"
+            className="payment-account-card settings-record-row"
             style={{
               '--account-color': account.color || 'var(--border)',
               '--account-background': account.color ? `${account.color}20` : 'var(--muted)'
             } as React.CSSProperties}
           >
-            <div className="payment-account-card__initial" title={account.color || 'Keine Farbe'}>
-              {account.name.charAt(0).toUpperCase() || '?'}
-            </div>
+            <span className="settings-record-color" style={{ background: account.color || 'var(--border)' }} title={account.color || 'Keine Farbe'} />
             <div className="payment-account-card__details">
               <div className="payment-account-card__name">{account.name}</div>
               <div className="helper">{KIND_LABELS[account.kind]}{account.iban ? ` · ${account.iban}` : ''}</div>
@@ -167,7 +132,7 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
               <button className="btn btn-edit" onClick={() => setDraft({ id: account.id, name: account.name, kind: account.kind, iban: account.iban || '', color: account.color || null, sortOrder: Math.max(1, account.sortOrder || index + 1), isActive: account.isActive !== 0 })} title="Bearbeiten" aria-label={`${account.name} bearbeiten`}>
                 <AppIcon icon={IconPencil} size="control" />
               </button>
-              <button className="btn ghost btn-trash" onClick={() => setDeleteConfirm({ id: account.id, name: account.name })} title="Löschen">
+              <button className="btn ghost btn-trash" onClick={() => setDeleteConfirm({ id: account.id, name: account.name })} title="Löschen" aria-label={`${account.name} löschen`}>
                 <IconTrash size={16} />
               </button>
             </div>
@@ -175,109 +140,21 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
         ))}
       </div>
 
+      {!busy && sortedAccounts.length === 0 && <div className="settings-empty">Noch keine Zahlungskonten vorhanden. Lege dein erstes Konto mit dem Button oben an.</div>}
       {busy && <div className="helper">Lade Konten…</div>}
 
-      {draft && createPortal(
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={closeDraft}>
-          <div className="modal payment-account-modal" onClick={(e) => e.stopPropagation()}>
-            <ModalHeader
-              className="payment-account-modal__header"
-              title={<>{draft.id ? 'Konto bearbeiten' : 'Konto anlegen'}</>}
-              onClose={closeDraft}
-              closeLabel="Schließen"
-              closeOnEscape={false}
-            />
-            <div className="payment-account-modal__body">
-              <div className="row">
-                <div className="field">
-                  <label>Name</label>
-                  <input className="input" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} autoFocus />
-                </div>
-                <div className="field">
-                  <label>Typ</label>
-                  <select className="input" value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value as PaymentAccountDraft['kind'] })}>
-                    {Object.entries(KIND_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-                  </select>
-                </div>
-                <div className="field">
-                  <label>IBAN</label>
-                  <input className="input" value={draft.iban || ''} onChange={(e) => setDraft({ ...draft, iban: e.target.value })} />
-                </div>
-                <div className="field">
-                  <label>Reihenfolge</label>
-                  <input className="input" type="number" min="1" value={draft.sortOrder} onChange={(e) => setDraft({ ...draft, sortOrder: Math.max(1, Number(e.target.value || 1)) })} />
-                  <div className="helper">1 = zuerst in der Auswahlliste</div>
-                </div>
-                <div className="field">
-                  <label>Status</label>
-                  <select className="input" value={draft.isActive ? '1' : '0'} onChange={(e) => setDraft({ ...draft, isActive: e.target.value === '1' })}>
-                    <option value="1">Aktiv</option>
-                    <option value="0">Archiviert</option>
-                  </select>
-                </div>
-                <div className="field field-full-width">
-                  <label>Farbe</label>
-                  <div className="color-picker-container">
-                    {ACCOUNT_PALETTE.map((color) => (
-                      <button key={color} type="button" className={`btn color-swatch-btn ${draft.color === color ? 'color-swatch-selected' : 'color-swatch-unselected'}`} onClick={() => setDraft({ ...draft, color })} title={color} style={{ background: color }} aria-label={`Farbe ${color}`}>
-                        <span aria-hidden="true" />
-                      </button>
-                    ))}
-              <RandomColorButton color={draft.color} onChange={(color) => { setDraft({ ...draft, color }); setDraftColor(color) }} size={28} />
-                    <button type="button" className="btn custom-color-btn" onClick={() => setShowColorPicker(true)} title="Eigene Farbe" style={{ background: draft.color || 'var(--muted)', color: draft.color ? contrastText(draft.color) : 'var(--text)' }}>
-                      Eigene…
-                    </button>
-                    <button type="button" className="btn custom-color-btn" onClick={() => setDraft({ ...draft, color: null })} title="Keine Farbe">Keine</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <footer className="payment-account-modal__footer">
-              <button className="btn" onClick={closeDraft}>Abbrechen</button>
-              <button className="btn primary" onClick={() => { void saveDraft() }}>Speichern</button>
-            </footer>
-          </div>
-        </div>, document.body
-      )}
-
-      {showColorPicker && draft && createPortal(
-        <div className="modal-overlay" onClick={() => setShowColorPicker(false)} role="dialog" aria-modal="true">
-          <div className="modal color-picker-modal" onClick={(e) => e.stopPropagation()}>
-            <ModalHeader
-              className="color-picker-header"
-              title="Eigene Farbe wählen"
-              onClose={() => setShowColorPicker(false)}
-              closeLabel="Schließen"
-              closeOnEscape={false}
-            />
-            <div className="row">
-              <div className="field">
-                <label htmlFor="payment-account-color-native">Picker</label>
-                <input id="payment-account-color-native" className="color-input-native" type="color" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} />
-              </div>
-              <div className="field">
-                <label htmlFor="payment-account-color-hex">HEX</label>
-                <input id="payment-account-color-hex" className="input" value={draftColor} onChange={(e) => { setDraftColor(e.target.value); setDraftError('') }} placeholder="#1976D2" />
-                {draftError && <div className="helper error-text">{draftError}</div>}
-              </div>
-            </div>
-            <div className="card color-preview-card">
-              <div className="color-preview-swatch" style={{ background: draftColor }} />
-              <div className="helper">Kontrast: <span className="contrast-sample" style={{ background: draftColor, color: contrastText(draftColor) }}>{contrastText(draftColor)}</span></div>
-            </div>
-            <div className="delete-modal-actions">
-              <button className="btn" onClick={() => setShowColorPicker(false)}>Abbrechen</button>
-              <button className="btn primary" onClick={() => {
-                const hex = draftColor.trim()
-                const ok = /^#([0-9a-fA-F]{6})$/.test(hex)
-                if (!ok) { setDraftError('Bitte gültigen HEX-Wert eingeben (z. B. #1976D2)'); return }
-                setDraft({ ...draft, color: hex })
-                setShowColorPicker(false)
-              }}>Übernehmen</button>
-            </div>
-          </div>
-        </div>, document.body
-      )}
+      {draft && <MasterDataDialog title={draft.id ? 'Konto bearbeiten' : 'Konto anlegen'} subtitle={draft.id ? 'Passe die wichtigsten Informationen zu diesem Konto an.' : 'Lege ein neues Konto an und hinterlege die wichtigsten Informationen.'} icon={draft.id ? <IconPencil size={22} /> : <IconPlus size={22} />} onClose={closeDraft} onSave={saveDraft} busy={saving} canSave={!!draft.name.trim()}>
+        <div className="dialog-form-grid">
+          <div className="field"><FieldLabel htmlFor={`${fieldId}-name`} icon={<IconUser size={15} />} required>Name</FieldLabel><input id={`${fieldId}-name`} className="input" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} placeholder="z. B. Hauptkonto" required autoFocus /></div>
+          <div className="field"><FieldLabel htmlFor={`${fieldId}-kind`} icon={<IconBuildingBank size={15} />} required>Typ</FieldLabel><select id={`${fieldId}-kind`} className="input" value={draft.kind} onChange={e => setDraft({ ...draft, kind: e.target.value as PaymentAccountDraft['kind'] })} required>{Object.entries(KIND_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></div>
+          <div className="field"><FieldLabel htmlFor={`${fieldId}-iban`} icon={<IconCreditCard size={15} />}>IBAN</FieldLabel><input id={`${fieldId}-iban`} className="input" value={draft.iban || ''} onChange={e => setDraft({ ...draft, iban: e.target.value })} placeholder="z. B. DE12 3456 7890 1234 5678 90" /></div>
+          <div className="field"><FieldLabel htmlFor={`${fieldId}-order`} icon={<IconListNumbers size={15} />}>Reihenfolge</FieldLabel><input id={`${fieldId}-order`} className="input" type="number" min="1" value={draft.sortOrder} onChange={e => setDraft({ ...draft, sortOrder: Math.max(1, Number(e.target.value || 1)) })} aria-describedby={`${fieldId}-order-hint`} /><div id={`${fieldId}-order-hint`} className="helper">1 = zuerst in der Auswahlliste</div></div>
+        </div>
+        <div className="dialog-form-section dialog-account-meta">
+          <div className="field"><FieldLabel htmlFor={`${fieldId}-status`} icon={<IconCircleDot size={15} />}>Status</FieldLabel><span className={`dialog-status-select ${draft.isActive ? 'is-active' : ''}`}><select id={`${fieldId}-status`} className="input" value={draft.isActive ? '1' : '0'} onChange={e => setDraft({ ...draft, isActive: e.target.value === '1' })}><option value="1">Aktiv</option><option value="0">Archiviert</option></select></span></div>
+          <ColorField value={draft.color} onChange={color => setDraft({ ...draft, color })} />
+        </div>
+      </MasterDataDialog>}
 
       {deleteConfirm && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>

@@ -98,7 +98,8 @@ export interface SystemApi {
         }>
         openFolder: () => Promise<{ ok: boolean; error?: string | null }>
         getDir: () => Promise<{ ok: boolean; dir?: string; error?: string }>
-        setDir: () => Promise<{ ok: boolean; dir?: string; moved?: number; error?: string; warning?: string }>
+        pickDir: () => Promise<{ ok: boolean; dir?: string; canceled?: boolean; error?: string }>
+        setDir: (payload?: { dir: string }) => Promise<{ ok: boolean; dir?: string; moved?: number; error?: string; warning?: string }>
         resetDir: () => Promise<{ ok: boolean; dir?: string; moved?: number; error?: string; warning?: string }>
         inspect: (filePath: string) => Promise<{ ok: boolean; counts?: Record<string, number>; error?: string }>
         inspectCurrent: () => Promise<{ ok: boolean; counts?: Record<string, number>; error?: string }>

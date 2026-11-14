@@ -1,11 +1,10 @@
-import ModalHeader, { ModalCloseButton } from '../ModalHeader'
-import RandomColorButton from '../common/RandomColorButton'
-import React, { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { getContrastTextColor } from '../../utils/tagColors'
+import React, { useEffect, useId, useState } from 'react'
+import { IconCategory, IconLetterCase, IconMoodSmile } from '@tabler/icons-react'
+import MasterDataDialog, { FieldLabel } from '../common/MasterDataDialog'
+import ColorField from '../common/ColorField'
+import CategoryIcon from '../common/CategoryIcon'
+import { CATEGORY_ICONS, categoryIconKey } from '../../utils/categoryIcons'
 
-const PALETTE = ['#7C4DFF', '#2962FF', '#00B8D4', '#00C853', '#AEEA00', '#FFD600', '#FF9100', '#FF3D00', '#F50057', '#9C27B0']
-const ICONS = ['🏷️', '📁', '🧾', '🛒', '🚗', '🏗️', '💡', '📣', '🎯', '🧰', '☕']
 
 export type CategoryValue = { id?: number; name: string; color?: string | null; icon?: string | null }
 
@@ -15,16 +14,12 @@ export default function CategoryModal({ value, onClose, onSaved, notify }: {
   onSaved: () => void
   notify: (type: 'success' | 'error' | 'info', text: string, ms?: number) => void
 }) {
+  const nameId = useId()
   const [draft, setDraft] = useState(value)
-  const [showColorPicker, setShowColorPicker] = useState(false)
-  const [draftColor, setDraftColor] = useState(value.color || '#00C853')
-  const [colorError, setColorError] = useState('')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     setDraft(value)
-    setDraftColor(value.color || '#00C853')
-    setColorError('')
   }, [value])
 
   const save = async () => {
@@ -42,42 +37,12 @@ export default function CategoryModal({ value, onClose, onSaved, notify }: {
     }
   }
 
-  const previewColor = draft.color || 'var(--muted)'
-  return createPortal(
-    <div className="modal-overlay" role="dialog" aria-modal="true" onMouseDown={onClose}>
-      <div className="modal" style={{ maxWidth: 500 }} onMouseDown={(event) => event.stopPropagation()}>
-        <ModalHeader >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 20 }}>🏷️</span><h2 style={{ margin: 0 }}>{draft.id ? 'Kategorie bearbeiten' : 'Neue Kategorie'}</h2></div>
-          <ModalCloseButton onClick={onClose} aria-label="Schließen" />
-        </ModalHeader>
-
-        <div className="card" style={{ padding: 12, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, background: draft.color ? `${draft.color}20` : 'var(--muted)' }}>
-          <div style={{ width: 40, height: 40, borderRadius: 8, background: previewColor, display: 'grid', placeItems: 'center', color: draft.color ? getContrastTextColor(draft.color) : 'var(--text)', fontSize: 20 }}>{draft.icon || '🏷️'}</div>
-          <div><div style={{ fontWeight: 600, fontSize: 15 }}>{draft.name || 'Kategorie-Name'}</div><div className="helper" style={{ fontSize: 11 }}>Vorschau</div></div>
-        </div>
-
-        <div style={{ display: 'grid', gap: 16 }}>
-          <div className="field"><label>Name</label><input className="input" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="z. B. Material, Vertrieb oder Projekt A" autoFocus /></div>
-          <div className="field"><label>Zeichen</label><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}><button type="button" onClick={() => setDraft({ ...draft, icon: null })} style={{ minWidth: 76, height: 32, padding: '0 9px', borderRadius: 8, border: !draft.icon ? '2px solid var(--accent)' : '1px solid var(--border)', background: !draft.icon ? 'color-mix(in oklab, var(--accent) 16%, transparent)' : 'transparent', color: 'var(--text)', cursor: 'pointer' }}>Kein Zeichen</button>{ICONS.map((icon) => <button key={icon} type="button" onClick={() => setDraft({ ...draft, icon })} style={{ width: 32, height: 32, borderRadius: 8, border: draft.icon === icon ? '2px solid var(--accent)' : '1px solid var(--border)', background: draft.icon === icon ? 'color-mix(in oklab, var(--accent) 16%, transparent)' : 'transparent', cursor: 'pointer' }}>{icon}</button>)}</div></div>
-          <div className="field">
-            <label>Farbe</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>{PALETTE.map((color) => <button key={color} type="button" onClick={() => setDraft({ ...draft, color })} title={color} style={{ width: 32, height: 32, borderRadius: 8, border: draft.color === color ? '3px solid var(--text)' : '2px solid transparent', background: color, cursor: 'pointer', transform: draft.color === color ? 'scale(1.1)' : undefined }} />)}<RandomColorButton color={draft.color} onChange={(color) => { setDraft({ ...draft, color }); setDraftColor(color) }} /></div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}><button type="button" className="btn" onClick={() => setShowColorPicker(true)} style={{ flex: 1 }}>🎨 Eigene Farbe…</button><button type="button" className="btn" onClick={() => setDraft({ ...draft, color: null })} style={{ flex: 1 }}>Keine Farbe</button></div>
-          </div>
-        </div>
-        <footer style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}><button className="btn" onClick={onClose}>Abbrechen</button><button className="btn primary" disabled={!draft.name.trim() || busy} onClick={() => void save()}>{busy ? 'Speichert…' : 'Speichern'}</button></footer>
-      </div>
-      {showColorPicker && <div className="modal-overlay" role="dialog" aria-modal="true" onMouseDown={() => setShowColorPicker(false)}><div className="modal" style={{ maxWidth: 420, display: 'grid', gap: 12 }} onMouseDown={(event) => event.stopPropagation()}>
-        <ModalHeader
-          title="Eigene Farbe wählen"
-          onClose={() => setShowColorPicker(false)}
-          closeLabel="Schließen"
-          closeOnEscape={false}
-        />
-        <div className="row"><div className="field"><label>Picker</label><input type="color" value={draftColor} onChange={(event) => { setDraftColor(event.target.value); setColorError('') }} style={{ width: 60, height: 36, padding: 0, border: '1px solid var(--border)', borderRadius: 6, background: 'transparent' }} /></div><div className="field"><label>HEX</label><input className="input" value={draftColor} onChange={(event) => { setDraftColor(event.target.value); setColorError('') }} placeholder="#00C853" />{colorError && <div className="helper" style={{ color: 'var(--danger)' }}>{colorError}</div>}</div></div>
-        <div className="card" style={{ padding: 8, display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 28, height: 28, borderRadius: 6, background: draftColor, border: '1px solid var(--border)' }} /><div className="helper">Kontrast: <span style={{ background: draftColor, color: getContrastTextColor(draftColor), padding: '2px 6px', borderRadius: 6 }}>{getContrastTextColor(draftColor)}</span></div></div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}><button className="btn" onClick={() => setShowColorPicker(false)}>Abbrechen</button><button className="btn primary" onClick={() => { const color = draftColor.trim(); if (!/^#[0-9a-fA-F]{6}$/.test(color)) { setColorError('Bitte gültigen HEX-Wert eingeben (z. B. #00C853)'); return } setDraft({ ...draft, color }); setShowColorPicker(false) }}>Übernehmen</button></div>
-      </div></div>}
-    </div>, document.body
-  )
+  return <MasterDataDialog compact title={draft.id ? 'Kategorie bearbeiten' : 'Neue Kategorie'} subtitle="Ordne Buchungen übersichtlich nach ihrem Zweck." icon={<IconCategory size={22} />} onClose={onClose} onSave={save} busy={busy} canSave={!!draft.name.trim()}>
+    <div className="field"><FieldLabel htmlFor={nameId} icon={<IconLetterCase size={15} />} required>Name</FieldLabel><input id={nameId} className="input" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} placeholder="z. B. Material oder Mitgliedsbeiträge" required autoFocus /></div>
+    <fieldset className="dialog-icon-field"><legend className="dialog-field-label"><IconMoodSmile size={15} aria-hidden="true" />Symbol</legend><div className="dialog-icon-options">
+      <button type="button" className="btn" aria-pressed={!draft.icon} onClick={() => setDraft({ ...draft, icon: null })}>Kein Symbol</button>
+      {CATEGORY_ICONS.map(({ key, label }) => <button key={key} type="button" className="btn" title={label} aria-label={`Symbol: ${label}`} aria-pressed={categoryIconKey(draft.icon) === key} onClick={() => setDraft({ ...draft, icon: key })}><CategoryIcon value={key} size={18} /></button>)}
+    </div></fieldset>
+    <div className="dialog-form-section"><ColorField value={draft.color} onChange={color => setDraft({ ...draft, color })} /></div>
+  </MasterDataDialog>
 }

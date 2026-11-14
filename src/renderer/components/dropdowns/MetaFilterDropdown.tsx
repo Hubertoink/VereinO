@@ -178,7 +178,7 @@ export default function MetaFilterDropdown({
           <label className="filter-dropdown__label">{isGeneralProfile ? 'Kategorie' : 'Sphäre'}</label>
           {isGeneralProfile ? <select className="input" value={primary ?? ''} onChange={(ev) => setPrimary(ev.target.value ? Number(ev.target.value) : null)}>
             <option value="">Alle</option>
-            {categories.map((category) => <option key={category.id} value={category.id}>{category.icon ? `${category.icon} ` : ''}{category.name}</option>)}
+            {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
           </select> : <select className="input" value={s ?? ''} onChange={(ev) => setS((ev.target.value as any) || null)}>
             <option value="">Alle</option>
             <option value="IDEELL">IDEELL</option>

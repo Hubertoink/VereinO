@@ -22,6 +22,7 @@ import ReimbursementsDialog from '../reimbursements/ReimbursementsDialog'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import BankImportRemapDialog from './BankImportRemapDialog'
 import { addDataChangedListener, dispatchDataChanged } from '../../utils/refresh'
+import { signalTutorialEvent } from '../../utils/pageTutorials'
 import type { DashboardTaskTarget } from '../../../../shared/dashboardTasks'
 
 type PaymentAccount = {
@@ -2100,7 +2101,7 @@ export default function BankImportView({
   const rowReviewLabel = { active: 'KI prüft …', queued: 'Wartet auf KI-Prüfung', analyzed: 'Analyse fertig', done: 'KI-geprüft', error: 'Prüfung nicht abgeschlossen' }
 
   return (
-    <div className="bank-import-container">
+    <div className="bank-import-container" data-tutorial="bank">
       <div className="bank-page-header">
         <h1>Bankimport</h1>
         <div className="bank-page-tools bank-header-tools">
@@ -2460,6 +2461,7 @@ export default function BankImportView({
             setInitialImportFile(null)
           }}
           onImported={(result, context) => {
+            if (result.imported > 0) signalTutorialEvent('bank-imported')
             setImportOutcome({ batchId: result.batchId, paymentAccountId: context.paymentAccountId, fileName: context.fileName,
               imported: result.imported, duplicates: result.duplicates, errors: result.errors.length })
             setAccountId(context.paymentAccountId)

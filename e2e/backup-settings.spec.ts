@@ -5,7 +5,7 @@ import fs from 'node:fs/promises'
 let script: string
 let css: string
 test.beforeAll(async () => {
-  css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/modalHeader.css'].map(file => fs.readFile(file, 'utf8')))).join('\n')
+  css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/modalHeader.css', 'src/renderer/views/Settings/settings.css'].map(file => fs.readFile(file, 'utf8')))).join('\n')
   const result = await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
     import React from 'react'
     import { createRoot } from 'react-dom/client'
@@ -54,7 +54,7 @@ test.beforeAll(async () => {
     function Fixture() {
       const {notify} = useToast()
       const report = React.useCallback((type,text,ms,action) => { window.notifications.push({type,text}); notify(type,text,ms,action) }, [notify])
-      return <div id="settings-surface" style={{transform:'translateZ(0)'}}><StoragePane notify={report} /></div>
+      return <div id="settings-surface" className="settings-content settings-unified" style={{transform:'translateZ(0)'}}><StoragePane notify={report} /></div>
     }
     createRoot(document.getElementById('root')).render(<ToastProvider><Fixture /></ToastProvider>)
   ` }, bundle: true, platform: 'browser', write: false, loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' } })

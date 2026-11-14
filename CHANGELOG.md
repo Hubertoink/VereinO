@@ -7,6 +7,28 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.16.0] - 2026-11-14
+
+### Hinzugefügt
+
+- Kontextuelle Einstiegshinweise erklären Buchungsansichten, Spalten, Plus-Filter, den Erfassungsworkflow und Bankimporte. Sie erscheinen einzeln, warten bei offenen Dialogen und lassen sich auf später verschieben oder dauerhaft ausblenden. Bestehende Organisationen erhalten beim Update keine automatische Einführung.
+- Ein Rechtsklick auf „Buchungen“ oder „Bankimport“ in der Navigation öffnet „Hilfe zu dieser Seite“. Bei Buchungen lässt sich dort auch direkt zwischen Klassisch und Plus wechseln. Das Menü ist ebenfalls über Umschalt+F10 erreichbar.
+
+### Geändert
+
+- Einstellungsseiten verwenden gemeinsame Überschriften, Abschnitte und Abstände. Ihre Breite orientiert sich am Inhalt; umfangreiche Tabellen erhalten mehr Platz.
+- Stammdaten- und weitere Dialoge sind kompakter gestaltet: klare Feldbeschriftungen, Bibliotheks-Icons, einheitliche Farbauswahl und übersichtliche Aktionsbereiche. Kleine Fenster sowie helle und dunkle Themes werden berücksichtigt.
+- Kategorie-Symbole verwenden monochromatische Icons aus der quelloffenen Tabler-Bibliothek. Bisherige Emoji-Zuordnungen werden weiterhin erkannt.
+- „Erste Schritte“ führt in vier Schritten durch Organisation, Buchungsansicht, Datensicherung und Abschluss. Optionale Starter-Tags werden bewusst ausgewählt; bestehende Workflow- und Tabelleneinstellungen bleiben erhalten.
+- Die Farbschema-Auswahl zeigt beide Buchungsminiaturen sofort im gewählten Theme. Setup-Eingaben einschließlich Sicherungsordner werden erst beim Abschluss übernommen.
+
+### Behoben
+
+- Zahlungskonto-Zeilen zeigen keinen störenden Hover-Hintergrund mehr. Einstellungsschaltflächen geben auch mit unterschiedlichen Themes sichtbares Hover-Feedback.
+- Eigene und zufällig gewählte Farben bleiben in der Farbauswahl erkennbar. Verschachtelte Farbdialoge behandeln Tastaturkürzel und Fokusrückgabe getrennt vom übergeordneten Formular.
+- Ein fehlgeschlagenes Setup kann erneut gespeichert werden, ohne Starter-Tags doppelt anzulegen. Abbrechen verändert den zuvor gewählten Sicherungsordner nicht.
+- Tutorial-Karten halten Abstand zum erklärten Bedienelement und wechseln bei Platzmangel die Seite. Ihre Position passt sich beim Scrollen und bei Größenänderungen an.
+
 ## [4.15.2] - 2026-11-14
 
 ### Geändert

@@ -1,4 +1,5 @@
 import { dialog, ipcMain, shell } from 'electron'
+import path from 'node:path'
 import * as backup from '../services/backup'
 import { requireAllowedExternalUrl } from '../services/externalUrl'
 
@@ -38,18 +39,26 @@ export function registerBackupAndShellHandlers(): void {
             return { ok: false, error: errorMessage(error) }
         }
     })
-    ipcMain.handle('backup.setDir', async () => {
+    ipcMain.handle('backup.pickDir', async () => {
         try {
-            const pick = await dialog.showOpenDialog({
-                title: 'Backup-Ordner wählen…',
-                properties: ['openDirectory', 'createDirectory']
-            })
-            if (pick.canceled || !pick.filePaths[0]) throw new Error('Abbruch')
-            const result = await backup.setBackupDirWithMigration(pick.filePaths[0])
-            return result
-        } catch (error) {
-            return { ok: false, error: errorMessage(error) }
-        }
+            const pick = await dialog.showOpenDialog({ title: 'Sicherungsordner wählen', properties: ['openDirectory', 'createDirectory'] })
+            if (pick.canceled || !pick.filePaths[0]) return { ok: false, canceled: true }
+            return { ok: true, dir: pick.filePaths[0] }
+        } catch (error) { return { ok: false, error: errorMessage(error) } }
+    })
+    ipcMain.handle('backup.setDir', async (_event, payload?: { dir: string }) => {
+        try {
+            let dir: string
+            if (payload !== undefined) {
+                if (typeof payload?.dir !== 'string' || !path.isAbsolute(payload.dir) || payload.dir.includes('\0')) throw new Error('Ungültiger Sicherungsordner.')
+                dir = payload.dir
+            } else {
+                const pick = await dialog.showOpenDialog({ title: 'Backup-Ordner wählen…', properties: ['openDirectory', 'createDirectory'] })
+                if (pick.canceled || !pick.filePaths[0]) throw new Error('Abbruch')
+                dir = pick.filePaths[0]
+            }
+            return await backup.setBackupDirWithMigration(dir)
+        } catch (error) { return { ok: false, error: errorMessage(error) } }
     })
     ipcMain.handle('backup.resetDir', async () => {
         try {

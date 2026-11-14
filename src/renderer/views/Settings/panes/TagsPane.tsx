@@ -1,3 +1,4 @@
+import { SettingsPageHeader } from '../components/SettingsPageHeader'
 import TagDeleteModal, { TagDeleteTarget } from '../../../components/modals/TagDeleteModal'
 import React from 'react'
 import { IconPencil, IconTag } from '@tabler/icons-react'
@@ -57,21 +58,8 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
   }
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <AppIcon icon={IconTag} size="control" />
-            <strong style={{ fontSize: 16 }}>Tags</strong>
-            <span className="chip" style={{ marginLeft: 8, fontSize: 11 }}>{tagDefs.length}</span>
-          </div>
-          <div className="helper">Verwalte Farben & Namen. Tags färben Buchungszeilen zur schnelleren visuellen Orientierung.</div>
-        </div>
-        <button className="btn primary" onClick={() => setEditTag({ name: '', color: null })} style={{ whiteSpace: 'nowrap' }}>
-          + Neuer Tag
-        </button>
-      </div>
+    <div className="settings-page settings-records-pane">
+      <SettingsPageHeader title="Tags" count={tagDefs.length} description="Verwalte Namen und Farben für die visuelle Orientierung in Buchungen." meta="Für diese Organisation" actions={<button className="btn primary" onClick={() => setEditTag({ name: '', color: null })}>+ Neuer Tag</button>} />
 
       {/* Tags Grid */}
       {tagDefs.length === 0 ? (
@@ -81,45 +69,15 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
           <div className="helper" style={{ marginTop: 4 }}>Erstelle deinen ersten Tag mit dem Button oben.</div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+        <div className="settings-record-list">
           {tagDefs.map(t => {
-            const bgColor = t.color ? `${t.color}20` : 'var(--muted)'
-            const borderColor = t.color || 'var(--border)'
             return (
               <div 
                 key={t.id} 
-                className="tag-management-item"
-                style={{ 
-                  padding: '12px 14px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 10,
-                  background: bgColor,
-                  borderLeft: `4px solid ${borderColor}`,
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-                }}
+                className="settings-record-row"
               >
-                {/* Color indicator */}
-                <div 
-                  style={{ 
-                    width: 32, 
-                    height: 32, 
-                    borderRadius: 8, 
-                    background: t.color || 'var(--muted)', 
-                    flexShrink: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fff',
-                    fontWeight: 600,
-                    fontSize: 14,
-                    textShadow: '0 1px 2px rgba(0,0,0,0.3)'
-                  }} 
-                  title={t.color || 'Keine Farbe'}
-                >
-                  {t.name.charAt(0).toUpperCase()}
-                </div>
-                
+                <span className="settings-record-color" style={{ background: t.color || 'var(--border)' }} title={t.color || 'Keine Farbe'} />
+
                 {/* Name and usage */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{t.name}</div>
@@ -142,6 +100,7 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
                     className="btn ghost btn-trash" 
                     onClick={() => setDeleteConfirm({ id: t.id, name: t.name, usage: t.usage })}
                     title="Löschen"
+                    aria-label={`${t.name} löschen`}
                     style={{ padding: '6px 8px' }}
                   >
                     <IconTrash size={16} />

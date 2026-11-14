@@ -1,3 +1,4 @@
+import { SettingsPageHeader } from '../components/SettingsPageHeader'
 import type { WorkflowPaneProps } from '../types'
 import HoverTooltip from '../../../components/common/HoverTooltip'
 import ReceiptWidgetSettings from '../components/ReceiptWidgetSettings'
@@ -18,12 +19,12 @@ export function WorkflowPane({
   notify
 }: WorkflowPaneProps) {
   return (
-    <div className="settings-workflow-pane">
+    <div className="settings-page settings-workflow-pane">
+      <SettingsPageHeader title="Arbeitsweise" description="Passe das Erfassen, Speichern und Korrigieren von Buchungen an." meta="Änderungen werden automatisch übernommen. Der Widget-Autostart gilt für dieses Gerät." />
       <div className="card settings-card settings-pane-card">
         <section className="settings-layout-panel">
           <div>
-            <div className="settings-layout-kicker">Buchungsfenster</div>
-            <h3>Arbeitsweise</h3>
+            <h3>Buchungen</h3>
             <p>Verhalten beim Erfassen, Speichern und Korrigieren von Buchungen.</p>
           </div>
 
@@ -83,7 +84,7 @@ export function WorkflowPane({
               />
             </label>
 
-            <div className="settings-layout-control settings-booking-presentation">
+            <div className="settings-layout-control">
               <div className="settings-layout-label-row">
                 <label>Buchungserfassung</label>
                 <span>

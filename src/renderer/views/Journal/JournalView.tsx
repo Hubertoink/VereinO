@@ -207,6 +207,7 @@ export default function JournalView({
     // ==================== STATE ====================
     // Pagination & Sorting
     const [rows, setRows] = useState<VoucherRow[]>([])
+    const [rowsLoading, setRowsLoading] = useState(true)
     const [totalRows, setTotalRows] = useState<number>(0)
     const [stornoPairIds, setStornoPairIds] = useState<[number, number] | null>(null)
     const voucherTooltipCache = useRef(new Map<number, VoucherRow>())
@@ -733,6 +734,7 @@ export default function JournalView({
     // ==================== DATA LOADING ====================
     const loadRecent = useCallback(async () => {
         const requestId = ++loadRequestIdRef.current
+        setRowsLoading(true)
         try {
             const offset = (activePage - 1) * journalLimit
             const res = await window.api?.vouchers?.list?.({
@@ -761,6 +763,8 @@ export default function JournalView({
             if (requestId === loadRequestIdRef.current) {
                 notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
             }
+        } finally {
+            if (requestId === loadRequestIdRef.current) setRowsLoading(false)
         }
     // Include refreshKey so external data changes (QuickAdd, imports, etc.) trigger a reload
     }, [journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterPaymentAccountId, activeFilterSphere, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, debouncedQ, activeFilterTag, stornoPairIds, notify, refreshKey])
@@ -864,7 +868,7 @@ export default function JournalView({
 
     // ==================== RENDER ====================
     return (
-        <div className="journal-view">
+        <div className="journal-view" data-tutorial="classic" aria-busy={rowsLoading}>
             {/* Filter Toolbar */}
             <div className="journal-filter-controls">
                 <ResponsiveSearch ref={searchInputRef} wide value={activeQ}
@@ -945,7 +949,7 @@ export default function JournalView({
                 <div className="filter-divider" />
 
                 {/* Anzeige-Cluster: Spaltenauswahl */}
-                <div ref={columnsFilterRef} className="toolbar-icon">
+                <div ref={columnsFilterRef} className="toolbar-icon" data-tutorial="columns">
                     <FilterDropdown
                         trigger={<AppIcon icon={IconLayoutGrid} size="action" />}
                         title="Spalten"

@@ -3,6 +3,7 @@ import React from 'react'
 import { YearEndPaneProps } from '../types'
 import { dispatchDataChanged } from '../../../utils/refresh'
 import { IconCash, IconCircleCheck, IconDownload, IconLock, IconTrendingDown, IconTrendingUp } from '@tabler/icons-react'
+import { SettingsPageHeader } from '../components'
 
 /**
  * YearEndPane - Year-End Closing: Preview, Export, Close/Reopen
@@ -68,15 +69,15 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
-      <div>
-        <strong>Jahresabschluss</strong>
-        <div className="helper">Vorschau, Export und Abschluss des Geschäftsjahres.</div>
-      </div>
+    <div className="settings-page settings-workflow-page">
+      <SettingsPageHeader
+        title="Jahresabschluss"
+        description="Prüfe Einnahmen und Ausgaben, exportiere den Abschluss und sperre das Geschäftsjahr."
+      />
 
-      <section className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8, borderRadius: 10, background: isLocked ? 'color-mix(in oklab, var(--danger) 12%, transparent)' : 'color-mix(in oklab, var(--accent) 12%, transparent)' }}>
+      <section className="settings-workflow-section">
+        <div className="settings-workflow-status-row">
+          <div className={`settings-workflow-status ${isLocked ? 'is-locked' : ''}`}>
             <IconLock size={20} aria-hidden="true" />
             <div>
               <div className="helper">Sperrstatus</div>
@@ -85,7 +86,7 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
               </div>
             </div>
           </div>
-          <div className="field" style={{ minWidth: 160 }}>
+          <div className="field settings-workflow-year">
             <label>Jahr</label>
             <select className="input" value={year} onChange={(e) => setYear(Number(e.target.value))} title="Jahr auswählen">
               {[...new Set([new Date().getFullYear(), ...yearsAvail])].sort((a, b) => b - a).map(y => (
@@ -96,9 +97,12 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
         </div>
       </section>
 
-      <section className="card" style={{ padding: 12, display: 'grid', gap: 8 }}>
-        <div className="helper">Interaktive Schritte</div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <section className="settings-workflow-section">
+        <div className="settings-workflow-section__heading">
+          <h3>Abschlussschritte</h3>
+          <p>Exportiere die Unterlagen oder schließe das ausgewählte Jahr ab.</p>
+        </div>
+        <div className="settings-workflow-actions">
           <button className="btn" disabled={busy} onClick={doExport}><IconDownload size={16} aria-hidden="true" /> Export-Paket</button>
           {!closeDisabled && (
             <button className="btn danger" disabled={busy} onClick={() => setConfirmAction({ type: 'close' })}><IconCircleCheck size={16} aria-hidden="true" /> Jahr abschließen…</button>
@@ -110,32 +114,35 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
       </section>
 
       {preview && (
-        <section className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
-          <div className="helper">Zeitraum: {preview.from} – {preview.to}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-            <div className="card" style={{ padding: 12 }}>
+        <section className="settings-workflow-section">
+          <div className="settings-workflow-section__heading">
+            <h3>Jahresübersicht</h3>
+            <p>Zeitraum: {preview.from} – {preview.to}</p>
+          </div>
+          <div className="settings-workflow-metrics">
+            <div className="settings-workflow-metric">
               <div className="helper">Einnahmen</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="settings-workflow-metric__value">
                 <IconTrendingUp size={20} aria-hidden="true" />
-                <div style={{ fontWeight: 600, color: 'var(--success)' }}>
+                <div className="settings-workflow-metric__amount is-positive">
                   {eur.format(preview.totals.inGross || 0)}
                 </div>
               </div>
             </div>
-            <div className="card" style={{ padding: 12 }}>
+            <div className="settings-workflow-metric">
               <div className="helper">Ausgaben</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="settings-workflow-metric__value">
                 <IconTrendingDown size={20} aria-hidden="true" />
-                <div style={{ fontWeight: 600, color: 'var(--danger)' }}>
+                <div className="settings-workflow-metric__amount is-negative">
                   {eur.format(Math.abs(preview.totals.outGross || 0))}
                 </div>
               </div>
             </div>
-            <div className="card" style={{ padding: 12 }}>
+            <div className="settings-workflow-metric">
               <div className="helper">Saldo</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="settings-workflow-metric__value">
                 <IconCash size={20} aria-hidden="true" />
-                <div style={{ fontWeight: 600, color: (preview.totals.inGross - Math.abs(preview.totals.outGross)) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                <div className={`settings-workflow-metric__amount ${(preview.totals.inGross - Math.abs(preview.totals.outGross)) >= 0 ? 'is-positive' : 'is-negative'}`}>
                   {eur.format(preview.totals.inGross - Math.abs(preview.totals.outGross))}
                 </div>
               </div>
@@ -145,32 +152,35 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
       )}
 
       {overall && (
-        <section className="card" style={{ padding: 12, display: 'grid', gap: 12 }}>
-          <div className="helper">Gesamtzeitraum (alle Buchungen)</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-            <div className="card" style={{ padding: 12 }}>
+        <section className="settings-workflow-section">
+          <div className="settings-workflow-section__heading">
+            <h3>Gesamtzeitraum</h3>
+            <p>Überblick über alle Buchungen, unabhängig vom ausgewählten Jahr.</p>
+          </div>
+          <div className="settings-workflow-metrics">
+            <div className="settings-workflow-metric">
               <div className="helper">Einnahmen</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="settings-workflow-metric__value">
                 <IconTrendingUp size={20} aria-hidden="true" />
-                <div style={{ fontWeight: 600, color: 'var(--success)' }}>
+                <div className="settings-workflow-metric__amount is-positive">
                   {eur.format((overall.byType.find((t: any) => t.key === 'IN')?.gross || 0))}
                 </div>
               </div>
             </div>
-            <div className="card" style={{ padding: 12 }}>
+            <div className="settings-workflow-metric">
               <div className="helper">Ausgaben</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="settings-workflow-metric__value">
                 <IconTrendingDown size={20} aria-hidden="true" />
-                <div style={{ fontWeight: 600, color: 'var(--danger)' }}>
+                <div className="settings-workflow-metric__amount is-negative">
                   {eur.format(Math.abs(overall.byType.find((t: any) => t.key === 'OUT')?.gross || 0))}
                 </div>
               </div>
             </div>
-            <div className="card" style={{ padding: 12 }}>
+            <div className="settings-workflow-metric">
               <div className="helper">Saldo</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="settings-workflow-metric__value">
                 <IconCash size={20} aria-hidden="true" />
-                <div style={{ fontWeight: 600, color: ((overall.byType.find((t: any) => t.key === 'IN')?.gross || 0) - Math.abs(overall.byType.find((t: any) => t.key === 'OUT')?.gross || 0)) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                <div className={`settings-workflow-metric__amount ${((overall.byType.find((t: any) => t.key === 'IN')?.gross || 0) - Math.abs(overall.byType.find((t: any) => t.key === 'OUT')?.gross || 0)) >= 0 ? 'is-positive' : 'is-negative'}`}>
                   {eur.format((overall.byType.find((t: any) => t.key === 'IN')?.gross || 0) - Math.abs(overall.byType.find((t: any) => t.key === 'OUT')?.gross || 0))}
                 </div>
               </div>
@@ -205,7 +215,7 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
           </div>
         </div>
       )}
-      {err && <div style={{ color: 'var(--danger)' }}>{err}</div>}
+      {err && <div className="settings-page-error" role="alert">{err}</div>}
     </div>
   )
 }

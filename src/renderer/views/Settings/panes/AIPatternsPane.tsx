@@ -1,3 +1,4 @@
+import { SettingsPageHeader, SettingsRow } from '../components/index'
 import React from 'react'
 import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from '@tabler/icons-react'
 import AppIcon from '../../../components/common/AppIcon'
@@ -160,10 +161,7 @@ export function AIPatternsPane({ tagDefs, paymentAccounts, notify }: Props) {
           {items.map((row) => (
             <tr key={row.key} className={row.enabled ? '' : 'is-disabled'}>
               <td>
-                <label className="switch" title={row.enabled ? 'Muster ausschalten' : 'Muster einschalten'}>
-                  <input type="checkbox" checked={row.enabled} onChange={() => toggle(row)} disabled={!enabled} />
-                  <span />
-                </label>
+                <input className="toggle" type="checkbox" role="switch" aria-label={`${row.title} aktivieren`} aria-checked={row.enabled} checked={row.enabled} onChange={() => toggle(row)} disabled={!enabled} />
               </td>
               <td>
                 <strong>{row.title}</strong>
@@ -191,32 +189,11 @@ export function AIPatternsPane({ tagDefs, paymentAccounts, notify }: Props) {
   )
 
   return (
-    <div className="settings-pane ai-pattern-pane">
-      <div className="card settings-pane-card ai-pattern-overview">
-        <div>
-          <div className="settings-title">
-            <span aria-hidden="true">✦</span> <strong>KI-Muster</strong>
-          </div>
-          <div className="settings-sub">
-            Muster und Einstellungen gelten nur für die aktuelle Organisation. Ein Muster wird erst nach mindestens zwei passenden gespeicherten Buchungen gelernt.
-          </div>
-        </div>
-        <label className={`ai-pattern-global-toggle ${enabled ? 'is-on' : 'is-off'}`} htmlFor="ai-patterns-enabled">
-          <span className="ai-pattern-global-toggle__copy">
-            <strong>Mustererkennung</strong>
-          </span>
-          <input
-            id="ai-patterns-enabled"
-            type="checkbox"
-            role="switch"
-            checked={enabled}
-            onChange={toggleGlobal}
-          />
-          <span className="ai-pattern-global-toggle__control" aria-hidden="true">
-            <span className="ai-pattern-global-toggle__knob" />
-          </span>
-        </label>
-      </div>
+    <div className="settings-page settings-pane ai-pattern-pane">
+      <SettingsPageHeader title="KI-Muster" description="Verwalte Regeln und gelernte Zuordnungen für Buchungsvorschläge." meta="Für diese Organisation · Änderungen werden automatisch gespeichert." />
+      <SettingsRow title="Mustererkennung" description="Ein Muster wird nach mindestens zwei passenden gespeicherten Buchungen gelernt." htmlFor="ai-patterns-enabled">
+        <input id="ai-patterns-enabled" className="toggle" type="checkbox" role="switch" aria-checked={enabled} checked={enabled} onChange={toggleGlobal} />
+      </SettingsRow>
 
       <div className="card settings-pane-card">
         <div className="settings-title"><strong>Regeln</strong></div>

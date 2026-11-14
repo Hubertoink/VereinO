@@ -1,3 +1,4 @@
+import CategoryIcon from '../../components/common/CategoryIcon'
 import React, { useEffect, useRef, useState } from 'react'
 import { IconX } from '@tabler/icons-react'
 import AppIcon from '../../components/common/AppIcon'
@@ -255,7 +256,7 @@ export default function InvoiceFormModal({
                       {isGeneralProfile ? <SelectDropdown id="invoice-sphere" value={String(form.draft.primaryClassificationValueId ?? '')} placeholder="Kategorie wählen" ariaLabel="Kategorie der Rechnung" onChange={(value) => {
                         const category = categories.find((entry) => entry.id === Number(value))
                         setDraft({ primaryClassificationValueId: value ? Number(value) : '', primaryClassificationName: category?.name || null, primaryClassificationColor: category?.color || null, primaryClassificationIcon: category?.icon || null })
-                      }} options={categories.map((category) => ({ value: String(category.id), label: `${category.icon ? `${category.icon} ` : ''}${category.name}`, color: category.color || undefined }))} /> : <select id="invoice-sphere" className="input" value={form.draft.sphere} onChange={(e) => setDraft({ sphere: e.target.value as InvoiceDraft['sphere'] })}>
+                      }} options={categories.map((category) => ({ value: String(category.id), label: category.name, icon: <CategoryIcon value={category.icon} />, color: category.color || undefined }))} /> : <select id="invoice-sphere" className="input" value={form.draft.sphere} onChange={(e) => setDraft({ sphere: e.target.value as InvoiceDraft['sphere'] })}>
                         <option value="IDEELL">IDEELL</option>
                         <option value="ZWECK">ZWECK</option>
                         <option value="VERMOEGEN">VERMOEGEN</option>

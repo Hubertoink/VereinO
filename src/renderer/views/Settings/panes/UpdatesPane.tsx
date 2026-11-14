@@ -1,5 +1,5 @@
+import { SettingsPageHeader, SettingsRow } from '../components/index'
 import React from 'react'
-import { IconDownload } from '@tabler/icons-react'
 
 type UpdateState = {
   status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error' | 'unsupported'
@@ -67,15 +67,13 @@ export function UpdatesPane({ notify }: Props) {
   }
 
   return (
-    <div className="settings-pane">
+    <div className="settings-page settings-pane">
+      <SettingsPageHeader title="Updates" description="Prüfe neue Versionen und halte VereinO aktuell." meta={`Installierte Version: ${appVersion || updateState.currentVersion || 'unbekannt'}`} />
       <div className="card settings-pane-card">
-        <div className="settings-title"><IconDownload size={18} aria-hidden="true" /> <strong>Updates</strong></div>
-        <div className="settings-sub">Installierte Version: {appVersion || updateState.currentVersion || 'unbekannt'}</div>
-        <div className="settings-inline-toggle" style={{ marginTop: 10 }}>
-          <label htmlFor="toggle-auto-update-check">Bei jedem Start nach Updates suchen</label>
+        <SettingsRow title="Automatisch nach Updates suchen" description="VereinO prüft bei jedem Start, ob eine neue Version verfügbar ist. Die Auswahl wird automatisch gespeichert." htmlFor="toggle-auto-update-check">
           <input id="toggle-auto-update-check" role="switch" aria-checked={autoUpdateCheck} className="toggle" type="checkbox" checked={autoUpdateCheck} onChange={(e) => { void toggleAutoUpdateCheck(e.target.checked) }} />
-        </div>
-        {updateState.message && <div className="helper" style={{ marginTop: 8 }}>{updateState.message}{updateState.status === 'downloading' && typeof updateState.downloadProgress === 'number' ? ` (${updateState.downloadProgress}%)` : ''}</div>}
+        </SettingsRow>
+        {updateState.message && <div className="settings-status" role="status">{updateState.message}{updateState.status === 'downloading' && typeof updateState.downloadProgress === 'number' ? ` (${updateState.downloadProgress}%)` : ''}</div>}
         <div className="settings-pane-actions flex gap-8" style={{ marginTop: 12, flexWrap: 'wrap' }}>
           <button className="btn" onClick={() => { void checkForUpdates() }} disabled={updateState.status === 'checking' || updateState.status === 'downloading'}>
             {updateState.status === 'checking' ? 'Suche läuft…' : updateState.status === 'downloading' ? 'Download läuft…' : 'Nach Updates suchen'}

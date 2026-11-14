@@ -1,6 +1,6 @@
-import ModalHeader from '../ModalHeader'
+import MasterDataDialog, { FieldLabel } from '../common/MasterDataDialog'
+import { IconBuildingCommunity } from '@tabler/icons-react'
 import React, { useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { OrganizationProfile } from '../../../../shared/classification'
 
 interface NewOrgModalProps {
@@ -39,39 +39,7 @@ export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalP
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && canSave && !busy) {
-      e.preventDefault()
-      handleCreate()
-    }
-    if (e.key === 'Escape') {
-      onClose()
-    }
-  }
-
-  return createPortal(
-    <div className="modal-overlay" onClick={onClose}>
-      <div 
-        className="modal" 
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={handleKeyDown}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="new-org-title"
-      >
-        <ModalHeader
-          className="flex justify-between items-center mb-12"
-          title="Neue Organisation anlegen"
-          titleId="new-org-title"
-          onClose={onClose}
-          closeLabel="Schließen"
-          closeOnEscape={false}
-        />
-
-        <div className="helper" style={{ marginBottom: 16 }}>
-          Jede Organisation hat eine eigene Datenbank mit separaten Buchungen, Mitgliedern und Einstellungen.
-        </div>
-
+  return <MasterDataDialog title="Neue Organisation anlegen" subtitle="Jede Organisation hat eine eigene Datenbank mit separaten Buchungen, Mitgliedern und Einstellungen." icon={<IconBuildingCommunity size={22} />} onClose={onClose} onSave={handleCreate} busy={busy} canSave={canSave} saveLabel="Erstellen">
         {error && (
           <div className="error-box" style={{ marginBottom: 12 }}>
             {error}
@@ -79,7 +47,7 @@ export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalP
         )}
 
         <div className="field">
-          <label htmlFor="org-name-input">Name der Organisation</label>
+          <FieldLabel htmlFor="org-name-input" required>Name der Organisation</FieldLabel>
           <input
             id="org-name-input"
             className="input"
@@ -88,6 +56,7 @@ export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalP
             placeholder="z.B. Förderverein Muster e.V."
             autoFocus
             disabled={busy}
+            required
           />
         </div>
 
@@ -96,15 +65,15 @@ export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalP
           <div className="helper" style={{ marginBottom: 8 }}>
             Das Profil legt fest, ob Buchungen nach gemeinnützigen Sphären oder frei angelegten Kategorien gegliedert werden.
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+          <div className="dialog-form-grid">
             <label
               style={{
                 display: 'block',
                 cursor: busy ? 'default' : 'pointer',
-                border: `1px solid ${profile === 'NONPROFIT' ? '#4f8cff' : 'var(--border, #3a4356)'}`,
+                border: `1px solid ${profile === 'NONPROFIT' ? 'var(--accent)' : 'var(--border, #3a4356)'}`,
                 borderRadius: 8,
                 padding: '14px 12px',
-                background: profile === 'NONPROFIT' ? 'color-mix(in oklab, #4f8cff 12%, var(--surface))' : 'color-mix(in oklab, var(--surface) 94%, transparent)'
+                background: profile === 'NONPROFIT' ? 'color-mix(in oklab, var(--accent) 12%, var(--surface))' : 'color-mix(in oklab, var(--surface) 94%, transparent)'
               }}
             >
               <input
@@ -124,10 +93,10 @@ export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalP
               style={{
                 display: 'block',
                 cursor: busy ? 'default' : 'pointer',
-                border: `1px solid ${profile === 'GENERAL' ? '#22c55e' : 'var(--border, #3a4356)'}`,
+                border: `1px solid ${profile === 'GENERAL' ? 'var(--accent)' : 'var(--border, #3a4356)'}`,
                 borderRadius: 8,
                 padding: '14px 12px',
-                background: profile === 'GENERAL' ? 'color-mix(in oklab, #22c55e 12%, var(--surface))' : 'color-mix(in oklab, var(--surface) 94%, transparent)'
+                background: profile === 'GENERAL' ? 'color-mix(in oklab, var(--accent) 12%, var(--surface))' : 'color-mix(in oklab, var(--surface) 94%, transparent)'
               }}
             >
               <input
@@ -146,20 +115,5 @@ export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalP
           </div>
         </fieldset>
 
-        <div className="flex justify-end gap-8" style={{ marginTop: 16 }}>
-          <button className="btn" onClick={onClose} disabled={busy}>
-            Abbrechen
-          </button>
-          <button 
-            className="btn primary" 
-            onClick={handleCreate}
-            disabled={!canSave || busy}
-          >
-            {busy ? 'Erstelle…' : 'Erstellen'}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  )
+  </MasterDataDialog>
 }

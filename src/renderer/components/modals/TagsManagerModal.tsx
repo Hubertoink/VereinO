@@ -1,4 +1,5 @@
-import ModalHeader, { ModalCloseButton } from '../ModalHeader'
+import ModalHeader from '../ModalHeader'
+import { IconTags } from '@tabler/icons-react'
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import TagModal, { TagValue } from './TagModal'
@@ -21,14 +22,10 @@ export default function TagsManagerModal({ onClose, notify, onChanged }: { onClo
     return createPortal(
         <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
             <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(860px, 96vw)' }}>
-                <ModalHeader >
-                    <h2 style={{ margin: 0 }}>Tags verwalten</h2>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn" onClick={refresh} disabled={busy}>Aktualisieren</button>
-                        <button className="btn primary" onClick={() => setEdit({ name: '', color: null })}>+ Neu</button>
-                        <ModalCloseButton onClick={onClose} />
-                    </div>
-                </ModalHeader>
+                <ModalHeader title="Tags verwalten" subtitle="Schlagwörter und ihre Verwendung in Buchungen." icon={<IconTags size={22} />} onClose={onClose} actions={<>
+                    <button className="btn" onClick={refresh} disabled={busy}>Aktualisieren</button>
+                    <button className="btn primary" onClick={() => setEdit({ name: '', color: null })}>+ Neu</button>
+                </>} />
                 {busy && <div className="helper">Lade …</div>}
                 <table cellPadding={6} style={{ marginTop: 4, width: '100%' }}>
                     <thead>

@@ -1,3 +1,4 @@
+import { SettingsPageHeader, SettingsSection } from '../components/index'
 import React, { useEffect, useMemo, useState } from 'react'
 import CashCheckModal from '@renderer/renderer/components/modals/CashCheckModal'
 import CashCheckAuditorsModal from '@renderer/renderer/components/modals/CashCheckAuditorsModal'
@@ -101,16 +102,11 @@ export function CashCheckPane({ notify, bumpDataVersion }: CashCheckPaneProps) {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div>
-          <strong>Kassenprüfung</strong>
-          <div className="helper">Erstelle neue Kassenprüfungen und verwalte bereits durchgeführte.</div>
-        </div>
-
+    <div className="settings-page settings-cashcheck-pane">
+      <SettingsPageHeader title="Kassenprüfung" description="Erstelle neue Kassenprüfungen und verwalte bereits durchgeführte." actions={
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div className="field" style={{ minWidth: 120 }}>
-            <select className="input" value={year} onChange={(e) => setYear(Number(e.target.value))} title="Jahr auswählen">
+            <select className="input" value={year} onChange={(e) => setYear(Number(e.target.value))} title="Jahr auswählen" aria-label="Jahr auswählen">
               {[...new Set([new Date().getFullYear(), ...yearsAvail])]
                 .sort((a, b) => b - a)
                 .map((y) => (
@@ -124,7 +120,7 @@ export function CashCheckPane({ notify, bumpDataVersion }: CashCheckPaneProps) {
             + Neue Kassenprüfung
           </button>
         </div>
-      </div>
+      } />
 
       <CashCheckModal
         open={showModal}
@@ -160,12 +156,7 @@ export function CashCheckPane({ notify, bumpDataVersion }: CashCheckPaneProps) {
         }}
       />
 
-      <section className="card" style={{ padding: 12, display: 'grid', gap: 10 }}>
-        <div>
-          <div style={{ fontWeight: 600 }}>Historie</div>
-          <div className="helper">Durchgeführte Kassenprüfungen im Jahr {year}.</div>
-        </div>
-
+      <SettingsSection title="Historie" description={`Durchgeführte Kassenprüfungen im Jahr ${year}.`}>
         {cashChecksBusy ? (
           <div className="helper">Lade…</div>
         ) : cashChecks.length === 0 ? (
@@ -173,7 +164,7 @@ export function CashCheckPane({ notify, bumpDataVersion }: CashCheckPaneProps) {
         ) : (
           <div style={{ display: 'grid', gap: 8 }}>
             {cashChecks.map((cc) => (
-              <div key={cc.id} className="card" style={{ padding: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <div key={cc.id} className="settings-record-row">
                 <div style={{ display: 'grid', gap: 2 }}>
                   <div>
                     <strong>{cc.date}</strong>
@@ -198,19 +189,17 @@ export function CashCheckPane({ notify, bumpDataVersion }: CashCheckPaneProps) {
                   title="PDF-Bericht erstellen und öffnen"
                   aria-label="PDF-Bericht erstellen und öffnen"
                   style={{
-                    background: '#c62828',
-                    color: '#fff',
                     fontWeight: 500,
                     padding: '6px 12px',
                   }}
                 >
-                  📄 PDF
+                  PDF exportieren
                 </button>
               </div>
             ))}
           </div>
         )}
-      </section>
+      </SettingsSection>
     </div>
   )
 }

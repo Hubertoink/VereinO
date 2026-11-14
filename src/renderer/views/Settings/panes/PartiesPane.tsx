@@ -1,3 +1,4 @@
+import { SettingsPageHeader } from '../components/SettingsPageHeader'
 import React from 'react'
 import { IconPencil } from '@tabler/icons-react'
 import AppIcon from '../../../components/common/AppIcon'
@@ -50,18 +51,12 @@ export function PartiesPane({ notify }: Props) {
   }
 
   return (
-    <div className="parties-pane">
-      <div className="settings-pane-heading">
-        <div>
-          <div className="settings-pane-title-row"><strong>Geschäftspartner</strong><span className="chip">{parties.length}</span></div>
-          <div className="helper">Zentrale Lieferanten- und Kundenkartei für Buchungen, Forderungen, Verbindlichkeiten und Rechnungen.</div>
-        </div>
-        <button type="button" className="btn primary" onClick={() => setDraft({ role: 'BOTH', isActive: 1 })}>+ Neuer Geschäftspartner</button>
-      </div>
+    <div className="settings-page settings-page--wide parties-pane">
+      <SettingsPageHeader title="Geschäftspartner" count={parties.length} description="Zentrale Lieferanten- und Kundenkartei für Buchungen und Rechnungen." meta="Für diese Organisation" actions={<button type="button" className="btn primary" onClick={() => setDraft({ role: 'BOTH', isActive: 1 })}>+ Neuer Geschäftspartner</button>} />
 
       <div className="parties-toolbar">
-        <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name, Ort, E-Mail oder IBAN suchen …" />
-        <select className="input" value={role} onChange={(e) => setRole(e.target.value as TPartyRole | '')}>
+        <input aria-label="Geschäftspartner suchen" className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name, Ort, E-Mail oder IBAN suchen …" />
+        <select aria-label="Rolle filtern" className="input" value={role} onChange={(e) => setRole(e.target.value as TPartyRole | '')}>
           <option value="">Alle Rollen</option>
           {Object.entries(PARTY_ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>

@@ -1,3 +1,4 @@
+import CategoryIcon from './common/CategoryIcon'
 import ModalHeader, { ModalCloseButton } from './ModalHeader'
 import { useBankDraftSourceHighlight } from '../hooks/useBankDraftSourceHighlight'
 import BankDraftSourcePanel from './booking/BankDraftSourcePanel'
@@ -617,7 +618,8 @@ export default function CompactBookingFlyout({
                   placeholder="Kategorie wählen"
                   options={classification.values.map((category) => ({
                     value: String(category.id),
-                    label: category.isActive ? `${category.icon || ''} ${category.name}`.trim() : `${category.icon || ''} ${category.name} (archiviert)`.trim(),
+                    label: category.isActive ? category.name : `${category.name} (archiviert)`,
+                    icon: <CategoryIcon value={category.icon} />,
                     color: category.color || undefined
                   }))}
                 />

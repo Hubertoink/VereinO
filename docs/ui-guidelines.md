@@ -116,6 +116,19 @@ Ein ruhiges, professionelles Interface mit klaren Hierarchien, verlässlicher Le
 
 - Abschnitte: Nummernkreise, USt-Sätze, Kategorien/Sphären, Benutzer & Rollen, Abschlussregeln, Exportpaket, Backup.
 
+#### Einstellungsseiten
+
+- Jede Unterseite beginnt mit einem einheitlichen Seitentitel und einer kurzen Erklärung; Aktionen und Status stehen bei Bedarf rechts daneben.
+- Einstellungsformulare gruppieren zusammengehörige Optionen in ruhigen Abschnitten. Beschriftung und Erklärung bleiben bei ihrem jeweiligen Control.
+- Stammdaten-Seiten verwenden einen gemeinsamen Kopf mit optionaler Suche, Zähler und Hauptaktion; Tabelle oder Liste richtet sich nach dem Inhalt.
+- Arbeitsabläufe wie Import, Sicherung und Jahresabschluss zeigen Status, Schritte, Vorschau und Bestätigung. Sie behalten ein workflow-orientiertes Layout statt in Formularzeilen gepresst zu werden.
+- Akzentfarben sind für Auswahl und Fokus reserviert; Erfolg, Warnung und Gefahr verwenden die semantischen Theme-Farben.
+- Alle 16 Einstellungsbereiche verwenden `SettingsPageHeader`. `SettingsSection` und `SettingsRow` sind die gemeinsame Basis für neue Abschnitte und Optionen; das Layout liegt gekapselt in `views/Settings/settings.css`.
+- Titel: 20 px, Abschnitt: 16 px, Beschriftung: 14 px, Hilfetext: 13 px. Außenabstand und Abschnittsabstand: 24 px; Zeilen: 16 px. Unter 650 px Inhaltsbreite stehen Controls unter ihrer Beschreibung.
+- Sichtbarkeit und Reihenfolge der Spalten, Zeilenhöhe, Zeilenlayout, Eintragsanzahl und Datumsformat sind unter „Tabelle“ gebündelt. Die Vorschau reagiert auf die Auswahl.
+- Stammdaten verwenden neutrale Listenzeilen mit kleinen Farbpunkten, Zähler und Hauptaktion im Seitenkopf. Farbe darf die Bezeichnung nicht ersetzen.
+- Hinweise zum Geltungsbereich und zur Speicherung beschreiben das tatsächliche Verhalten. Automatische Übernahme und explizite Formularaktionen bleiben unterscheidbar; ohne Rückmeldung des Speichervorgangs wird kein „Gespeichert“-Status behauptet.
+
 ## Komponentenbibliothek
 
 - Navigation: Sidebar mit kompakten Icons + Labels, aktiv deutlich.
@@ -261,3 +274,38 @@ export function Card({ title, children, actions }) {
 
 - Budgets & Zweckbindungen: Mülleimer-Icon (🗑) in Zeilen verwendet den `btn danger` Stil (rot), um die destruktive Aktion klar zu signalisieren.
 - Buchungen: Kein Lösch-Button mehr in der Journal-Tabelle. Löschen erfolgt innerhalb des Bearbeiten-Dialogs (unten links), der die bestehende Bestätigungsabfrage öffnet.
+
+
+## Kompakte Dialoge
+
+- Stammdatenformulare verwenden `MasterDataDialog` und `ColorField`: Icon-Kachel, Titel und kurzer Hilfstext, statische Feldbeschriftungen, getrennte Fußzeile mit Aktionen.
+- Standardbreite 700 px, kurze Formulare 540 px; unter 440 px stehen die Formularfelder untereinander. Hohe Inhalte scrollen, Kopf und Fuß bleiben erreichbar.
+- Feldhöhe 36 px, Labels 12 px, dünne Fokuslinie statt eingefärbter Fokusfläche. Alle Farben stammen aus den Theme-Tokens.
+- Status und Farbe bilden bei Konten eine eigene kompakte Zeile. Farbchips sind 22 px groß; eigene und zufällige Farben zeigen eine sichtbare Farbprobe.
+- Alle übrigen Dialoge übernehmen den gemeinsamen `ModalHeader`, die neutrale Schließen-Schaltfläche und die gemeinsamen Oberflächen-/Fokusregeln. Fachlich umfangreiche Dialoge behalten ihre benötigte Größe und Gliederung.
+- Verschachtelte Farbdialoge dürfen beim Schließen oder Speichern das übergeordnete Formular nicht auslösen. Escape, Strg/Cmd+S und die Rückgabe des Fokus werden in den Formular-UI-Tests geprüft.
+
+- Kategorie-Symbole stammen aus `@tabler/icons-react` (MIT). `utils/categoryIcons.ts` verwaltet kurze stabile Schlüssel und die Zuordnung früherer Emoji-Werte; `CategoryIcon` rendert das monochromatische Bibliotheks-Symbol. Native Selects zeigen den Kategorienamen ohne Icon-Schlüssel.
+
+
+## Erstes Setup
+
+- Vier Schritte: Willkommen, Deine Ansicht, Datensicherung, Startklar. Ein maximal 900 px breiter Dialog mit beschrifteter Schrittfolge und festem Aktionsbereich; nur der Inhalt scrollt.
+- Organisationsname, verantwortliche Person, Buchungsansicht, optionales Farbschema und Sicherungseinstellungen bilden den Kern. Starter-Tags sind optional und werden bewusst ausgewählt.
+- Eingaben bleiben bis „VereinO starten“ lokal im Entwurf. Auch die Ordnerauswahl verändert den Sicherungsort erst beim Abschluss. „Später einrichten“ und Escape verwerfen diesen Entwurf.
+- Bestehende Workflow- und Tabelleneinstellungen bleiben unverändert. Speicherfehler bleiben sichtbar, ein erneuter Versuch erzeugt keine doppelten Tags, und `setup.completed` wird zuletzt gesetzt.
+- Nicht abgeschlossene Einrichtungen werden beim Start einmal pro Organisation und Sitzung angeboten. Der Sicherungshinweis wird währenddessen nicht zusätzlich geöffnet.
+- Seitenspezifische Hinweise ergänzen das Setup für Buchungen und Bankimport; Details stehen unten.
+
+- Farbschema-Auswahl im Setup rendert beide Buchungsminiaturen sofort mit den gemeinsamen App-Paletten. Der Scope `.setup-theme-preview` setzt lokale Theme-Tokens; das globale Theme bleibt bis zum Abschluss unverändert.
+
+## Kontextuelle Seitenhilfe
+
+- Rechtsklick auf „Buchungen“ oder „Bankimport“ in der seitlichen oder oberen Navigation öffnet „Hilfe zu dieser Seite“. Umschalt+F10 und die Kontextmenütaste bieten denselben Zugang, Pfeiltasten navigieren im Menü. Bei Buchungen enthält es zusätzlich „Klassisch“ und „Plus“ als Auswahl mit sichtbarem aktuellem Zustand.
+- Themen: Buchungsansichten mit Vorschau, klassische Spaltenauswahl, Plus-Details und Filter, Erfassungs-/Speicherverhalten und der Weg vom importierten Bankbeleg zur Buchung. Ansichtswechsel und Workflow-Einstellungen erfolgen nur auf ausdrückliche Auswahl.
+- Automatische Hinweise gelten nur für Organisationen ohne abgeschlossenes Setup und ohne bestehende Buchungen bei der ersten Initialisierung. Bestehende Nutzer bekommen beim Update keine automatische Einführung; die Hilfe bleibt manuell erreichbar.
+- Maximal eine nichtmodale Karte gleichzeitig; keine automatische Tour. Pro Seitenbesuch höchstens ein Hinweis. Die erste erfolgreiche Buchung bzw. der erste erfolgreiche Bankimport kann einen neuen passenden Hinweis auslösen. Fehlgeschlagene Operationen und Bearbeitungen lösen nichts aus.
+- Die Seite muss geladen und mindestens 1,8 Sekunden ohne Dialog/Dropdown bereit sein. Offene Dialoge, seitliche Buchungsformulare und die responsive Navigationsüberlagerung unterdrücken Karten. Automatische Karten übernehmen keinen Fokus.
+- „Später“ verschiebt das Thema um mindestens 24 Stunden und bis zu einem späteren Seitenbesuch. „Nicht mehr anzeigen“ schließt es dauerhaft von automatischen Hinweisen aus. Manuelles Wiederaufrufen bleibt möglich. Fortschritt liegt pro Organisation und Gerät in `vereinO.page-help.v1:<orgId>`; ein Organisationswechsel verwirft offene Karten und Menüs.
+- Theme-Tokens, Tabler-Icons (MIT), kleine Bildschirmbreiten und reduzierte Bewegung werden unterstützt. Keine zusätzliche dauerhaft sichtbare Hilfeschaltfläche in der Navigation.
+- Karten wählen rechts, links, unterhalb oder oberhalb ihres Bezugselements einen freien Platz mit 14 px Abstand. Bei wenig Höhe scrollt die Karte innerhalb der freien Fläche; das erklärte Bedienelement bleibt frei. Scrollen, Größenänderungen und wechselnde Inhalte berechnen die Platzierung neu.

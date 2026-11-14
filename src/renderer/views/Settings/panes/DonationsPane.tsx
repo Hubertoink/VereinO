@@ -1,3 +1,4 @@
+import { SettingsPageHeader } from '../components/SettingsPageHeader'
 import React from 'react'
 import type { OrgPaneProps } from '../types'
 import DonationReceiptModal, { DonationReceiptDraft } from '../../../components/modals/DonationReceiptModal'
@@ -141,11 +142,8 @@ export function DonationsPane({ notify }: OrgPaneProps) {
   }
 
   return (
-    <div className="settings-pane donations-pane">
-      <section className="card settings-pane-card">
-        <strong>💝 Spendenbescheinigung</strong>
-        <div className="helper">Assistent für Geld- und Sachzuwendungen nach § 10b EStG mit PDF- und Word-Export.</div>
-      </section>
+    <div className="settings-page settings-pane donations-pane">
+      <SettingsPageHeader title="Spenden" description="Verwalte Standarddaten und Entwürfe für Geld- und Sachzuwendungen mit PDF- und Word-Export." meta="Für diese Organisation · Standarddaten mit „Speichern“ übernehmen." />
 
       <section className="card settings-pane-card donations-defaults">
         <strong>Standarddaten</strong>
@@ -194,7 +192,7 @@ export function DonationsPane({ notify }: OrgPaneProps) {
         ) : (
           <div className="donations-draft-list">
             {drafts.map((draft) => (
-              <div key={draft.id} className="card donations-draft-item">
+              <div key={draft.id} className="settings-record-row donations-draft-item">
                 <div>
                   <div className="donations-draft-title">{draft.donorName || 'Ohne Name'}</div>
                   <div className="helper">

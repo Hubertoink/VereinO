@@ -4,6 +4,7 @@ import type { LocalInvoiceScanDraftState } from '../components/modals/LocalInvoi
 import type { InvoiceAiGuidance } from '../types/invoiceAiGuidance'
 import type { BookingEntryPresentation } from '../context/UIPreferencesContextCore'
 import { encodeFilesForUpload } from '../utils/fileEncoding'
+import { signalTutorialEvent } from '../utils/pageTutorials'
 import type { BankDraftSource } from '../types/bankDraftSource'
 import type { PartyCreationSource } from '../utils/partyCreationSource'
 
@@ -474,6 +475,7 @@ export function useQuickAdd(
 
         const res = await create(payload)
         if (res) {
+            signalTutorialEvent('booking-saved')
             if (activeDraft.invoiceBatchJobId) {
                 try {
                     await window.api.ai.invoiceBatch.approve({ id: activeDraft.invoiceBatchJobId, voucherId: res.id })

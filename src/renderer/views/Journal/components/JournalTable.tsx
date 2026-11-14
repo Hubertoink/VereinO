@@ -1,3 +1,4 @@
+import CategoryIcon from '../../../components/common/CategoryIcon'
 ﻿import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { IconLock, IconPencil, IconRotateClockwise } from '@tabler/icons-react'
@@ -789,7 +790,7 @@ export default function JournalTable({
         ) : k === 'type' ? (
             <td key={k}><span className={`badge voucher-type-badge voucher-type-badge--${r.type.toLowerCase()} ${r.type.toLowerCase()}`}>{r.type}</span></td>
         ) : k === 'sphere' ? (
-            <td key={k} className="journal-badge-cell">{r.type === 'TRANSFER' ? '' : isGeneralProfile ? <span className="badge" style={{ background: r.primaryClassificationColor || 'var(--muted)', color: '#fff' }}>{r.primaryClassificationIcon ? `${r.primaryClassificationIcon} ` : ''}{r.primaryClassificationName || '—'}</span> : <span className={`badge sphere-${r.sphere.toLowerCase()}`}>{r.sphere}</span>}</td>
+            <td key={k} className="journal-badge-cell">{r.type === 'TRANSFER' ? '' : isGeneralProfile ? <span className="badge" style={{ background: r.primaryClassificationColor || 'var(--muted)', color: '#fff' }}><CategoryIcon value={r.primaryClassificationIcon} />{r.primaryClassificationName || '—'}</span> : <span className={`badge sphere-${r.sphere.toLowerCase()}`}>{r.sphere}</span>}</td>
         ) : k === 'description' ? (
             <td key={k}>
                 <div className="journal-description-cell" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>

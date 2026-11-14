@@ -1,6 +1,7 @@
 import { currentAiDraftComment } from './utils/aiBookingDraft'
 import { openReportBookings } from './utils/reportNavigation'
 import ModalHeader from './components/ModalHeader'
+import PageTutorials from './components/tutorials/PageTutorials'
 import { resolveBankDraftParty } from './utils/bankDraftParty'
 import { bankDraftSourceFromTransaction } from './types/bankDraftSource'
 import { invoiceDescription } from './utils/invoiceDescription'
@@ -706,6 +707,7 @@ function DetachedQuickAddWindow() {
           if (warnings?.length) warnings.forEach((msg) => notify('info', 'Warnung: ' + msg))
           notifyBookingSaved({
             ...res,
+            mode: 'create',
             draftId: detachedDraftIdRef.current,
             agentDraftId: payload?.agentDraftId
           })
@@ -2015,6 +2017,7 @@ function AppInner() {
   const [showMetaFilter, setShowMetaFilter] = useState<boolean>(false)
   // Setup Wizard modal state
   const [showSetupWizard, setShowSetupWizard] = useState<boolean>(false)
+  const setupOfferedOrganizations = useRef(new Set<string>())
 
   useEffect(() => {
     try {
@@ -2191,6 +2194,7 @@ function AppInner() {
           if (p?.bankTransactionId) dispatchDataChanged(['bank-imports'])
           notifyBookingSaved({
             ...res,
+            mode: 'create',
             agentDraftId: p?.agentDraftId
           })
         }
@@ -2997,6 +3001,19 @@ function AppInner() {
         setTagDefs(data.tags as typeof tagDefs)
         setPeriodLock(data.periodLock)
 
+        const [setup, active] = await Promise.all([
+          window.api.settings.get({ key: 'setup.completed' }),
+          window.api.organizations.active(),
+        ])
+        if (cancelled) return
+        if (setup.value !== true && active.organization) {
+          if (!setupOfferedOrganizations.current.has(active.organization.id)) {
+            setupOfferedOrganizations.current.add(active.organization.id)
+            setShowSetupWizard(true)
+          }
+          // The setup handles backup preferences; don't stack a backup prompt over it.
+          return
+        }
         const { mode, intervalDays, lastAuto } = data.backup
         const due = !lastAuto || Date.now() - lastAuto > intervalDays * 24 * 60 * 60 * 1000
         if (mode === 'PROMPT' && due) setAutoBackupPrompt({ intervalDays })
@@ -3445,6 +3462,7 @@ function AppInner() {
       )}
 
       {/* Main content */}
+      <PageTutorials page={activePage} bookingView={bookingView} setBookingView={setBookingView} openSettings={openSettingsTile} />
       <main className={`app-main${isClassicBookings ? ' app-main--journal' : isPlusBookings ? ' app-main--bookings-plus' : ''}`}>
         <Suspense fallback={<LoadingState message="Bereich wird geladen…" />}>
           {activePage === 'Reports' && (
@@ -4210,116 +4228,8 @@ function AppInner() {
           onClose={() => setShowSetupWizard(false)}
           bookingView={bookingView}
           setBookingView={setBookingView}
-          navLayout={navLayout}
-          setNavLayout={(v) => {
-            setNavLayout(v)
-            try {
-              localStorage.setItem('ui.navLayout', v)
-            } catch {}
-          }}
-          navIconColorMode={navIconColorMode}
-          setNavIconColorMode={(v) => {
-            setNavIconColorMode(v)
-            try {
-              localStorage.setItem('ui.navIconColorMode', v)
-            } catch {}
-          }}
           colorTheme={colorTheme}
-          setColorTheme={(v) => {
-            setColorTheme(v)
-            try {
-              localStorage.setItem('ui.colorTheme', v)
-            } catch {}
-            try {
-              document.documentElement.setAttribute('data-color-theme', v)
-            } catch {}
-          }}
-          journalRowStyle={journalRowStyle}
-          setJournalRowStyle={(v) => {
-            setJournalRowStyle(v)
-            try {
-              localStorage.setItem('ui.journalRowStyle', v)
-            } catch {}
-            try {
-              document.documentElement.setAttribute('data-journal-row-style', v)
-            } catch {}
-          }}
-          journalRowDensity={journalRowDensity}
-          setJournalRowDensity={(v) => {
-            setJournalRowDensity(v)
-            try {
-              localStorage.setItem('ui.journalRowDensity', v)
-            } catch {}
-            try {
-              document.documentElement.setAttribute('data-journal-row-density', v)
-            } catch {}
-          }}
-          backgroundImage={backgroundImage}
-          setBackgroundImage={(v) => {
-            setBackgroundImage(v)
-            try {
-              localStorage.setItem('ui.backgroundImage', v)
-            } catch {}
-            try {
-              document.documentElement.setAttribute('data-background-image', v)
-            } catch {}
-          }}
-          customBackgroundImage={customBackgroundImage}
-          setCustomBackgroundImage={(v) => {
-            setCustomBackgroundImage(v)
-          }}
-          glassModals={glassModals}
-          setGlassModals={(v) => {
-            setGlassModals(v)
-            try {
-              localStorage.setItem('ui.glassModals', String(v))
-            } catch {}
-            try {
-              document.documentElement.setAttribute('data-glass-modals', String(v))
-            } catch {}
-          }}
-          dateFmt={dateFmt}
-          setDateFmt={(v) => {
-            setDateFmt(v)
-            try {
-              localStorage.setItem('ui.dateFmt', v)
-            } catch {}
-          }}
-          showBookingDraftTabs={showBookingDraftTabs}
-          setShowBookingDraftTabs={(v) => {
-            setShowBookingDraftTabs(v)
-            try {
-              localStorage.setItem('ui.showBookingDraftTabs', String(v))
-            } catch {}
-          }}
-          showBookingEditTabs={showBookingEditTabs}
-          setShowBookingEditTabs={(v) => {
-            setShowBookingEditTabs(v)
-            try {
-              localStorage.setItem('ui.showBookingEditTabs', String(v))
-            } catch {}
-          }}
-          bookingEntryPresentation={bookingEntryPresentation}
-          setBookingEntryPresentation={(v) => {
-            setBookingEntryPresentation(v)
-            try {
-              localStorage.setItem('ui.bookingEntryPresentation', v)
-            } catch {}
-          }}
-          allowVoucherDeletion={allowVoucherDeletion}
-          setAllowVoucherDeletion={(v) => {
-            setAllowVoucherDeletion(v)
-            try {
-              localStorage.setItem('ui.allowVoucherDeletion', String(v))
-            } catch {}
-          }}
-          quickAddAfterSave={quickAddAfterSave}
-          setQuickAddAfterSave={(v) => {
-            setQuickAddAfterSave(v)
-            try {
-              localStorage.setItem('ui.quickAddAfterSave', v)
-            } catch {}
-          }}
+          setColorTheme={setColorTheme}
           existingTags={tagDefs as any}
           notify={notify}
         />

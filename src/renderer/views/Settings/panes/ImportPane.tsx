@@ -1,3 +1,4 @@
+import { SettingsPageHeader } from '../components/SettingsPageHeader'
 import ModalHeader, { ModalCloseButton } from '../../../components/ModalHeader'
 import React from 'react'
 import { ImportPaneProps } from '../types'
@@ -64,16 +65,8 @@ export function ImportPane({ notify }: ImportPaneProps) {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <div style={{ display: 'grid', gap: 6 }}>
-          <strong>Datenimport</strong>
-          <div className="helper">Importiere Buchungen oder Mitglieder aus Excel-Dateien.</div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="btn" title="Import-Log anzeigen" onClick={() => { setShowLog(true); loadLog() }}><IconListDetails size={16} aria-hidden="true" /> Log</button>
-        </div>
-      </div>
+    <div className="settings-page settings-import-pane">
+      <SettingsPageHeader title="Datenimport" description="Importiere Buchungen oder Mitglieder aus Excel-Dateien: Datei auswählen, Zuordnung prüfen, importieren." actions={<button className="btn" title="Import-Log anzeigen" onClick={() => { setShowLog(true); loadLog() }}><IconListDetails size={16} aria-hidden="true" /> Import-Log</button>} />
 
       {/* Tab Buttons */}
       <div className="import-pane-tabs" role="tablist" aria-label="Importtyp">
@@ -98,7 +91,9 @@ export function ImportPane({ notify }: ImportPaneProps) {
       {/* Tab Content */}
       {activeTab === 'vouchers' && (
         <div>
-          <div className="helper" style={{ marginBottom: 8 }}>
+          <details className="settings-disclosure">
+            <summary>Hinweise zum Dateiformat</summary>
+            <div className="helper">
             Excel (.xlsx). Vorschau → Zuordnung prüfen → Import. Kontoauszüge werden im Hauptbereich „Bankimport“ verarbeitet.
             <ul style={{ margin: '4px 0 0 16px' }}>
               <li>Empfohlen: Kopfzeile in Zeile 1, Daten ab Zeile 2. Keine zusammengeführten Zellen.</li>
@@ -106,14 +101,17 @@ export function ImportPane({ notify }: ImportPaneProps) {
               <li>Mindestens: Datum und Betrag (Brutto oder Netto+USt). Optional: Art, Sphäre, Zweckbindung, Zahlweg.</li>
               <li>Bank-/Bar-Split: Alternativ die vier Spalten Bank+/-, Bar+/- verwenden (erzeugt ggf. mehrere Buchungen pro Zeile).</li>
             </ul>
-          </div>
+            </div>
+          </details>
           <ImportXlsxCard notify={notify} />
         </div>
       )}
 
       {activeTab === 'members' && (
         <div>
-          <div className="helper" style={{ marginBottom: 8 }}>
+          <details className="settings-disclosure">
+            <summary>Hinweise zum Dateiformat</summary>
+            <div className="helper">
             Excel (.xlsx) mit Mitgliederdaten. Vorschau → Zuordnung prüfen → Import.
             <ul style={{ margin: '4px 0 0 16px' }}>
               <li>Pflichtfelder: Mitgliedsnummer, Eintrittsdatum und Name (oder Vor-/Nachname).</li>
@@ -121,7 +119,8 @@ export function ImportPane({ notify }: ImportPaneProps) {
               <li>Adresse kann vollständig oder als Straße/PLZ/Ort aufgeteilt sein.</li>
               <li>Bestehende Mitglieder können optional aktualisiert werden (nach Mitgliedsnummer).</li>
             </ul>
-          </div>
+            </div>
+          </details>
           <MembersImportCard notify={notify} />
         </div>
       )}

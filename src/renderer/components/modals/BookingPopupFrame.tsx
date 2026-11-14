@@ -8,6 +8,7 @@ type BookingPopupFrameProps = {
   title: React.ReactNode
   titleId?: string
   subtitle?: React.ReactNode
+  icon?: React.ReactNode
   onClose: () => void
   className?: string
   overlayClassName?: string
@@ -30,6 +31,7 @@ export default function BookingPopupFrame({
   title,
   titleId,
   subtitle,
+  icon,
   onClose,
   className = '',
   overlayClassName = '',
@@ -99,6 +101,7 @@ export default function BookingPopupFrame({
           title={title}
           titleId={titleId}
           subtitle={subtitle}
+          icon={icon}
           actions={headerAccessory}
           onClose={onClose}
           closeOnEscape={false}

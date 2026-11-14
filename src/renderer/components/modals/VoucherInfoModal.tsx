@@ -1,3 +1,4 @@
+import CategoryIcon from '../common/CategoryIcon'
 import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import PartyName from '../common/PartyName'
 import ReimbursementsDialog from '../../views/reimbursements/ReimbursementsDialog'
@@ -134,7 +135,7 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
   const sphereLabel = voucher.sphere === 'IDEELL' ? 'Ideell' : voucher.sphere === 'ZWECK' ? 'Zweckbetrieb' : voucher.sphere === 'VERMOEGEN' ? 'Vermögensverwaltung' : 'Wirt. Geschäftsbetrieb'
   const classificationLabel = isGeneralProfile ? 'Kategorie' : 'Sphäre'
   const classificationValue = isGeneralProfile
-    ? `${voucher.primaryClassificationIcon ? `${voucher.primaryClassificationIcon} ` : ''}${voucher.primaryClassificationName || '—'}`
+    ? voucher.primaryClassificationName || '—'
     : sphereLabel
 
   useEffect(() => {
@@ -558,7 +559,7 @@ Status: ${statusLabel}`
             <section className="card voucher-info-card voucher-info-information">
               <h3 className="voucher-info-section-title"><IconInfoCircle size={18} />Buchungsinformationen</h3>
               <div className="voucher-info-detail-row"><span>Art</span><div><span className={`badge ${voucher.type.toLowerCase()}`}>{typeLabel}</span></div></div>
-              <div className="voucher-info-detail-row"><span>{classificationLabel}</span><span>{classificationValue}</span></div>
+              <div className="voucher-info-detail-row"><span>{classificationLabel}</span><span>{isGeneralProfile && <CategoryIcon value={voucher.primaryClassificationIcon} />}{classificationValue}</span></div>
               <div className="voucher-info-detail-row"><span>Zahlweg</span><span>{paymentLabel}</span></div>
               <div className="voucher-info-assignments">
             {isLockedByStorno ? (

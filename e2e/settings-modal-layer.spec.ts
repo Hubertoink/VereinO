@@ -24,7 +24,7 @@ test.beforeAll(async () => {
         const [rows, setRows] = useState(accounts)
         const [cash, setCash] = useState(false)
         const [auditors, setAuditors] = useState(false)
-        return <section className="card settings-content" style={{ margin: '180px 60px', height: 160, overflow: 'hidden' }}>
+        return <section className="card settings-content settings-unified" style={{ margin: '180px 60px', height: 160, overflow: 'hidden' }}>
           <PaymentAccountsPane paymentAccounts={rows} setPaymentAccounts={setRows} notify={noop} bumpDataVersion={noop} />
           <button onClick={() => setCash(true)}>Kassenprüfung öffnen</button>
           <button onClick={() => setAuditors(true)}>Prüfer öffnen</button>
@@ -33,10 +33,10 @@ test.beforeAll(async () => {
         </section>
       }
       createRoot(document.getElementById('root')).render(<Harness />)
-    ` }, bundle: true, write: false, platform: 'browser', define: { 'process.env.NODE_ENV': '"production"' }
+    ` }, bundle: true, write: false, platform: 'browser', jsx: 'automatic', loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' }
   })
   script = result.outputFiles[0].text
-  styles = await readFile('src/renderer/styles.css', 'utf8')
+  styles = (await Promise.all(['src/renderer/styles.css', 'src/renderer/views/Settings/settings.css', 'src/renderer/components/modalHeader.css'].map(file => readFile(file, 'utf8')))).join('\n')
 })
 
 for (const glass of [false, true]) {

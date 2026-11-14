@@ -1,3 +1,4 @@
+import CategoryIcon from '../common/CategoryIcon'
 import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import { useInvoicePaste } from '../../hooks/useInvoicePaste'
 import type { PartyCreationSource } from '../../utils/partyCreationSource'
@@ -1516,7 +1517,7 @@ export default function LocalInvoiceScanModal({
                   {isGeneralProfile ? <SelectField
                     label="Kategorie"
                     value={String(bookingMeta.primaryClassificationValueId || '')}
-                    options={categories.map((category) => ({ value: String(category.id), label: `${category.icon ? `${category.icon} ` : ''}${category.name}` }))}
+                    options={categories.map((category) => ({ value: String(category.id), label: category.name, icon: <CategoryIcon value={category.icon} /> }))}
                     onChange={(value) => setBookingMeta((current) => ({ ...current, primaryClassificationValueId: value ? Number(value) : null }))}
                   /> : <SelectField
                     label="Sphäre"

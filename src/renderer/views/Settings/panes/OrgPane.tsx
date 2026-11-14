@@ -1,3 +1,4 @@
+import { SettingsPageHeader, SettingsSection } from '../components'
 import { switchOrganizationWithTransition } from '../../../utils/organizationTransition'
 import React from 'react'
 import { OrgPaneProps } from '../types'
@@ -7,7 +8,7 @@ import TaxExemptionModal from '../../../components/modals/TaxExemptionModal'
 import type { TaxExemptionCertificate } from '../../../../../shared/types'
 import type { ClassificationValue, OrganizationProfile } from '../../../../../shared/classification'
 import { addDataChangedListener, dispatchDataChanged } from '../../../utils/refresh'
-import { IconBuilding, IconLayoutList, IconTags } from '@tabler/icons-react'
+import { IconBuilding, IconTags } from '@tabler/icons-react'
 
 interface ActiveOrg {
   id: string
@@ -240,10 +241,11 @@ export function OrgPane({ notify }: OrgPaneProps) {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div className="settings-page settings-org-pane">
+      <SettingsPageHeader title="Organisation" description="Verwalte Organisationsprofil, Angaben für Exporte und hinterlegte Dokumente." meta="Formulare werden über die jeweilige Aktion gespeichert." />
       {/* Active Organization Name (for switcher) */}
       {activeOrg && (
-        <div style={{ marginBottom: 12, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
+        <section className="settings-org-section">
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
             <div>
               <strong><IconBuilding size={16} aria-hidden="true" /> Aktive Organisation</strong>
@@ -271,10 +273,10 @@ export function OrgPane({ notify }: OrgPaneProps) {
               Umbenennen
             </button>
           </div>
-        </div>
+        </section>
       )}
 
-      <div style={{ paddingBottom: 16, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 12 }}>
+      <div className="settings-org-section settings-org-profile" style={{ paddingBottom: 16, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 12 }}>
         <div>
           <strong>{profile === 'GENERAL' ? <><IconTags size={16} aria-hidden="true" /> Allgemeine Budgetverwaltung</> : <><IconBuilding size={16} aria-hidden="true" /> Gemeinnützige Organisation</>}</strong>
           <div className="helper" style={{ marginTop: 4 }}>
@@ -387,11 +389,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
         </div>
       )}
 
-      {/* Organization Display Settings */}
-      <div>
-        <strong><IconLayoutList size={16} aria-hidden="true" /> Anzeige-Einstellungen</strong>
-        <div className="helper">Diese Angaben erscheinen in der Titelleiste und in Exporten.</div>
-      </div>
+      <SettingsSection title="Angaben für Anzeige und Exporte" description="Diese Angaben erscheinen in der Titelleiste und in Exporten. Änderungen anschließend speichern.">
       {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
       <div className="row">
         <div className="field">
@@ -470,10 +468,12 @@ export function OrgPane({ notify }: OrgPaneProps) {
         <button className="btn primary" disabled={busy} onClick={save}>Speichern</button>
       </div>
 
+      </SettingsSection>
+
       {/* Tax Exemption Certificate Section */}
-      {profile !== 'GENERAL' && <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+      {profile !== 'GENERAL' && <div className="settings-org-section">
         <div style={{ marginBottom: 12 }}>
-          <strong>📄 Steuerbefreiungsbescheid</strong>
+          <h3>Steuerbefreiungsbescheid</h3>
           <div className="helper">Gemeinnützigkeitsbescheid für Spendenbescheinigungen hinterlegen</div>
         </div>
 
