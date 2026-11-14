@@ -20,7 +20,7 @@ Installationspakete:
 | Linux | `VereinO-<version>-x86_64.AppImage` | Direkt ausführbare AppImage-Datei |
 | macOS | `VereinO-<version>-x64.dmg` / `.zip` | Wird vom GitHub-Release-Workflow gebaut; aktuell unsigniert |
 
-Der gebrandete Windows-Assistent ist für das nächste Release vorbereitet. Bereits veröffentlichte Installer behalten ihr bisheriges Design.
+Ab Version 4.15.2 führt der Windows-Assistent mit VereinO-Branding durch die Installation und folgt dem hellen oder dunklen Windows-App-Modus.
 
 macOS-Hinweis: Ohne Apple Developer ID ist die App nicht signiert/notarisiert. Beim ersten Start kann macOS deshalb eine Gatekeeper-Warnung zeigen; in dem Fall die App per Rechtsklick -> Öffnen starten.
 

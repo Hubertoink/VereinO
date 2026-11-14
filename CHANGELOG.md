@@ -7,6 +7,8 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.15.2] - 2026-11-14
+
 ### Geändert
 
 - Der Windows-Installer führt mit VereinO-Branding durch Begrüßung, MIT-Lizenz, Installationsart und Zielordner. Automatische Updates verwenden weiterhin den bestehenden Update-Ablauf.
