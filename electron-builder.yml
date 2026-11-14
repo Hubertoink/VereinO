@@ -13,6 +13,9 @@ asarUnpack:
 extraResources:
   - from: assets/ocr
     to: ocr
+extraFiles:
+  - from: LICENSE
+    to: LICENSE.txt
 directories:
   output: release
 win:
@@ -20,6 +23,23 @@ win:
     - target: nsis
       arch: [x64]
   icon: build/Icon.ico
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  installerIcon: build/Icon.ico
+  uninstallerIcon: build/Icon.ico
+  installerSidebar: build/installerSidebar.bmp
+  uninstallerSidebar: build/installerSidebar.bmp
+  installerHeader: build/installerHeader.bmp
+  include: build/installer.nsh
+  license: LICENSE
+  installerLanguages:
+    - de_DE
+  language: 1031
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
 artifactName: '${productName}-Setup-${version}-${arch}.${ext}'
 mac:
   category: public.app-category.finance

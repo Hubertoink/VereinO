@@ -1,6 +1,8 @@
 # VereinO
 
-Offline-first Desktop-App für moderne Vereinsbuchhaltung.
+[![Lizenz: MIT](https://img.shields.io/badge/Lizenz-MIT-22a06b.svg)](LICENSE)
+
+Open-Source-Desktop-App für moderne Vereinsbuchhaltung – lokal, offline-first und unter der MIT-Lizenz.
 
 VereinO richtet sich an gemeinnützige Vereine, die Buchungen, Belege, Mitglieder, Budgets, Zweckbindungen, Rechnungen und Berichte lokal verwalten möchten. Die Buchhaltung bleibt auf dem eigenen Gerät.
 
@@ -10,13 +12,15 @@ Die einfachste Installation läuft über die GitHub-Releases:
 
 [VereinO Releases](https://github.com/Hubertoink/VereinO/releases)
 
-Aktuelle Release-Artefakte:
+Installationspakete:
 
 | System | Datei | Hinweis |
 | --- | --- | --- |
-| Windows | `VereinO-Setup-<version>-x64.exe` | Empfohlener Installer mit Auto-Update-Metadaten |
+| Windows | `VereinO-Setup-<version>-x64.exe` | Geführter VereinO-Setup-Assistent mit MIT-Lizenzanzeige und Auto-Update-Metadaten |
 | Linux | `VereinO-<version>-x86_64.AppImage` | Direkt ausführbare AppImage-Datei |
 | macOS | `VereinO-<version>-x64.dmg` / `.zip` | Wird vom GitHub-Release-Workflow gebaut; aktuell unsigniert |
+
+Der gebrandete Windows-Assistent ist für das nächste Release vorbereitet. Bereits veröffentlichte Installer behalten ihr bisheriges Design.
 
 macOS-Hinweis: Ohne Apple Developer ID ist die App nicht signiert/notarisiert. Beim ersten Start kann macOS deshalb eine Gatekeeper-Warnung zeigen; in dem Fall die App per Rechtsklick -> Öffnen starten.
 
@@ -103,7 +107,9 @@ Der GitHub-Workflow erstellt anschließend die Release-Artefakte für Windows, L
 
 ## Lizenz
 
-MIT License. Details stehen in [LICENSE](LICENSE), sofern die Lizenzdatei im Checkout vorhanden ist.
+VereinO ist Open Source und steht unter der [MIT-Lizenz](LICENSE). Du darfst den Code nutzen, verändern und weitergeben, auch kommerziell, unter den Bedingungen dieser Lizenz.
+
+Neu gebaute Windows-Installer zeigen die Lizenz an. Eine Kopie liegt außerdem als `LICENSE.txt` im installierten Anwendungsverzeichnis. Eingebundene Bibliotheken und andere Drittanbieterbestandteile behalten ihre jeweiligen Lizenzen.
 
 ## Support
 

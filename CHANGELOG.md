@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an VereinO werden in dieser Datei dokumentiert.
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/)
 und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unreleased]
+
+### Geändert
+
+- Der Windows-Installer führt mit VereinO-Branding durch Begrüßung, MIT-Lizenz, Installationsart und Zielordner. Automatische Updates verwenden weiterhin den bestehenden Update-Ablauf.
+- GitHub und README kennzeichnen VereinO als Open Source unter der MIT-Lizenz. Der vollständige Lizenztext liegt im Repository und wird mit der Anwendung ausgeliefert.
+
 ## [4.15.1] - 2026-11-13
 
 ### Hinzugefügt

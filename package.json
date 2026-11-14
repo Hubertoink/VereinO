@@ -6,6 +6,11 @@
   "main": "dist-electron/main/index.cjs",
   "author": "Nikolas Häfner",
   "license": "MIT",
+  "homepage": "https://github.com/Hubertoink/VereinO",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Hubertoink/VereinO.git"
+  },
   "type": "module",
   "scripts": {
     "predev": "node scripts/ensure-electron-arch.cjs && node scripts/rebuild-native.cjs",
