@@ -17,7 +17,7 @@
     "dev": "node scripts/run-electron-vite.cjs dev",
     "prebuild": "node scripts/ensure-electron-arch.cjs",
     "build": "electron-vite build",
-    "prepackage": "npm run build",
+    "prepackage": "npm run build && node scripts/build-installer-theme.cjs",
     "release:artifacts": "npm run package",
     "release:publish": "node scripts/publish-release.cjs",
     "prepreview": "node scripts/ensure-electron-arch.cjs",

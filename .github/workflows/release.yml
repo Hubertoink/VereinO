@@ -56,6 +56,10 @@ jobs:
       - name: Build app
         run: npm run build
 
+      - name: Verify Windows installer theme
+        if: matrix.platform == 'windows'
+        run: node scripts/build-installer-theme.cjs --test
+
       - name: Package app
         run: npm run package -- --publish never
 

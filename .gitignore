@@ -6,6 +6,8 @@ release/
 Thumbs.db
 *.log
 *.tsbuildinfo
+/build/installer-theme/generated/
+/build/installer-theme/VereinOTheme.dll
 /.idea/
 /.vscode/*.log
 /.vscode/*.db

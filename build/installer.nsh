@@ -1,6 +1,19 @@
 ; Keep electron-builder's installation, upgrade and uninstall implementation.
 ; Only the presentation of its assisted installer is customized here.
 
+!addplugindir /x86-unicode "${BUILD_RESOURCES_DIR}\installer-theme"
+!ifdef BUILD_UNINSTALLER
+  !define MUI_CUSTOMFUNCTION_UNGUIINIT un.VereinOThemeInit
+  Function un.VereinOThemeInit
+    VereinOTheme::Init /NOUNLOAD
+  FunctionEnd
+!else
+  !define MUI_CUSTOMFUNCTION_GUIINIT VereinOThemeInit
+  Function VereinOThemeInit
+    VereinOTheme::Init /NOUNLOAD
+  FunctionEnd
+!endif
+
 !macro customWelcomePage
   !insertmacro skipPageIfUpdated
   !define MUI_WELCOMEPAGE_TITLE "Willkommen bei VereinO"

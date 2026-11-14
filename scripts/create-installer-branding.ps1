@@ -61,13 +61,19 @@ try {
         } finally { $shape.Dispose(); $accent.Dispose() }
     } finally { $canvas.Dispose(); $sidebar.Bitmap.Dispose() }
 
-    $header = New-Canvas 150 57
-    $canvas = $header.Graphics
-    try {
-        $canvas.Clear([System.Drawing.Color]::White)
-        $canvas.DrawImage($logo, 2, 7, 42, 42)
-        Draw-BrandText $canvas 'VereinO' 20 '#14221e' 49 7 $true
-        Draw-BrandText $canvas ('Open Source ' + [char]0x00B7 + ' MIT') 9 '#4e645a' 50 33
-        $header.Bitmap.Save((Join-Path $brandDir 'installerHeader.bmp'), [System.Drawing.Imaging.ImageFormat]::Bmp)
-    } finally { $canvas.Dispose(); $header.Bitmap.Dispose() }
+    foreach ($dark in @($false, $true)) {
+        $header = New-Canvas 150 57
+        $canvas = $header.Graphics
+        try {
+            $background = if ($dark) { '#191d1c' } else { '#ffffff' }
+            $foreground = if ($dark) { '#f0f3f1' } else { '#14221e' }
+            $muted = if ($dark) { '#cbdad3' } else { '#4e645a' }
+            $fileName = if ($dark) { 'installerHeaderDark.bmp' } else { 'installerHeader.bmp' }
+            $canvas.Clear([System.Drawing.ColorTranslator]::FromHtml($background))
+            $canvas.DrawImage($logo, 2, 7, 42, 42)
+            Draw-BrandText $canvas 'VereinO' 20 $foreground 49 7 $true
+            Draw-BrandText $canvas ('Open Source ' + [char]0x00B7 + ' MIT') 9 $muted 50 33
+            $header.Bitmap.Save((Join-Path $brandDir $fileName), [System.Drawing.Imaging.ImageFormat]::Bmp)
+        } finally { $canvas.Dispose(); $header.Bitmap.Dispose() }
+    }
 } finally { $logo.Dispose() }
