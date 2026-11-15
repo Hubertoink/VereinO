@@ -7,6 +7,28 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [4.17.0] - 2026-11-15
+
+### Hinzugefügt
+
+- Der KI-Import liest Excel- und CSV-Dateien ein und schlägt auf Wunsch Tags, Budgets und weitere Zuordnungen vor. Buchungen, mögliche Beziehungen und neue Stammdaten werden vor der gemeinsamen Übernahme geprüft und freigegeben.
+- Importaufträge lassen sich speichern, später fortsetzen und per Rechtsklick entfernen. Drag & Drop und optionale Hinweise an die KI erleichtern die Dateiauswahl und Analyse.
+- Excel-Importvorlagen unterstützen eigene Tabellenblätter für Konten, Tags, Kategorien, Budgets und Zweckbindungen. Neue Stammdaten und Verweise aus Buchungen werden vor der Übernahme geprüft.
+- Eine Excel-Testdatei mit normalen Buchungen, Beziehungen und gezielten Prüffällen steht beim Release zum Download bereit.
+
+### Geändert
+
+- Die Importprüfung verwendet Statuskennzahlen als Filter, die gemeinsame Buchungssuche und einen überlagerten Detailbereich. Datumsfelder bieten den Kalender im App-Design; kleine Symbole kennzeichnen KI-Vorschläge und manuelle Änderungen.
+- Abweichende Buchungs- und Budgetjahre können bewusst bestätigt werden, sofern keine verbindliche Budgetzeitraum-Sperre vorliegt.
+- Zahlungskonten zeigen die Zahl zugeordneter Buchungen einschließlich Umbuchungen. Beim Versuch, ein verwendetes Konto zu löschen, erklärt ein Hinweis die Sperre und verweist auf das Archivieren.
+
+### Behoben
+
+- Geänderte Importzuordnungen werden erneut geprüft, sodass erledigte Korrekturhinweise verschwinden. Bestätigungen zu Budgetjahren werden nach relevanten Änderungen erneut erforderlich.
+- Versehentliches Schließen des KI-Imports wird abgefangen. Ein Klick außerhalb der Buchungsdetails schließt zunächst den Detailbereich und erhält die Änderungen im Entwurf.
+- Import- und Organisationsdialoge haben bündige, kompaktere Kopfzeilen. Fehlerhafte Umlaute im KI-Import sind korrigiert.
+- Die klassische Buchungsansicht hat auch unten Abstand zum Fensterrand.
+
 ## [4.16.1] - 2026-11-14
 
 ### Geändert

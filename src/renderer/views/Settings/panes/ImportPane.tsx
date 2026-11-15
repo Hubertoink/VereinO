@@ -1,11 +1,13 @@
 import { SettingsPageHeader } from '../components/SettingsPageHeader'
-import ModalHeader, { ModalCloseButton } from '../../../components/ModalHeader'
+import ModalHeader from '../../../components/ModalHeader'
 import React from 'react'
 import { ImportPaneProps } from '../types'
 import { createPortal } from 'react-dom'
 import { IconListDetails } from '@tabler/icons-react'
 import { ImportXlsxCard } from '../components/ImportXlsxCard'
 import { MembersImportCard } from '../components/MembersImportCard'
+import './importPane.css'
+import { AiImportModal } from '../components/AiImportModal'
 
 type ImportTab = 'vouchers' | 'members'
 
@@ -47,6 +49,7 @@ const MembersIcon = () => (
 export function ImportPane({ notify }: ImportPaneProps) {
   const [activeTab, setActiveTab] = React.useState<ImportTab>('vouchers')
   const [showLog, setShowLog] = React.useState(false)
+  const [showAiImport, setShowAiImport] = React.useState(false)
   const [logRows, setLogRows] = React.useState<Array<{ id: number; createdAt: string; entity: string; action: string; diff?: any | null }>>([])
   const [busy, setBusy] = React.useState(false)
   const [err, setErr] = React.useState('')
@@ -104,6 +107,11 @@ export function ImportPane({ notify }: ImportPaneProps) {
             </div>
           </details>
           <ImportXlsxCard notify={notify} />
+          <div className="card" style={{ marginTop: 16 }}>
+            <strong>KI-gestützter Import</strong>
+            <p className="helper">Excel- und CSV-Buchungen einlesen, Konten und Sphären/Kategorien zuordnen, gemeinsame Tags und Budgets vorschlagen lassen. Alle Ergebnisse bleiben bis zur Übernahme ein prüfbarer Entwurf.</p>
+            <button className="btn primary" onClick={() => setShowAiImport(true)}>KI-Import öffnen</button>
+          </div>
         </div>
       )}
 
@@ -125,59 +133,61 @@ export function ImportPane({ notify }: ImportPaneProps) {
         </div>
       )}
 
+      {showAiImport && <AiImportModal onClose={() => setShowAiImport(false)} />}
       {showLog && createPortal(
-        <div className="modal-overlay" onClick={() => setShowLog(false)} role="dialog" aria-modal="true">
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 10, width: 'min(900px, 96vw)' }}>
-            <ModalHeader >
-              <h2 style={{ margin: 0 }}>Import-Log</h2>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn" onClick={loadLog} disabled={busy}>Aktualisieren</button>
-                <ModalCloseButton onClick={() => setShowLog(false)} />
-              </div>
-            </ModalHeader>
-            {err && <div style={{ color: 'var(--danger)' }}>{err}</div>}
-            {busy && <div className="helper">Lade …</div>}
-            {!busy && (
-              <div style={{ overflowX: 'auto' }}>
-                <table cellPadding={6} style={{ width: '100%' }}>
-                  <thead>
-                    <tr>
-                      <th align="left">Zeit</th>
-                      <th align="left">Typ</th>
-                      <th align="right">Importiert</th>
-                      <th align="right">Aktualisiert</th>
-                      <th align="right">Übersprungen</th>
-                      <th align="right">Fehler</th>
-                      <th align="left">Fehler-Datei</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {logRows.map((r, i) => {
-                      const d = r.diff || {}
-                      const isMember = r.entity === 'members_import'
-                      const fmt = isMember ? 'Mitglieder' : (d.format || 'Buchungen')
-                      const errCnt = Number(d.errorCount || 0)
-                      return (
-                        <tr key={r.id || i}>
-                          <td>{new Date(r.createdAt || d.when || '').toLocaleString()}</td>
-                          <td>{fmt}</td>
-                          <td align="right">{d.imported ?? '—'}</td>
-                          <td align="right">{d.updated ?? '—'}</td>
-                          <td align="right">{d.skipped ?? '—'}</td>
-                          <td align="right" style={{ color: errCnt > 0 ? 'var(--danger)' : undefined }}>{errCnt}</td>
-                          <td>{d.errorFilePath ? (
-                            <button className="btn" onClick={() => window.api?.shell?.showItemInFolder?.(d.errorFilePath)} title={String(d.errorFilePath)}>Öffnen</button>
-                          ) : '—'}</td>
-                        </tr>
-                      )
-                    })}
-                    {logRows.length === 0 && (
-                      <tr><td colSpan={7} className="helper">Keine Einträge vorhanden.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+        <div className="modal-overlay import-log-overlay" onClick={() => setShowLog(false)}>
+          <div className="modal import-log-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="import-log-title">
+            <ModalHeader
+              title="Import-Log"
+              titleId="import-log-title"
+              onClose={() => setShowLog(false)}
+              actions={<button className="btn" onClick={loadLog} disabled={busy}>Aktualisieren</button>}
+            />
+            <div className="import-log-modal__body">
+              {err && <div style={{ color: 'var(--danger)' }}>{err}</div>}
+              {busy && <div className="helper">Lade …</div>}
+              {!busy && (
+                <div style={{ overflowX: 'auto' }}>
+                  <table cellPadding={6} style={{ width: '100%' }}>
+                    <thead>
+                      <tr>
+                        <th align="left">Zeit</th>
+                        <th align="left">Typ</th>
+                        <th align="right">Importiert</th>
+                        <th align="right">Aktualisiert</th>
+                        <th align="right">Übersprungen</th>
+                        <th align="right">Fehler</th>
+                        <th align="left">Fehler-Datei</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {logRows.map((r, i) => {
+                        const d = r.diff || {}
+                        const isMember = r.entity === 'members_import'
+                        const fmt = isMember ? 'Mitglieder' : (d.format || 'Buchungen')
+                        const errCnt = Number(d.errorCount || 0)
+                        return (
+                          <tr key={r.id || i}>
+                            <td>{new Date(r.createdAt || d.when || '').toLocaleString()}</td>
+                            <td>{fmt}</td>
+                            <td align="right">{d.imported ?? '—'}</td>
+                            <td align="right">{d.updated ?? '—'}</td>
+                            <td align="right">{d.skipped ?? '—'}</td>
+                            <td align="right" style={{ color: errCnt > 0 ? 'var(--danger)' : undefined }}>{errCnt}</td>
+                            <td>{d.errorFilePath ? (
+                              <button className="btn" onClick={() => window.api?.shell?.showItemInFolder?.(d.errorFilePath)} title={String(d.errorFilePath)}>Öffnen</button>
+                            ) : '—'}</td>
+                          </tr>
+                        )
+                      })}
+                      {logRows.length === 0 && (
+                        <tr><td colSpan={7} className="helper">Keine Einträge vorhanden.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>, document.body)
       }

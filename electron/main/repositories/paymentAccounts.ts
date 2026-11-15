@@ -31,11 +31,15 @@ export function listPaymentAccounts(opts?: { activeOnly?: boolean }) {
       iban,
       color,
       sort_order as sortOrder,
-      is_active as isActive
+      is_active as isActive,
+      (SELECT COUNT(*) FROM vouchers v
+       WHERE v.payment_account_id = payment_accounts.id
+          OR v.transfer_from_account_id = payment_accounts.id
+          OR v.transfer_to_account_id = payment_accounts.id) as bookingCount
     FROM payment_accounts
     ${whereSql}
     ORDER BY is_active DESC, sort_order ASC, name COLLATE NOCASE ASC, id ASC
-  `).all() as PaymentAccountRow[]
+  `).all() as (PaymentAccountRow & { bookingCount: number })[]
 }
 
 export function getPaymentAccountById(id: number, d: DB = getDb()) {

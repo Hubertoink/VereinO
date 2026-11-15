@@ -23,8 +23,8 @@ export default function ConfirmSwitchOrgModal({ orgName, onConfirm, onCancel }: 
 
   return createPortal(
     <div className="modal-overlay" onClick={onCancel}>
-      <div 
-        className="modal modal-sm" 
+      <div
+        className="modal confirm-switch-modal"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
         role="dialog"
@@ -32,7 +32,7 @@ export default function ConfirmSwitchOrgModal({ orgName, onConfirm, onCancel }: 
         aria-labelledby="confirm-switch-title"
       >
         <ModalHeader
-          className="flex justify-between items-center mb-12"
+
           title="Organisation wechseln?"
           titleId="confirm-switch-title"
           onClose={onCancel}
@@ -40,10 +40,10 @@ export default function ConfirmSwitchOrgModal({ orgName, onConfirm, onCancel }: 
           closeOnEscape={false}
         />
 
-        <p style={{ marginBottom: 16 }}>
+        <div className="confirm-switch-body"><p style={{ marginBottom: 12 }}>
           Möchtest du jetzt zu <strong>"{orgName}"</strong> wechseln?
         </p>
-        
+
         <div className="helper" style={{ marginBottom: 16 }}>
           Die App wird neu geladen und verwendet dann die Datenbank der gewählten Organisation.
         </div>
@@ -55,7 +55,7 @@ export default function ConfirmSwitchOrgModal({ orgName, onConfirm, onCancel }: 
           <button className="btn primary" onClick={onConfirm} autoFocus>
             Jetzt wechseln
           </button>
-        </div>
+        </div></div>
       </div>
     </div>,
     document.body

@@ -2,17 +2,19 @@ import ExcelJS from 'exceljs'
 import { Buffer as NodeBuffer } from 'node:buffer'
 import { createVoucher } from '../repositories/vouchers'
 import { updateVoucher } from '../repositories/vouchers'
-import { getPaymentAccountById, paymentMethodForAccountKind, upsertPaymentAccount } from '../repositories/paymentAccounts'
-import { upsertBudget } from '../repositories/budgets'
-import { upsertBinding } from '../repositories/bindings'
+import { getPaymentAccountById, paymentMethodForAccountKind } from '../repositories/paymentAccounts'
 import { ensureTag } from '../repositories/tags'
 import { getDb } from '../db/database'
 import { writeAudit } from './audit'
 import { XMLParser } from 'fast-xml-parser'
 import { dialog, app } from 'electron'
 import path from 'path'
+import { getOrganizationProfile } from '../repositories/classifications'
+import { addImportMasterSheets, createImportMasters, getImportMasterSnapshot, matchMaster, readImportMasterSheets, validateImportMasters } from './importMasterData'
+import { IMPORT_MASTER_SHEETS, ImportMasterRowSchema, importNumber, type ImportMasterRow } from '../../../shared/importMasterData'
 
 export type ImportPreview = {
+    organizationProfile?: 'GENERAL' | 'NONPROFIT'
     headers: string[]
     sample: any[]
     suggestedMapping: Record<string, string | null>
@@ -32,7 +34,7 @@ export type ImportRule = {
     enabled?: boolean
     sourceField: 'description' | 'paymentAccount' | 'tags' | 'note'
     contains: string
-    targetField: 'tags' | 'type' | 'paymentMethod' | 'paymentAccount' | 'budget' | 'earmarkCode' | 'sphere'
+    targetField: 'tags' | 'type' | 'paymentMethod' | 'paymentAccount' | 'budget' | 'earmarkCode' | 'sphere' | 'category'
     value: string
 }
 
@@ -54,6 +56,8 @@ export type ImportDraftRow = {
 }
 
 export type ImportAnalyzeResult = ImportPreview & {
+    masterData?: ImportMasterRow[]
+    organizationProfile?: 'GENERAL' | 'NONPROFIT'
     rows: ImportDraftRow[]
     summary: {
         total: number
@@ -70,6 +74,7 @@ export type ImportAnalyzeResult = ImportPreview & {
         paymentAccounts: string[]
     }
     lookup: {
+        categories?: LookupOption[]
         paymentAccounts: LookupOption[]
         budgets: LookupOption[]
         earmarks: LookupOption[]
@@ -85,6 +90,7 @@ const FIELD_KEYS = [
     'date',
     'type',
     'sphere',
+    'category',
     'description',
     'note',
     'paymentMethod',
@@ -112,7 +118,7 @@ function normalizeHeader(h: string) {
     return s
 }
 
-function suggestMapping(headers: string[]): Record<string, string | null> {
+export function suggestMapping(headers: string[]): Record<string, string | null> {
     const map: Record<string, string | null> = {
         voucherId: null, voucherNo: null, date: null, type: null, sphere: null, description: null, note: null, paymentMethod: null, paymentAccount: null,
         netAmount: null, vatRate: null, grossAmount: null, inGross: null, outGross: null, earmarkCode: null, earmarkAmount: null, budget: null, budgetAmount: null,
@@ -120,12 +126,15 @@ function suggestMapping(headers: string[]): Record<string, string | null> {
     }
     for (const h of headers) {
         const n = normalizeHeader(h)
+        if (/budget.*(betrag|amount)/.test(n)) { map.budgetAmount = h; continue }
+        if (/(zweckbindung|earmark).*(betrag|amount)/.test(n)) { map.earmarkAmount = h; continue }
         if (!map.voucherId && /(buchungs-?id|beleg-?id|voucher.?id|\bid\b)/.test(n)) map.voucherId = h
         else if (!map.voucherNo && /(beleg.?nr|belegnummer|voucher.?no|buchungsnummer|\bnr\b)/.test(n)) map.voucherNo = h
         else if (!map.date && /(datum|date)/.test(n)) map.date = h
-        else if (!map.type && /(art|type|in|out|transfer)/.test(n)) map.type = h
+        else if (!map.type && /^(art|typ|type)(\b|\s|\()/.test(n)) map.type = h
         else if (!map.sphere && /(sph|sphäre|sphere)/.test(n)) map.sphere = h
-        else if (!map.description && /(beschreibung|text|zweck|desc|bezeichnung)/.test(n)) map.description = h
+        else if (!map.category && /^(kategorie|category)$/.test(n)) map.category = h
+        else if (!map.description && /^(beschreibung|text|verwendungszweck|desc|bezeichnung)$/.test(n)) map.description = h
         else if (!map.note && /(kommentar|notiz|notizen|hinweis|note)/.test(n)) map.note = h
         else if (!map.paymentMethod && /(zahlweg|payment.?method|payment method|zahlart)/.test(n)) map.paymentMethod = h
         else if (!map.paymentAccount && /(konto|zahlkonto|payment.?account)/.test(n)) map.paymentAccount = h
@@ -134,9 +143,9 @@ function suggestMapping(headers: string[]): Record<string, string | null> {
         else if (!map.inGross && /(ein|einnahm|eingang)/.test(n) && /(brutto|betrag|amount)?/.test(n)) map.inGross = h
         else if (!map.outGross && /(ausgab|ausgang)/.test(n) && /(brutto|betrag|amount)?/.test(n)) map.outGross = h
         else if (!map.grossAmount && /(brutto|gross|betrag|amount)/.test(n)) map.grossAmount = h
-        else if (!map.earmarkCode && /(zweckbindung|earmark|code)/.test(n)) map.earmarkCode = h
+        else if (!map.earmarkCode && /^(zweckbindung|earmark|code)$/.test(n)) map.earmarkCode = h
         else if (!map.earmarkAmount && /(zweckbindung.*betrag|earmark.*amount)/.test(n)) map.earmarkAmount = h
-        else if (!map.budget && /(budget)/.test(n)) map.budget = h
+        else if (!map.budget && /^budget$/.test(n)) map.budget = h
         else if (!map.budgetAmount && /(budget.*betrag|budget.*amount)/.test(n)) map.budgetAmount = h
         else if (!map.tags && /(tag|tags|schlagwort)/.test(n)) map.tags = h
         else if (!map.bankIn && /bank|konto/.test(n) && (/\+/.test(n) || /(ein|eingang|einnahm)/.test(n))) map.bankIn = h
@@ -175,7 +184,7 @@ function rememberNewTags(tags: string[], knownTags: Set<string>, newTags: Set<st
     }
 }
 
-type LookupOption = { id: number; label: string }
+type LookupOption = { id: number; label: string; aliases?: string[] }
 
 function buildPaymentAccountOptions(d = getDb()): LookupOption[] {
     const rows = d.prepare(`
@@ -186,7 +195,7 @@ function buildPaymentAccountOptions(d = getDb()): LookupOption[] {
     `).all() as Array<{ id: number; name: string; kind: string }>
     return rows.map((row) => ({
         id: row.id,
-        label: `#${row.id} | ${row.name} [${row.kind}]`
+        label: `#${row.id} | ${row.name} [${row.kind}]`, aliases: [row.name]
     }))
 }
 
@@ -199,7 +208,7 @@ function buildBudgetOptions(d = getDb()): LookupOption[] {
     return rows.map((row) => {
         const base = row.name || row.categoryName || row.projectName || `Budget ${row.id}`
         const archived = row.isArchived ? ' [archiviert]' : ''
-        return { id: row.id, label: `#${row.id} | ${row.year} · ${row.sphere} · ${base}${archived}` }
+        return { id: row.id, label: `#${row.id} | ${row.year} · ${row.sphere} · ${base}${archived}`, aliases: [base] }
     })
 }
 
@@ -211,7 +220,7 @@ function buildEarmarkOptions(d = getDb()): LookupOption[] {
     `).all() as Array<{ id: number; code: string; name: string; isActive?: number }>
     return rows.map((row) => ({
         id: row.id,
-        label: `#${row.id} | ${row.code} · ${row.name}${row.isActive === 0 ? ' [inaktiv]' : ''}`
+        label: `#${row.id} | ${row.code} · ${row.name}${row.isActive === 0 ? ' [inaktiv]' : ''}`, aliases: [row.code, row.name, `${row.code} ${row.name}`]
     }))
 }
 
@@ -224,7 +233,7 @@ function extractIdFromLookup(value: any): number | undefined {
     if (value == null || value === '') return undefined
     if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value)
     const text = String(value).trim()
-    const match = /^#?\s*(\d+)\b/.exec(text)
+    const match = /^#\s*(\d+)(?:\s*\||$)/.exec(text)
     return match ? Number(match[1]) : undefined
 }
 
@@ -235,18 +244,16 @@ function normalizeLookupKey(value: any): string {
 function findLookupId(
     value: any,
     options: LookupOption[],
-    aliases: string[] = []
+    _aliases: string[] = []
 ): number | undefined {
     const directId = extractIdFromLookup(value)
-    if (directId != null) return directId
+    if (directId != null) return options.some(option => option.id === directId) ? directId : undefined
     const key = normalizeLookupKey(value)
     if (!key) return undefined
     const byLabel = options.find((option) => normalizeLookupKey(option.label) === key)
     if (byLabel) return byLabel.id
-    if (aliases.length > 0) {
-        const byAlias = options.find((option, index) => normalizeLookupKey(aliases[index]) === key)
-        if (byAlias) return byAlias.id
-    }
+    const matches = options.filter(option => option.aliases?.some(alias => normalizeLookupKey(alias) === key))
+    if (matches.length === 1) return matches[0].id
     return undefined
 }
 
@@ -297,7 +304,7 @@ export async function previewXlsx(base64: string): Promise<ImportPreview> {
     if (!pick) throw new Error('Keine Tabelle gefunden')
     const { ws, headerRowIdx, headers, idxByHeader } = pick
     const sample: any[] = []
-    const maxR = Math.min(ws.actualRowCount, headerRowIdx + 20)
+    const maxR = Math.min(ws.rowCount, headerRowIdx + 20)
     for (let r = headerRowIdx + 1; r <= maxR; r++) {
         const rowObj: any = {}
         headers.forEach((h, i) => {
@@ -307,7 +314,7 @@ export async function previewXlsx(base64: string): Promise<ImportPreview> {
         sample.push(rowObj)
     }
     const suggestedMapping = suggestMapping(headers)
-    return { headers, sample, suggestedMapping, headerRowIndex: headerRowIdx }
+    return { headers, sample, suggestedMapping, headerRowIndex: headerRowIdx, organizationProfile: getOrganizationProfile() }
 }
 
 // --- CAMT.053 (ISO 20022) support ---
@@ -503,14 +510,11 @@ function parseEnum<T extends string>(v: any, set: readonly T[], fallback?: T): T
 
 function parseNumber(v: any): number | undefined {
     if (v == null || v === '') return undefined
-    if (typeof v === 'number') return v
+    if (typeof v === 'number') return Number.isFinite(v) ? v : undefined
     const s = String(v)
         .replace(/\u00A0/g, ' ')
         .replace(/[€\s]/g, '')
-        .replace(/\./g, '')
-        .replace(',', '.')
-    const n = Number(s)
-    return isFinite(n) ? n : undefined
+    return importNumber(s)
 }
 
 function parseDate(v: any): string | undefined {
@@ -526,9 +530,12 @@ function parseDate(v: any): string | undefined {
     const dm = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(s)
     if (dm) {
         const d = new Date(Date.UTC(Number(dm[3]), Number(dm[2]) - 1, Number(dm[1])))
-        return d.toISOString().slice(0, 10)
+        return d.getUTCFullYear() === Number(dm[3]) && d.getUTCMonth() === Number(dm[2]) - 1 && d.getUTCDate() === Number(dm[1]) ? d.toISOString().slice(0, 10) : undefined
     }
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        const d = new Date(`${s}T00:00:00Z`)
+        return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === s ? s : undefined
+    }
     // Excel serial?
     const n = Number(s)
     if (isFinite(n) && n > 25569) { // Excel serial date (approx)
@@ -582,6 +589,7 @@ function getRowValue(
 }
 
 function looksLikeSummaryRow(rawDate: any, description: any) {
+    if (parseDate(rawDate)) return false
     const txt = [rawDate, description].map(x => (x == null ? '' : String(x))).join(' ').toLowerCase()
     return /ergebnis|summe|saldo/.test(txt)
 }
@@ -643,8 +651,9 @@ function normalizeDraftValues(
 
     const type = parseEnum(values.type, ['IN', 'OUT', 'TRANSFER', 'INTERNAL'] as const)
     const sphere = parseEnum(values.sphere, ['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'] as const) || 'IDEELL'
+    if (getOrganizationProfile() === 'NONPROFIT' && values.sphere && !['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'].includes(String(values.sphere).toUpperCase())) issues.push(issue('error', 'sphere', 'Sphäre ist ungültig.'))
     values.type = type || ''
-    values.sphere = sphere
+    values.sphere = values.sphere && !['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'].includes(String(values.sphere).toUpperCase()) ? values.sphere : sphere
 
     const paymentMethod = parseEnum(values.paymentMethod, ['BAR', 'BANK'] as const)
     const paymentAccountId = findLookupId(values.paymentAccount, lookups.paymentAccounts, lookups.paymentAccountAliases)
@@ -652,24 +661,25 @@ function normalizeDraftValues(
     values.paymentAccountId = paymentAccountId ?? null
     values.paymentMethod = paymentMethodForAccountKind(paymentAccount?.kind) ?? paymentMethod ?? values.paymentMethod ?? ''
     if (values.paymentAccount && paymentAccountId == null) {
-        issues.push(issue('warning', 'paymentAccount', `Konto nicht gefunden: ${values.paymentAccount}`))
+        issues.push(issue('error', 'paymentAccount', `Konto nicht gefunden oder nicht eindeutig: ${values.paymentAccount}`))
     }
 
     const budgetId = findLookupId(values.budget, lookups.budgets, lookups.budgetAliases)
     values.budgetId = budgetId ?? null
-    if (values.budget && budgetId == null) issues.push(issue('warning', 'budget', `Budget nicht gefunden: ${values.budget}`))
+    if (values.budget && budgetId == null) issues.push(issue('error', 'budget', `Budget nicht gefunden oder nicht eindeutig: ${values.budget}`))
 
     const earmarkId = findLookupId(values.earmarkCode, lookups.earmarks, lookups.earmarkAliases)
     values.earmarkId = earmarkId ?? null
-    if (values.earmarkCode && earmarkId == null) issues.push(issue('warning', 'earmark', `Zweckbindung nicht gefunden: ${values.earmarkCode}`))
+    if (values.earmarkCode && earmarkId == null) issues.push(issue('error', 'earmark', `Zweckbindung nicht gefunden oder nicht eindeutig: ${values.earmarkCode}`))
 
     const grossAmount = parseNumber(values.grossAmount)
     const netAmount = parseNumber(values.netAmount)
-    values.grossAmount = grossAmount ?? ''
-    values.netAmount = netAmount ?? ''
-    values.vatRate = parseNumber(values.vatRate) ?? 0
-    values.budgetAmount = parseNumber(values.budgetAmount) ?? ''
-    values.earmarkAmount = parseNumber(values.earmarkAmount) ?? ''
+    for (const field of ['grossAmount', 'netAmount', 'vatRate', 'budgetAmount', 'earmarkAmount']) {
+        const raw = values[field]
+        const number = parseNumber(raw)
+        if (raw != null && String(raw).trim() !== '' && number == null) issues.push(issue('error', field, `Ungültiger Betrag (${field}): ${raw}`))
+        values[field] = number ?? raw ?? (field === 'vatRate' ? 0 : '')
+    }
 
     if (grossAmount == null && netAmount == null) issues.push(issue('error', 'amount', 'Kein Betrag erkannt.'))
     if (!type && grossAmount != null) values.type = grossAmount < 0 ? 'OUT' : 'IN'
@@ -788,13 +798,16 @@ async function analyzeCamtFile(
 export async function analyzeFile(
     base64: string,
     mapping: Record<FieldKey, string | null>,
-    rules?: ImportRule[]
+    rules?: ImportRule[],
+    options?: { masterData?: ImportMasterRow[]; draftRows?: ImportDraftRow[]; sheetName?: string }
 ): Promise<ImportAnalyzeResult> {
     if (detectFileType(base64) === 'CAMT') return analyzeCamtFile(base64, mapping, rules)
     const wb = new ExcelJS.Workbook()
     const buf = NodeBuffer.from(base64, 'base64')
     await (wb as any).xlsx.load(buf as any)
-    const pick = pickWorksheet(wb)
+    const requestedSheet = options?.sheetName ? wb.getWorksheet(options.sheetName) : undefined
+    if (options?.sheetName && !requestedSheet) throw new Error('Tabellenblatt nicht gefunden.')
+    const pick = requestedSheet ? { ws: requestedSheet, ...detectHeader(requestedSheet) } : pickWorksheet(wb)
     if (!pick) throw new Error('Keine Tabelle gefunden')
     const { ws, headerRowIdx, headers, idxByHeader } = pick
     const d = getDb()
@@ -802,12 +815,13 @@ export async function analyzeFile(
     const suggestedMapping = suggestMapping(headers)
     const rows: ImportDraftRow[] = []
 
-    for (let r = headerRowIdx + 1; r <= ws.actualRowCount; r++) {
+    for (let r = headerRowIdx + 1; r <= ws.rowCount; r++) {
         const original: Record<string, any> = {}
         headers.forEach((h, i) => {
             const col = idxByHeader[h] || (i + 1)
             original[h || `col${i + 1}`] = normalizeCellValue(ws.getRow(r).getCell(col).value)
         })
+        if (Object.values(original).every(value => value == null || String(value).trim() === '')) continue
         const get = (key: FieldKey) => getRowValue(ws, idxByHeader, mapping, r, key)
         const rawDate = get('date')
         const description = get('description')
@@ -831,6 +845,7 @@ export async function analyzeFile(
             date: rawDate ?? '',
             type: get('type') ?? '',
             sphere: get('sphere') ?? mapping.defaultSphere ?? 'IDEELL',
+            category: get('category') ?? '',
             description: description ?? '',
             note: get('note') ?? '',
             paymentMethod: get('paymentMethod') ?? '',
@@ -879,24 +894,20 @@ export async function analyzeFile(
         earmarks: uniqueSorted(rows.filter((row) => row.values.earmarkCode && !row.values.earmarkId).map((row) => String(row.values.earmarkCode))),
         paymentAccounts: uniqueSorted(rows.filter((row) => row.values.paymentAccount && !row.values.paymentAccountId).map((row) => String(row.values.paymentAccount)))
     }
-    const summary = {
-        total: rows.length,
-        ok: rows.filter((row) => row.status === 'ok').length,
-        warnings: rows.filter((row) => row.status === 'warning').length,
-        errors: rows.filter((row) => row.status === 'error').length,
-        duplicates: rows.filter((row) => row.status === 'duplicate').length,
-        ignored: rows.filter((row) => row.status === 'ignored').length
-    }
     const sample = rows.slice(0, 50).map((row) => row.original)
+    const reviewed = reviewImportDraft(options?.draftRows ?? rows, options?.masterData ?? readImportMasterSheets(wb))
     return {
         headers,
         sample,
         suggestedMapping,
         headerRowIndex: headerRowIdx,
-        rows,
-        summary,
+        rows: reviewed.rows,
+        summary: reviewed.summary,
+        masterData: reviewed.masterData,
+        organizationProfile: getOrganizationProfile(),
         missing,
         lookup: {
+            categories: getImportMasterSnapshot().categories.filter(c => c.active).map(c => ({ id: c.id, label: c.label })),
             paymentAccounts: lookups.paymentAccounts,
             budgets: lookups.budgets,
             earmarks: lookups.earmarks,
@@ -905,7 +916,90 @@ export async function analyzeFile(
     }
 }
 
-function draftPayload(row: ImportDraftRow, d = getDb()) {
+export function reviewImportDraft(input: ImportDraftRow[], definitions: ImportMasterRow[] = [], allowPendingMasters = false) {
+    const snapshot = getImportMasterSnapshot()
+    const general = getOrganizationProfile() === 'GENERAL'
+    const fields = { paymentAccounts: 'paymentAccount', budgets: 'budget', earmarks: 'earmarkCode', categories: 'category', tags: 'tags' } as const
+    const masterInput = definitions.filter(definition => !definition.id.startsWith('booking:') || input.some(row => {
+        if (row.status === 'ignored' || row.duplicateAction === 'skip') return false
+        const value = row.values[fields[definition.entity]]
+        const references = definition.entity === 'tags' ? parseTagsValue(value) : [value]
+        return references.some(reference => [definition.reference, definition.name].some(name => normalizeLookupKey(name) === normalizeLookupKey(reference)))
+    })).map(row => ({ ...row }))
+    for (const row of input.filter(r => r.status !== 'ignored' && r.duplicateAction !== 'skip')) {
+        for (const entity of Object.keys(fields) as ImportMasterRow['entity'][]) {
+            if (entity === 'categories' && !general) continue
+            const value = row.values[fields[entity]]
+            for (const reference of entity === 'tags' ? parseTagsValue(value) : [String(value || '').trim()].filter(Boolean)) {
+                if (masterInput.some(m => m.entity === entity && [m.reference, m.name].some(n => normalizeLookupKey(n) === normalizeLookupKey(reference)))) continue
+                const existing = matchMaster(reference, snapshot[entity])
+                // Existing references are already covered by the booking validation.
+                if (existing) continue
+                masterInput.push(ImportMasterRowSchema.parse({ id: `booking:${entity}:${reference}`, entity, sourceSheet: 'Buchungen', sourceRow: row.sourceRow, reference, name: reference }))
+            }
+        }
+    }
+    const masterData = validateImportMasters(masterInput, snapshot, general)
+    const lookups = getImportLookups()
+    const rows = input.map(row => {
+        if (row.status === 'ignored') return row
+        const values = { ...row.values }
+        const masterIssues: ImportDraftIssue[] = []
+        const pendingFields = new Set<string>()
+        for (const entity of Object.keys(fields) as ImportMasterRow['entity'][]) {
+            if (entity === 'categories' && !general) continue
+            const field = fields[entity]
+            const references = entity === 'tags' ? parseTagsValue(values[field]) : [String(values[field] || '').trim()].filter(Boolean)
+            const resolved = references.map(reference => {
+                const definition = masterData.find(m => m.entity === entity && [m.reference, m.name].some(n => normalizeLookupKey(n) === normalizeLookupKey(reference)))
+                if (!definition) return reference
+                if (definition.status === 'error') masterIssues.push(issue('error', field, `${IMPORT_MASTER_SHEETS[entity]}: ${definition.name} – ${definition.issues.join(' ')}`))
+                else if (definition.status === 'new') {
+                    pendingFields.add(field === 'earmarkCode' ? 'earmark' : field)
+                    masterIssues.push(issue(allowPendingMasters ? 'warning' : 'error', field, allowPendingMasters ? `${definition.name}: wird nach Freigabe gemeinsam angelegt.` : `${definition.name}: Stammdaten geprüft, bitte vor den Buchungen anlegen.`))
+                }
+                const existing = snapshot[entity].find(o => o.id === definition.existingId)
+                return definition.status === 'existing' && existing ? existing.label : reference
+            })
+            values[field] = entity === 'tags' ? resolved.join('; ') : resolved[0] || ''
+        }
+        const normalized = normalizeDraftValues(values, lookups, getDb())
+        const issues = [...normalized.issues.filter(i => !(allowPendingMasters && pendingFields.has(i.code) && i.level === 'error')), ...masterIssues]
+        if (general) {
+            const category = matchMaster(values.category, snapshot.categories)
+            values.primaryClassificationValueId = category?.id ?? null
+            if (!category?.active && !(allowPendingMasters && pendingFields.has('category'))) issues.push(issue('error', 'category', values.category ? `Kategorie nicht gefunden oder inaktiv: ${values.category}` : 'Bitte eine Kategorie zuordnen.'))
+        }
+        for (const [entity, field] of [['paymentAccounts', 'paymentAccount'], ['budgets', 'budget'], ['earmarks', 'earmarkCode']] as const) {
+            const existing = matchMaster(values[field], snapshot[entity])
+            if (existing && !existing.active) issues.push(issue('error', field, 'Der zugeordnete Eintrag ist inaktiv oder archiviert.'))
+        }
+        const budget = snapshot.budgets.find(b => b.id === values.budgetId)
+        const pendingBudget = masterData.find(b => b.entity === 'budgets' && [b.reference, b.name].some(n => normalizeLookupKey(n) === normalizeLookupKey(values.budget)))
+        const budgetYear = budget?.year ?? (pendingBudget?.year ? Number(pendingBudget.year) : undefined)
+        const budgetSphere = budget?.sphere ?? pendingBudget?.sphere
+        if (budgetYear && values.date && Number(String(values.date).slice(0, 4)) !== budgetYear) issues.push(issue('warning', 'budgetYear', `Buchungsjahr weicht vom Budgetjahr ${budgetYear} ab.`))
+        if (!general && budgetSphere && budgetSphere !== values.sphere) issues.push(issue('warning', 'budgetSphere', 'Sphäre der Buchung weicht von der Budget-Sphäre ab.'))
+        for (const [entity, idField] of [['budgets', 'budgetId'], ['earmarks', 'earmarkId']] as const) {
+            if (!values[idField]) continue
+            const period = getDb().prepare(`SELECT start_date as startDate, end_date as endDate, enforce_time_range as enforceTimeRange${entity === 'budgets' ? ', year' : ''} FROM ${entity} WHERE id = ?`).get(values[idField]) as any
+            const start = period?.startDate || (period?.year ? `${period.year}-01-01` : '')
+            const end = period?.endDate || (period?.year ? `${period.year}-12-31` : '')
+            if (period?.enforceTimeRange && ((start && values.date < start) || (end && values.date > end))) issues.push(issue('error', idField, 'Buchungsdatum liegt außerhalb des erlaubten Zuordnungszeitraums.'))
+        }
+        const total = parseNumber(values.grossAmount) ?? ((parseNumber(values.netAmount) ?? 0) * (1 + Number(values.vatRate || 0) / 100))
+        for (const [amount, ref] of [['budgetAmount', 'budget'], ['earmarkAmount', 'earmarkCode']] as const) {
+            const allocated = parseNumber(values[amount])
+            if (allocated != null && (allocated < 0 || allocated > Math.abs(total) + 0.005 || !values[ref])) issues.push(issue('error', amount, 'Zuordnungsbetrag muss zur Buchung passen und eine Zuordnung haben.'))
+        }
+        return { ...row, values, issues, duplicateIds: normalized.duplicateIds, status: statusFromIssues(issues, normalized.duplicateIds) }
+    })
+    const summary = { total: rows.length, ok: 0, warnings: 0, errors: 0, duplicates: 0, ignored: 0 }
+    for (const row of rows) summary[({ ok: 'ok', warning: 'warnings', error: 'errors', duplicate: 'duplicates', ignored: 'ignored' } as const)[row.status]]++
+    return { rows, summary, masterData }
+}
+
+export function draftPayload(row: ImportDraftRow, d = getDb()) {
     const values = row.values || {}
     const date = parseDate(values.date)
     if (!date) throw new Error('Datum fehlt/ungültig')
@@ -924,6 +1018,7 @@ function draftPayload(row: ImportDraftRow, d = getDb()) {
         date,
         type,
         sphere,
+        primaryClassificationValueId: values.primaryClassificationValueId ?? undefined,
         description: values.description != null ? String(values.description) : undefined,
         note: values.note != null ? String(values.note) : undefined,
         paymentMethod: resolvedPaymentMethod,
@@ -944,7 +1039,12 @@ function draftPayload(row: ImportDraftRow, d = getDb()) {
     return payload
 }
 
-export async function commitImportDraft(rows: ImportDraftRow[]): Promise<ImportDraftCommitResult> {
+export async function commitImportDraft(input: ImportDraftRow[], masterData: ImportMasterRow[] = []): Promise<ImportDraftCommitResult> {
+    const review = reviewImportDraft(input, masterData)
+    const rows = review.rows
+    if (review.masterData.some(m => m.status !== 'existing')) throw new Error('Bitte zuerst die Stammdaten prüfen und anlegen.')
+    const blocking = rows.filter(row => row.status === 'error' && row.duplicateAction !== 'skip')
+    if (blocking.length) throw new Error(`Bitte zuerst die Buchungen korrigieren: Zeile ${blocking[0].sourceRow}: ${blocking[0].issues.filter(i => i.level === 'error').map(i => i.message).join(' ')}`)
     const d = getDb()
     let imported = 0
     let skipped = 0
@@ -977,32 +1077,13 @@ export async function commitImportDraft(rows: ImportDraftRow[]): Promise<ImportD
     return { imported, skipped, errors, rowStatuses, newTags: Array.from(newTags).sort((a, b) => a.localeCompare(b, 'de')) }
 }
 
-export function createMissingImportMasterData(input: Partial<ImportAnalyzeResult['missing']>) {
+export function createMissingImportMasterData(input: Partial<ImportAnalyzeResult['missing']> & { masterData?: ImportMasterRow[] }) {
+    if (input.masterData) return createImportMasters(input.masterData)
+    if (input.budgets?.length || input.paymentAccounts?.length || input.earmarks?.length) throw new Error('Bitte Kontotypen und Budgetangaben zuerst in der Stammdaten-Vorschau prüfen.')
     const d = getDb()
-    const created = { tags: 0, budgets: 0, earmarks: 0, paymentAccounts: 0 }
+    const created = { tags: 0, budgets: 0, earmarks: 0, paymentAccounts: 0, categories: 0 }
     for (const tag of input.tags || []) {
         if (ensureTag(d as any, tag)?.created) created.tags++
-    }
-    const year = new Date().getFullYear()
-    for (const budget of input.budgets || []) {
-        const name = String(budget || '').trim()
-        if (!name) continue
-        upsertBudget({ year, sphere: 'IDEELL', amountPlanned: 0, name })
-        created.budgets++
-    }
-    for (const earmark of input.earmarks || []) {
-        const raw = String(earmark || '').trim()
-        if (!raw) continue
-        const code = raw.replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24) || `IMPORT-${created.earmarks + 1}`
-        upsertBinding({ code, name: raw, isActive: true })
-        created.earmarks++
-    }
-    for (const account of input.paymentAccounts || []) {
-        const name = String(account || '').trim()
-        if (!name) continue
-        const kind = /(bar|cash|kasse)/i.test(name) ? 'CASH' : 'BANK'
-        upsertPaymentAccount({ name, kind, isActive: true })
-        created.paymentAccounts++
     }
     return created
 }
@@ -1041,7 +1122,7 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
         if (rowStatuses.length < 1000) rowStatuses.push({ row, ok, message })
     }
 
-    for (let r = headerRowIdx + 1; r <= ws.actualRowCount; r++) {
+    for (let r = headerRowIdx + 1; r <= ws.rowCount; r++) {
         try {
             const get = (key: FieldKey): any => {
                 const h = mapping[key]
@@ -1223,7 +1304,7 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
 }
 
 // Heuristics: detect header row within first 20 rows
-function detectHeader(ws: ExcelJS.Worksheet): { headerRowIdx: number; headers: string[]; idxByHeader: Record<string, number>; score: number } {
+export function detectHeader(ws: ExcelJS.Worksheet): { headerRowIdx: number; headers: string[]; idxByHeader: Record<string, number>; score: number } {
     const maxScan = Math.min(20, ws.actualRowCount)
     let bestIdx = 1
     let bestScore = -1
@@ -1284,6 +1365,7 @@ function detectHeader(ws: ExcelJS.Worksheet): { headerRowIdx: number; headers: s
 function pickWorksheet(wb: ExcelJS.Workbook): { ws: ExcelJS.Worksheet; headerRowIdx: number; headers: string[]; idxByHeader: Record<string, number> } | null {
     let best: { ws: ExcelJS.Worksheet; headerRowIdx: number; headers: string[]; idxByHeader: Record<string, number>; score: number } | null = null
     for (const ws of wb.worksheets) {
+        if ([...Object.values(IMPORT_MASTER_SHEETS), 'Listen', 'PowerQuery_Hinweis'].some(name => name.toLowerCase() === ws.name.toLowerCase())) continue
         const det = detectHeader(ws)
         if (!best || det.score > best.score) {
             best = { ws, ...det }
@@ -1295,7 +1377,7 @@ function pickWorksheet(wb: ExcelJS.Workbook): { ws: ExcelJS.Worksheet; headerRow
 }
 
 // Normalize ExcelJS cell.value into primitive string/number/Date where possible
-function normalizeCellValue(v: any): any {
+export function normalizeCellValue(v: any): any {
     if (v == null) return v
     if (typeof v === 'string' || typeof v === 'number' || v instanceof Date) return v
     if (typeof v === 'object') {
@@ -1316,22 +1398,22 @@ function normalizeCellValue(v: any): any {
 export async function generateImportTemplate(destPath?: string): Promise<{ filePath: string }> {
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet('Import')
+    const general = getOrganizationProfile() === 'GENERAL'
     const lookupSheet = ensureLookupSheet(wb)
     populateLookupSheet(wb, lookupSheet)
+    addImportMasterSheets(wb)
     // Intro text
     ws.addRow(['VereinO – Dynamische Importvorlage'])
     ws.addRow(['Hinweise:'])
-    ws.addRow(['1) Lege zuerst Konten, Budgets, Zweckbindungen und Tags in VereinO an. 2) Nutze dann diese Vorlage mit den aktuellen Listen. 3) Mehrfach-Tags mit ; trennen.'])
+    ws.addRow(['Stammdaten in den eigenen Reitern ergänzen; bei neuen Einträgen Referenz leer lassen. In Buchungen Namen oder Referenzen verwenden. Mehrfach-Tags mit ; trennen. Vor dem Import werden alle Zuordnungen geprüft.'])
     ws.getRow(1).font = { bold: true, size: 14 }
     ws.getRow(2).font = { bold: true }
     ws.addRow([])
-    const columns = ['Datum', 'Beschreibung', 'Kommentar', 'Art (IN/OUT/TRANSFER)', 'Sphäre', 'Konto', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'Netto', 'USt %', 'Budget', 'Budget-Betrag', 'Zweckbindung', 'Zweckbindungs-Betrag', 'Tags']
+    const columns = ['Datum', 'Beschreibung', 'Kommentar', 'Art (IN/OUT/TRANSFER)', general ? 'Kategorie' : 'Sphäre', 'Konto', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'Netto', 'USt %', 'Budget', 'Budget-Betrag', 'Zweckbindung', 'Zweckbindungs-Betrag', 'Tags']
     ws.columns = [
         { width: 12 }, { width: 34 }, { width: 24 }, { width: 18 }, { width: 14 }, { width: 30 }, { width: 16 }, { width: 16 }, { width: 14 }, { width: 10 }, { width: 34 }, { width: 14 }, { width: 32 }, { width: 18 }, { width: 28 }
     ]
     const firstAccount = buildPaymentAccountOptions()[0]?.label || ''
-    const firstBudget = buildBudgetOptions()[0]?.label || ''
-    const firstEarmark = buildEarmarkOptions()[0]?.label || ''
     ws.addTable({
         name: 'Buchungen',
         ref: 'A4',
@@ -1339,16 +1421,25 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
         totalsRow: false,
         columns: columns.map((c) => ({ name: c })),
         rows: [
-            ['2025-01-15', 'Beispiel: Mitgliedsbeitrag', '', 'IN', 'IDEELL', firstAccount, 50, '', '', 0, firstBudget, 50, firstEarmark, 50, 'Mitglieder; Beitrag']
+            [new Date().toISOString().slice(0, 4) + '-01-15', 'Beispiel: Einnahme (ersetzen oder löschen)', '', 'IN', general ? getImportMasterSnapshot().categories.find(c => c.active)?.name || '' : 'IDEELL', firstAccount, 50, '', '', 0, '', '', '', '', '']
         ]
     })
     // Freeze header + intro
+    ws.mergeCells('A1:O1')
+    ws.mergeCells('A3:O3')
+    ws.getRow(3).alignment = { wrapText: true, vertical: 'middle' }
+    ws.getRow(3).height = 32
+    ws.getRow(4).alignment = { wrapText: true, vertical: 'middle' }
+    ws.getRow(4).height = 32
+    ws.getColumn(5).width = general ? 26 : 16
+    for (const col of [7, 8, 9, 12, 14]) ws.getColumn(col).numFmt = '#,##0.00'
     ws.views = [{ state: 'frozen', ySplit: 4 }]
     addListValidation(ws, 'D5:D10000', '"IN,OUT,TRANSFER,INTERNAL"')
-    addListValidation(ws, 'E5:E10000', '"IDEELL,ZWECK,VERMOEGEN,WGB"')
-    addListValidation(ws, 'F5:F10000', '=PaymentAccounts')
-    addListValidation(ws, 'K5:K10000', '=Budgets')
-    addListValidation(ws, 'M5:M10000', '=Earmarks')
+    if (!general) addListValidation(ws, 'E5:E10000', '"IDEELL,ZWECK,VERMOEGEN,WGB"')
+    else addListValidation(ws, 'E5:E10000', '=ImportCategories')
+    addListValidation(ws, 'F5:F10000', '=ImportAccounts')
+    addListValidation(ws, 'K5:K10000', '=ImportBudgets')
+    addListValidation(ws, 'M5:M10000', '=ImportEarmarks')
 
     // Power Query guidance
     const tips = wb.addWorksheet('PowerQuery_Hinweis')
@@ -1409,9 +1500,11 @@ export async function generateImportTemplate(destPath?: string): Promise<{ fileP
 // Generate a test XLSX with several example rows following the template columns
 export async function generateImportTestData(destPath?: string): Promise<{ filePath: string }> {
     const wb = new ExcelJS.Workbook()
+    const general = getOrganizationProfile() === 'GENERAL'
     const ws = wb.addWorksheet('Import')
     const lookupSheet = ensureLookupSheet(wb)
     populateLookupSheet(wb, lookupSheet)
+    addImportMasterSheets(wb)
     // Intro rows similar to template
     ws.addRow(['Verein Finanzplaner – Testdaten'])
     ws.addRow(['Diese Datei enthält Beispielbuchungen für den Import.'])
@@ -1420,7 +1513,7 @@ export async function generateImportTestData(destPath?: string): Promise<{ fileP
     ws.getRow(2).font = { bold: true }
     ws.addRow([])
 
-    const columns = ['Datum', 'Beschreibung', 'Kommentar', 'Art (IN/OUT/TRANSFER)', 'Sphäre', 'Konto', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'Netto', 'USt %', 'Budget', 'Budget-Betrag', 'Zweckbindung', 'Zweckbindungs-Betrag', 'Tags']
+    const columns = ['Datum', 'Beschreibung', 'Kommentar', 'Art (IN/OUT/TRANSFER)', general ? 'Kategorie' : 'Sphäre', 'Konto', 'Einnahmen (Brutto)', 'Ausgaben (Brutto)', 'Netto', 'USt %', 'Budget', 'Budget-Betrag', 'Zweckbindung', 'Zweckbindungs-Betrag', 'Tags']
     ws.columns = [
         { width: 12 }, { width: 34 }, { width: 22 }, { width: 18 }, { width: 14 }, { width: 30 }, { width: 16 }, { width: 16 }, { width: 14 }, { width: 10 }, { width: 34 }, { width: 14 }, { width: 32 }, { width: 18 }, { width: 28 }
     ]
@@ -1445,10 +1538,14 @@ export async function generateImportTestData(destPath?: string): Promise<{ fileP
         [`${y}-${m}-10`, 'Summe', '', '', '', '', '', '', '', '', '', '', '', '', '']
     ]
 
+    if (general) {
+        const category = getImportMasterSnapshot().categories.find(c => c.active)?.name || ''
+        rows.forEach(row => { row[4] = category })
+    }
     ws.addTable({ name: 'Buchungen', ref: 'A4', headerRow: true, totalsRow: false, columns: columns.map(n => ({ name: n })), rows })
     ws.views = [{ state: 'frozen', ySplit: 4 }]
     addListValidation(ws, 'D5:D10000', '"IN,OUT,TRANSFER,INTERNAL"')
-    addListValidation(ws, 'E5:E10000', '"IDEELL,ZWECK,VERMOEGEN,WGB"')
+    addListValidation(ws, 'E5:E10000', general ? '=ImportCategories' : '"IDEELL,ZWECK,VERMOEGEN,WGB"')
     addListValidation(ws, 'F5:F10000', '=PaymentAccounts')
     addListValidation(ws, 'K5:K10000', '=Budgets')
     addListValidation(ws, 'M5:M10000', '=Earmarks')
@@ -1470,9 +1567,11 @@ export async function generateImportTestData(destPath?: string): Promise<{ fileP
 
 export async function exportEditableVouchersWorkbook(destPath?: string): Promise<{ filePath: string }> {
     const wb = new ExcelJS.Workbook()
+    const general = getOrganizationProfile() === 'GENERAL'
     const ws = wb.addWorksheet('Buchungen')
     const lookupSheet = ensureLookupSheet(wb)
     populateLookupSheet(wb, lookupSheet)
+    addImportMasterSheets(wb)
     ws.addRow(['VereinO – Bearbeitbare Buchungsliste'])
     ws.addRow(['Ändere Werte direkt in dieser Tabelle und importiere sie anschließend wieder über den Buchungsimport.'])
     ws.addRow(['Wichtig: Buchungs-ID und Belegnummer nicht verändern. Mehrfach-Tags mit ; trennen.'])
@@ -1480,7 +1579,7 @@ export async function exportEditableVouchersWorkbook(destPath?: string): Promise
     ws.getRow(1).font = { bold: true, size: 14 }
     ws.getRow(2).font = { bold: true }
 
-    const columns = ['Buchungs-ID', 'Belegnummer', 'Datum', 'Beschreibung', 'Kommentar', 'Art (IN/OUT/TRANSFER)', 'Sphäre', 'Konto', 'Brutto', 'Netto', 'USt %', 'Budget', 'Budget-Betrag', 'Zweckbindung', 'Zweckbindungs-Betrag', 'Tags']
+    const columns = ['Buchungs-ID', 'Belegnummer', 'Datum', 'Beschreibung', 'Kommentar', 'Art (IN/OUT/TRANSFER)', general ? 'Kategorie' : 'Sphäre', 'Konto', 'Brutto', 'Netto', 'USt %', 'Budget', 'Budget-Betrag', 'Zweckbindung', 'Zweckbindungs-Betrag', 'Tags']
     ws.columns = [
         { width: 12 }, { width: 16 }, { width: 12 }, { width: 34 }, { width: 24 }, { width: 18 }, { width: 14 }, { width: 30 }, { width: 14 }, { width: 14 }, { width: 10 }, { width: 34 }, { width: 14 }, { width: 32 }, { width: 18 }, { width: 28 }
     ]
@@ -1495,7 +1594,7 @@ export async function exportEditableVouchersWorkbook(destPath?: string): Promise
     })
     ws.views = [{ state: 'frozen', ySplit: 4 }]
     addListValidation(ws, 'F5:F10000', '"IN,OUT,TRANSFER,INTERNAL"')
-    addListValidation(ws, 'G5:G10000', '"IDEELL,ZWECK,VERMOEGEN,WGB"')
+    addListValidation(ws, 'G5:G10000', general ? '=ImportCategories' : '"IDEELL,ZWECK,VERMOEGEN,WGB"')
     addListValidation(ws, 'H5:H10000', '=PaymentAccounts')
     addListValidation(ws, 'L5:L10000', '=Budgets')
     addListValidation(ws, 'N5:N10000', '=Earmarks')
@@ -1525,6 +1624,7 @@ function dprepareVoucherExportRows(): any[][] {
             v.note,
             v.type,
             v.sphere,
+            cv.name as primaryClassificationName,
             v.payment_account_id as paymentAccountId,
             pa.name as paymentAccountName,
             pa.kind as paymentAccountKind,
@@ -1549,6 +1649,7 @@ function dprepareVoucherExportRows(): any[][] {
                 WHERE vt.voucher_id = v.id
             ) as tags
         FROM vouchers v
+        LEFT JOIN classification_values cv ON cv.id = v.primary_classification_value_id
         LEFT JOIN payment_accounts pa ON pa.id = v.payment_account_id
         LEFT JOIN budgets b ON b.id = v.budget_id
         LEFT JOIN earmarks e ON e.id = v.earmark_id
@@ -1566,7 +1667,7 @@ function dprepareVoucherExportRows(): any[][] {
             row.description || '',
             row.note || '',
             row.type,
-            row.sphere,
+            getOrganizationProfile() === 'GENERAL' ? row.primaryClassificationName || '' : row.sphere,
             accountLabel,
             row.grossAmount,
             row.netAmount,

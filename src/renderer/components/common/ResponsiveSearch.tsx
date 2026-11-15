@@ -13,16 +13,18 @@ type Props = {
   title?: string
   wide?: boolean
   type?: 'text' | 'search'
+  forceCompact?: boolean
 }
 
 const ResponsiveSearch = forwardRef<ResponsiveSearchHandle, Props>(function ResponsiveSearch(
-  { value, onChange, label, placeholder, title, wide = false, type = 'text' }, ref
+  { value, onChange, label, placeholder, title, wide = false, type = 'text', forceCompact = false }, ref
 ) {
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const closeRef = useRef<(() => void) | null>(null)
   const selectOnOpen = useRef(false)
-  const [compact, setCompact] = useState(() => window.matchMedia('(max-width: 1100px)').matches)
+  const [responsiveCompact, setCompact] = useState(() => window.matchMedia('(max-width: 1100px)').matches)
+  const compact = forceCompact || responsiveCompact
   const [open, setOpen] = useState(false)
 
   useEffect(() => {

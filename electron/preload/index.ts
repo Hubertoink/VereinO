@@ -486,6 +486,16 @@ const rendererApi = {
     }
   },
   imports: {
+    aiPreview: (payload) => invoke('imports.aiPreview', payload),
+    aiCreate: (payload) => invoke('imports.aiCreate', payload),
+    aiGet: (payload) => invoke('imports.aiGet', payload),
+    aiList: () => invoke('imports.aiList'),
+    aiDelete: (payload) => invoke('imports.aiDelete', payload),
+    aiReview: (payload) => invoke('imports.aiReview', payload),
+    aiStart: (payload) => invoke('imports.aiStart', payload),
+    aiCancel: (payload) => invoke('imports.aiCancel', payload),
+    aiSave: (payload) => invoke('imports.aiSave', payload),
+    aiCommit: (payload) => invoke('imports.aiCommit', payload),
     preview: (payload) => invoke('imports.preview', payload),
     execute: (payload) => invoke('imports.execute', payload),
     analyze: (payload) => invoke('imports.analyze', payload),

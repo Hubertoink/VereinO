@@ -1,4 +1,5 @@
 import { withBankAiReviewLock } from '../services/bankAiReviewLock'
+import { AiImportFileSchema, AiImportCreateSchema, AiImportIdentitySchema, AiImportSaveSchema } from '../../../shared/aiImport'
 import type { BankAiReviewProgress } from '../../../shared/bankAiReviewProgress'
 import { buildReportMonths, renderReportAnalytics, reportAnalyticsCss } from '../../../shared/reportAnalytics'
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
@@ -2554,6 +2555,28 @@ ${reportAnalyticsCss}
     const res = await previewFile(fileBase64)
     return ImportPreviewOutput.parse(res as any)
   })
+  ipcMain.handle('imports.aiPreview', async (_e, payload) => {
+    const input = AiImportFileSchema.parse(payload)
+    return (await import('../services/aiImport')).previewAiImport(input.fileName, input.fileBase64)
+  })
+  ipcMain.handle('imports.aiCreate', async (_e, payload) => (await import('../services/aiImport')).createAiImport(AiImportCreateSchema.parse(payload)))
+  ipcMain.handle('imports.aiList', async () => (await import('../services/aiImport')).listAiImports())
+  ipcMain.handle('imports.aiDelete', async (_e, payload) => (await import('../services/aiImport')).deleteAiImport(z.object({ id: z.string().uuid() }).parse(payload).id))
+  ipcMain.handle('imports.aiReview', async (_e, payload) => (await import('../services/aiImport')).saveAiImport(AiImportSaveSchema.parse(payload), false))
+  ipcMain.handle('imports.aiGet', async (_e, payload) => (await import('../services/aiImport')).getAiImport(z.object({ id: z.string().uuid() }).parse(payload).id))
+  ipcMain.handle('imports.aiStart', async (_e, payload) => (await import('../services/aiImport')).startAiImport(AiImportIdentitySchema.parse(payload)))
+  ipcMain.handle('imports.aiCancel', async (_e, payload) => (await import('../services/aiImport')).cancelAiImport(AiImportIdentitySchema.parse(payload)))
+  ipcMain.handle('imports.aiSave', async (_e, payload) => (await import('../services/aiImport')).saveAiImport(AiImportSaveSchema.parse(payload)))
+  ipcMain.handle('imports.aiCommit', async (_e, payload) => {
+    const input = AiImportIdentitySchema.parse(payload)
+    const d = getDb()
+    await requireSafetyBackup(backup.makeBackup, 'preAiImport', 'KI-Import übernehmen')
+    const service = await import('../services/aiImport')
+    if (d !== getDb()) throw new Error('Organisation wurde gewechselt. Bitte den Import erneut öffnen.')
+    const result = service.commitAiImport(input)
+    notifyDataChanged(['vouchers', 'tags', 'budgets', 'earmarks', 'settings'])
+    return result
+  })
   ipcMain.handle('imports.execute', async (_e, payload) => {
     const parsed = ImportExecuteInput.parse(payload)
     // Safety: backup before potentially large data modification
@@ -2578,7 +2601,7 @@ ${reportAnalyticsCss}
       dataBytes: parsed.fileBytes,
       dataBase64: parsed.fileBase64
     })
-    const res = await analyzeFile(fileBase64, parsed.mapping as any, parsed.rules as any)
+    const res = await analyzeFile(fileBase64, parsed.mapping as any, parsed.rules as any, { masterData: parsed.masterData, draftRows: parsed.draftRows as any })
     return ImportAnalyzeOutput.parse(res as any)
   })
   ipcMain.handle('imports.commitDraft', async (_e, payload) => {
@@ -2590,7 +2613,7 @@ ${reportAnalyticsCss}
       /* ignore */
     }
     const { commitImportDraft } = await loadImportsService()
-    const res = await commitImportDraft(parsed.rows as any)
+    const res = await commitImportDraft(parsed.rows as any, parsed.masterData)
     return ImportExecuteOutput.parse(res as any)
   })
   ipcMain.handle('imports.createMissing', async (_e, payload) => {

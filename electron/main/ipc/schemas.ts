@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ImportMasterRowSchema } from '../../../shared/importMasterData'
 
 // Public IPC-schema facade. Domain modules are re-exported here so existing
 // renderer, preload and main-process imports stay stable during the migration.
@@ -306,7 +307,8 @@ const PaymentAccountShape = z.object({
   iban: z.string().nullable().optional(),
   color: z.string().nullable().optional(),
   sortOrder: z.number(),
-  isActive: z.number()
+  isActive: z.number(),
+  bookingCount: z.number().int().nonnegative()
 })
 export const PaymentAccountsListInput = z.object({ activeOnly: z.boolean().optional() }).optional()
 export const PaymentAccountsListOutput = z.object({ rows: z.array(PaymentAccountShape) })
@@ -967,6 +969,7 @@ export const ImportPreviewInput = z
   .object(ImportFileFields)
   .refine(hasImportFileData, { message: 'Importdatei fehlt.' })
 export const ImportPreviewOutput = z.object({
+  organizationProfile: z.enum(['GENERAL', 'NONPROFIT']).optional(),
   headers: z.array(z.string()),
   sample: z.array(z.record(z.any())),
   suggestedMapping: z.record(z.string().nullable()),
@@ -1001,7 +1004,8 @@ const ImportRuleSchema = z.object({
     'paymentAccount',
     'budget',
     'earmarkCode',
-    'sphere'
+    'sphere',
+    'category'
   ]),
   value: z.string()
 })
@@ -1024,6 +1028,7 @@ const ImportDraftRowSchema = z.object({
 })
 
 const ImportMissingSchema = z.object({
+  masterData: z.array(ImportMasterRowSchema).optional(),
   tags: z.array(z.string()).optional(),
   budgets: z.array(z.string()).optional(),
   earmarks: z.array(z.string()).optional(),
@@ -1034,11 +1039,15 @@ export const ImportAnalyzeInput = z
   .object({
     ...ImportFileFields,
     mapping: z.record(z.string().nullable()),
-    rules: z.array(ImportRuleSchema).optional()
+    rules: z.array(ImportRuleSchema).optional(),
+    masterData: z.array(ImportMasterRowSchema).optional(),
+    draftRows: z.array(ImportDraftRowSchema).optional()
   })
   .refine(hasImportFileData, { message: 'Importdatei fehlt.' })
 
 export const ImportAnalyzeOutput = ImportPreviewOutput.extend({
+  masterData: z.array(ImportMasterRowSchema).optional(),
+  organizationProfile: z.enum(['GENERAL', 'NONPROFIT']).optional(),
   rows: z.array(ImportDraftRowSchema),
   summary: z.object({
     total: z.number(),
@@ -1055,6 +1064,7 @@ export const ImportAnalyzeOutput = ImportPreviewOutput.extend({
     paymentAccounts: z.array(z.string())
   }),
   lookup: z.object({
+    categories: z.array(z.object({ id: z.number(), label: z.string() })).optional(),
     paymentAccounts: z.array(z.object({ id: z.number(), label: z.string() })),
     budgets: z.array(z.object({ id: z.number(), label: z.string() })),
     earmarks: z.array(z.object({ id: z.number(), label: z.string() })),
@@ -1062,9 +1072,10 @@ export const ImportAnalyzeOutput = ImportPreviewOutput.extend({
   })
 })
 
-export const ImportCommitDraftInput = z.object({ rows: z.array(ImportDraftRowSchema) })
+export const ImportCommitDraftInput = z.object({ rows: z.array(ImportDraftRowSchema), masterData: z.array(ImportMasterRowSchema).optional() })
 export const ImportCreateMissingInput = ImportMissingSchema
 export const ImportCreateMissingOutput = z.object({
+  categories: z.number().optional(),
   tags: z.number(),
   budgets: z.number(),
   earmarks: z.number(),

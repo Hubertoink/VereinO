@@ -123,7 +123,12 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
           >
             <span className="settings-record-color" style={{ background: account.color || 'var(--border)' }} title={account.color || 'Keine Farbe'} />
             <div className="payment-account-card__details">
-              <div className="payment-account-card__name">{account.name}</div>
+              <div className="payment-account-card__heading">
+                <span className="payment-account-card__name" title={account.name}>{account.name}</span>
+                {account.bookingCount != null && <span className="payment-account-card__usage" title="Zugeordnete Buchungen einschließlich Umbuchungen">
+                  {account.bookingCount.toLocaleString('de-DE')} {account.bookingCount === 1 ? 'Buchung' : 'Buchungen'}
+                </span>}
+              </div>
               <div className="helper">{KIND_LABELS[account.kind]}{account.iban ? ` · ${account.iban}` : ''}</div>
               {!account.isActive && <span className="payment-account-card__archived">Archiviert</span>}
             </div>
@@ -132,7 +137,13 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
               <button className="btn btn-edit" onClick={() => setDraft({ id: account.id, name: account.name, kind: account.kind, iban: account.iban || '', color: account.color || null, sortOrder: Math.max(1, account.sortOrder || index + 1), isActive: account.isActive !== 0 })} title="Bearbeiten" aria-label={`${account.name} bearbeiten`}>
                 <AppIcon icon={IconPencil} size="control" />
               </button>
-              <button className="btn ghost btn-trash" onClick={() => setDeleteConfirm({ id: account.id, name: account.name })} title="Löschen" aria-label={`${account.name} löschen`}>
+              <button className="btn ghost btn-trash" onClick={() => {
+                if ((account.bookingCount ?? 0) > 0) {
+                  notify('info', `„${account.name}“ kann nicht gelöscht werden, weil dem Konto Buchungen zugeordnet sind. Du kannst es unter „Bearbeiten“ stattdessen archivieren.`)
+                  return
+                }
+                setDeleteConfirm({ id: account.id, name: account.name })
+              }} title="Löschen" aria-label={`${account.name} löschen`}>
                 <IconTrash size={16} />
               </button>
             </div>

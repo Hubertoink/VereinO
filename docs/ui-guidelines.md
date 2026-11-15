@@ -299,6 +299,15 @@ export function Card({ title, children, actions }) {
 
 - Farbschema-Auswahl im Setup rendert beide Buchungsminiaturen sofort mit den gemeinsamen App-Paletten. Der Scope `.setup-theme-preview` setzt lokale Theme-Tokens; das globale Theme bleibt bis zum Abschluss unverändert.
 
+## KI-Import
+
+- Vier Schritte im Kopf: Datei auswählen, KI-Analyse, Daten prüfen, Übernehmen. Jeder Schritt zeigt einen kurzen Status; die Primäraktion steht immer rechts im festen Fußbereich.
+- Die Einrichtung gliedert sich in nummerierte Abschnitte (Datei, Spalten, Zuordnungsregeln, Kontext). Erkannte Spalten erscheinen als Chips, die vollständige Zuordnung bleibt aufklappbar.
+- Die Prüfung zeigt Kennzahl-Karten, die zugleich als Statusfilter dienen. Die Buchungstabelle ist eine Lesetabelle mit den Journal-Badges für Art und Sphäre. Werte, die nicht unverändert aus der Datei stammen, tragen ein kleines Symbol (KI-Vorschlag, manuell geändert, Nutzervorgabe).
+- Bearbeitet wird eine Zeile im überlagerten Detailbereich rechts mit Originalquelle und Vor/Zurück-Navigation. Die Tabelle behält ihre Breite; ein Klick außerhalb schließt den Detailbereich und erhält die Änderungen im Entwurf.
+- Stammdaten werden nach Typ gruppiert. Nur neue oder fehlerhafte Einträge sind editierbar, vorhandene erscheinen als Chips. Die Freigabe steht gesammelt oben.
+- Offene Punkte (Buchungen, Beziehungen, Stammdaten, ungespeichert) stehen als Checkliste im Fußbereich neben „Auswahl übernehmen“ und führen zum jeweiligen Reiter.
+
 ## Kontextuelle Seitenhilfe
 
 - Rechtsklick auf „Buchungen“ oder „Bankimport“ in der seitlichen oder oberen Navigation öffnet „Hilfe zu dieser Seite“. Umschalt+F10 und die Kontextmenütaste bieten denselben Zugang, Pfeiltasten navigieren im Menü. Bei Buchungen enthält es zusätzlich „Klassisch“ und „Plus“ als Auswahl mit sichtbarem aktuellem Zustand.

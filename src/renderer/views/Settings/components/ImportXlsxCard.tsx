@@ -2,6 +2,8 @@ import ModalHeader from '../../../components/ModalHeader'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { dispatchDataChanged } from '../../../utils/refresh'
+import { ImportMasterDataTable } from './ImportMasterDataTable'
+import type { ImportMasterRow } from '../../../../../shared/importMasterData'
 
 interface ImportXlsxCardProps {
   notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
@@ -17,6 +19,7 @@ const EMPTY_MAPPING: Record<string, string | null> = {
   date: null,
   type: null,
   sphere: null,
+  category: null,
   description: null,
   note: null,
   paymentMethod: null,
@@ -46,6 +49,7 @@ const FIELD_KEYS: Array<{ key: string; label: string; required?: boolean; enumVa
   { key: 'note', label: 'Kommentar' },
   { key: 'type', label: 'Art' },
   { key: 'sphere', label: 'Sphäre' },
+  { key: 'category', label: 'Kategorie' },
   { key: 'paymentMethod', label: 'Zahlweg BAR/BANK' },
   { key: 'paymentAccount', label: 'Zahlkonto' },
   { key: 'grossAmount', label: 'Brutto' },
@@ -88,9 +92,12 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
   const [mapping, setMapping] = useState<Record<string, string | null>>(EMPTY_MAPPING)
   const [analysis, setAnalysis] = useState<AnalyzeResult | null>(null)
   const [rows, setRows] = useState<DraftRow[]>([])
+  const [masterData, setMasterData] = useState<ImportMasterRow[]>([])
+  const [profile, setProfile] = useState<'GENERAL' | 'NONPROFIT'>('NONPROFIT')
+  const [dirty, setDirty] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [problemOnly, setProblemOnly] = useState(false)
-  const [batchField, setBatchField] = useState<'tags' | 'budget' | 'paymentAccount' | 'sphere'>('tags')
+  const [batchField, setBatchField] = useState<'tags' | 'budget' | 'paymentAccount' | 'sphere' | 'category'>('tags')
   const [batchValue, setBatchValue] = useState('')
   const [rules, setRules] = useState<ImportRule[]>(() => safeJson(localStorage.getItem('vereino.import.rules'), DEFAULT_RULES))
   const [busy, setBusy] = useState(false)
@@ -104,9 +111,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
   }, [rules])
 
   const step = !fileBytes ? 0 : analysis ? 2 : 1
-  const missingCount = analysis
-    ? analysis.missing.tags.length + analysis.missing.budgets.length + analysis.missing.earmarks.length + analysis.missing.paymentAccounts.length
-    : 0
+  const general = profile === 'GENERAL'
   const visibleRows = useMemo(() => rows.filter((row) => !problemOnly || row.status !== 'ok'), [rows, problemOnly])
   const importableRows = rows.filter((row) => row.status !== 'ignored' && row.duplicateAction !== 'skip')
 
@@ -114,6 +119,10 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
     setError('')
     setResult(null)
     setAnalysis(null)
+    setFileBytes(null)
+    setHeaders([])
+    setMasterData([])
+    setDirty(false)
     setRows([])
     setSelected(new Set())
     setFileName(f.name)
@@ -131,6 +140,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
         }
         const prev = await window.api?.imports.preview?.({ fileBytes: bytes })
         if (prev) {
+          setProfile(prev.organizationProfile || 'NONPROFIT')
           const remembered = safeJson<Record<string, string | null>>(localStorage.getItem(storageKey(prev.headers)), {})
           setHeaders(prev.headers)
           setSample(prev.sample as any)
@@ -145,7 +155,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
     }
   }
 
-  async function analyze() {
+  async function analyze(fromFile = false) {
     if (!fileBytes) return
     setBusy(true)
     setError('')
@@ -155,10 +165,13 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
         throw new Error('Der neue Import-Assistent ist im laufenden Fenster noch nicht verfügbar. Bitte VereinO einmal komplett schließen und neu starten.')
       }
       localStorage.setItem(storageKey(headers), JSON.stringify(mapping))
-      const res = await window.api?.imports.analyze?.({ fileBytes, mapping, rules })
+      const res = await window.api?.imports.analyze?.({ fileBytes, mapping, rules, ...(analysis && !fromFile ? { masterData, draftRows: rows } : {}) })
       if (res) {
         setAnalysis(res)
+        setProfile(res.organizationProfile || 'NONPROFIT')
         setRows(res.rows)
+        setMasterData(res.masterData || [])
+        setDirty(false)
         setSelected(new Set())
         notify?.('success', `Validierung fertig: ${res.summary.errors} Fehler, ${res.summary.duplicates} Duplikate`)
       } else {
@@ -179,8 +192,9 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
       if (!window.api?.imports?.createMissing) {
         throw new Error('Stammdaten-Anlage ist im laufenden Fenster noch nicht verfügbar. Bitte VereinO einmal neu starten.')
       }
-      const res = await window.api?.imports.createMissing?.(analysis.missing)
-      notify?.('success', `Stammdaten angelegt: ${res?.tags || 0} Tags, ${res?.budgets || 0} Budgets, ${res?.earmarks || 0} Zweckbindungen, ${res?.paymentAccounts || 0} Konten`)
+      const res = await window.api?.imports.createMissing?.({ masterData })
+      notify?.('success', `Stammdaten angelegt: ${res?.tags || 0} Tags, ${res?.budgets || 0} Budgets, ${res?.categories || 0} Kategorien, ${res?.earmarks || 0} Zweckbindungen, ${res?.paymentAccounts || 0} Konten`)
+      dispatchDataChanged()
       await analyze()
     } catch (e: any) {
       setError('Stammdaten konnten nicht angelegt werden: ' + (e?.message || String(e)))
@@ -190,7 +204,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
   }
 
   async function commitDraft() {
-    const blocking = rows.filter((row) => row.status === 'error')
+    const blocking = rows.filter((row) => row.status === 'error' && row.duplicateAction !== 'skip')
     if (blocking.length > 0) {
       setError(`Bitte zuerst ${blocking.length} fehlerhafte Zeilen korrigieren oder löschen.`)
       return
@@ -201,7 +215,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
       if (!window.api?.imports?.commitDraft) {
         throw new Error('Entwurfs-Import ist im laufenden Fenster noch nicht verfügbar. Bitte VereinO einmal neu starten.')
       }
-      const res = await window.api?.imports.commitDraft?.({ rows })
+      const res = await window.api?.imports.commitDraft?.({ rows, masterData })
       if (res) {
         setResult(res)
         dispatchDataChanged(['vouchers'])
@@ -218,14 +232,17 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
   }
 
   function updateRow(id: string, key: string, value: any) {
-    setRows((prev) => prev.map((row) => row.id === id ? { ...row, values: { ...row.values, [key]: value }, status: row.status === 'error' ? 'warning' : row.status } : row))
+    setDirty(true)
+    setRows((prev) => prev.map((row) => row.id === id ? { ...row, values: { ...row.values, [key]: value } } : row))
   }
 
   function updateDuplicateAction(id: string, duplicateAction: DraftRow['duplicateAction']) {
+    setDirty(true)
     setRows((prev) => prev.map((row) => row.id === id ? { ...row, duplicateAction } : row))
   }
 
   function updateLookupRow(id: string, field: 'paymentAccount' | 'budget' | 'earmarkCode', value: string) {
+    setDirty(true)
     const metaField = field === 'paymentAccount' ? 'paymentAccountId' : field === 'budget' ? 'budgetId' : 'earmarkId'
     const options = field === 'paymentAccount'
       ? analysis?.lookup.paymentAccounts
@@ -239,12 +256,14 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
   }
 
   function deleteSelected() {
+    setDirty(true)
     if (selected.size === 0) return
     setRows((prev) => prev.filter((row) => !selected.has(row.id)))
     setSelected(new Set())
   }
 
   function applyBatch() {
+    setDirty(true)
     if (!batchValue.trim() || selected.size === 0) return
     const metaField = batchField === 'paymentAccount' ? 'paymentAccountId' : batchField === 'budget' ? 'budgetId' : null
     const options = batchField === 'paymentAccount' ? analysis?.lookup.paymentAccounts : batchField === 'budget' ? analysis?.lookup.budgets : []
@@ -277,6 +296,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
 
   return (
     <div className="card import-assistant">
+      <datalist id="import-categories">{analysis?.lookup.categories?.map(c => <option key={c.id} value={c.label} />)}</datalist>
       <input ref={fileRef} type="file" accept=".xlsx" hidden onChange={(e) => e.target.files?.[0] && processFile(e.target.files[0])} />
       <div className="import-steps">
         {['Datei', 'Zuordnung', 'Validierung & Entwurf'].map((label, index) => (
@@ -334,13 +354,13 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
               <strong>Kopfzeile erkannt: Zeile {headerRowIndex || 1}</strong>
               <div className="helper">VereinO merkt sich diese Zuordnung für dieselbe Tabellenstruktur automatisch.</div>
             </div>
-            <button className="btn primary" onClick={analyze} disabled={busy || !fileBytes}>Validieren & Entwurf laden</button>
+            <button className="btn primary" onClick={() => analyze(true)} disabled={busy || !fileBytes}>Validieren & Entwurf laden</button>
           </div>
           <div className="members-mapping-grid" style={{ marginTop: 8 }}>
-            <div className="mapping-section"><div className="section-title">Basis</div><Field keyName="voucherId" /><Field keyName="voucherNo" /><Field keyName="date" /><Field keyName="description" /><Field keyName="note" /><Field keyName="type" /><Field keyName="sphere" /></div>
+            <div className="mapping-section"><div className="section-title">Basis</div><Field keyName="voucherId" /><Field keyName="voucherNo" /><Field keyName="date" /><Field keyName="description" /><Field keyName="note" /><Field keyName="type" /><Field keyName={general ? "category" : "sphere"} /></div>
             <div className="mapping-section"><div className="section-title">Beträge</div><Field keyName="grossAmount" /><Field keyName="netAmount" /><Field keyName="vatRate" /><Field keyName="inGross" /><Field keyName="outGross" /></div>
             <div className="mapping-section"><div className="section-title">Stammdaten</div><Field keyName="paymentMethod" /><Field keyName="paymentAccount" /><Field keyName="budget" /><Field keyName="budgetAmount" /><Field keyName="earmarkCode" /><Field keyName="earmarkAmount" /><Field keyName="tags" /></div>
-            <div className="mapping-section"><div className="section-title">Split & Standard</div><Field keyName="bankIn" /><Field keyName="bankOut" /><Field keyName="cashIn" /><Field keyName="cashOut" /><Field keyName="defaultSphere" /></div>
+            <div className="mapping-section"><div className="section-title">Split & Standard</div><Field keyName="bankIn" /><Field keyName="bankOut" /><Field keyName="cashIn" /><Field keyName="cashOut" />{!general && <Field keyName="defaultSphere" />}</div>
           </div>
         </div>
       )}
@@ -358,7 +378,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
                 </select>
                 <input className="input" placeholder="enthält..." value={rule.contains} onChange={(e) => setRules((prev) => prev.map((r, i) => i === index ? { ...r, contains: e.target.value } : r))} />
                 <select className="input" value={rule.targetField} onChange={(e) => setRules((prev) => prev.map((r, i) => i === index ? { ...r, targetField: e.target.value as any } : r))}>
-                  <option value="tags">Tags setzen</option><option value="type">Art setzen</option><option value="paymentMethod">Zahlweg setzen</option><option value="paymentAccount">Konto setzen</option><option value="budget">Budget setzen</option><option value="earmarkCode">Zweckbindung setzen</option><option value="sphere">Sphäre setzen</option>
+                  <option value="tags">Tags setzen</option><option value="type">Art setzen</option><option value="paymentMethod">Zahlweg setzen</option><option value="paymentAccount">Konto setzen</option><option value="budget">Budget setzen</option><option value="earmarkCode">Zweckbindung setzen</option><option value={general ? 'category' : 'sphere'}>{general ? 'Kategorie setzen' : 'Sphäre setzen'}</option>
                 </select>
                 <input className="input" placeholder="Wert" value={rule.value} onChange={(e) => setRules((prev) => prev.map((r, i) => i === index ? { ...r, value: e.target.value } : r))} />
                 <button className="btn danger" onClick={() => setRules((prev) => prev.filter((_, i) => i !== index))}>x</button>
@@ -378,29 +398,16 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
             <div className="import-summary-card dup"><strong>{analysis.summary.duplicates}</strong><span>Duplikate</span></div>
           </div>
 
-          {missingCount > 0 && (
-            <div className="card import-missing-card" style={{ marginTop: 10, padding: 10 }}>
-              <strong>Fehlende Stammdaten gefunden</strong>
-              <div className="helper" style={{ marginTop: 4 }}>
-                {analysis.missing.tags.length} neue Tags, {analysis.missing.budgets.length} unbekannte Budgets, {analysis.missing.earmarks.length} unbekannte Zweckbindungen, {analysis.missing.paymentAccounts.length} unbekannte Konten.
-              </div>
-              <div className="helper" style={{ marginTop: 6 }}>
-                {[
-                  ...analysis.missing.tags.map((v) => `Tag: ${v}`),
-                  ...analysis.missing.budgets.map((v) => `Budget: ${v}`),
-                  ...analysis.missing.earmarks.map((v) => `Zweckbindung: ${v}`),
-                  ...analysis.missing.paymentAccounts.map((v) => `Konto: ${v}`)
-                ].slice(0, 12).join(' | ')}
-              </div>
-              <button className="btn" style={{ marginTop: 8 }} onClick={createMissing}>Fehlende Stammdaten jetzt anlegen</button>
-            </div>
-          )}
+          <ImportMasterDataTable rows={masterData} general={general} busy={busy} dirty={dirty}
+            onChange={(id, field, value) => { setDirty(true); setMasterData(prev => prev.map(row => row.id === id ? { ...row, [field]: value } : row)) }}
+            onValidate={() => analyze()} onCreate={createMissing} />
+          {dirty && <p className="helper">Der Entwurf wurde geändert. Bitte vor dem Übernehmen erneut prüfen.</p>}
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
             <label className="helper"><input type="checkbox" checked={problemOnly} onChange={(e) => setProblemOnly(e.target.checked)} /> nur problematische Zeilen anzeigen</label>
             <span className="helper">{selected.size} ausgewählt</span>
             <select className="input" style={{ width: 160 }} value={batchField} onChange={(e) => setBatchField(e.target.value as any)}>
-              <option value="tags">Tags</option><option value="budget">Budget</option><option value="paymentAccount">Konto</option><option value="sphere">Sphäre</option>
+              <option value="tags">Tags</option><option value="budget">Budget</option><option value="paymentAccount">Konto</option><option value={general ? "category" : "sphere"}>{general ? "Kategorie" : "Sphäre"}</option>
             </select>
             {batchField === 'paymentAccount' ? (
               <select className="input" style={{ width: 260 }} value={batchValue} onChange={(e) => setBatchValue(e.target.value)}>
@@ -412,6 +419,8 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
                 <option value="">Budget wählen...</option>
                 {analysis.lookup.budgets.map((item) => <option key={item.id} value={item.label}>{item.label}</option>)}
               </select>
+            ) : batchField === 'category' ? (
+              <input className="input" list="import-categories" value={batchValue} onChange={e => setBatchValue(e.target.value)} placeholder="Kategorie" />
             ) : batchField === 'sphere' ? (
               <select className="input" style={{ width: 180 }} value={batchValue} onChange={(e) => setBatchValue(e.target.value)}>
                 <option value="">Sphäre wählen...</option><option value="IDEELL">IDEELL</option><option value="ZWECK">ZWECK</option><option value="VERMOEGEN">VERMOEGEN</option><option value="WGB">WGB</option>
@@ -421,7 +430,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
             )}
             <button className="btn" onClick={applyBatch} disabled={selected.size === 0 || !batchValue.trim()}>Auf Auswahl anwenden</button>
             <button className="btn danger" onClick={deleteSelected} disabled={selected.size === 0}>Auswahl löschen</button>
-            <button className="btn primary" style={{ marginLeft: 'auto' }} onClick={commitDraft} disabled={busy || importableRows.length === 0}>Jetzt übernehmen ({importableRows.length})</button>
+            <button className="btn primary" style={{ marginLeft: 'auto' }} onClick={commitDraft} disabled={busy || dirty || !!result?.imported || importableRows.length === 0 || importableRows.some(row => row.status === 'error') || masterData.some(row => row.status !== 'existing')}>Jetzt übernehmen ({importableRows.length})</button>
           </div>
 
           <div style={{ overflowX: 'auto', marginTop: 8, maxHeight: 520 }}>
@@ -429,7 +438,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
               <thead>
                 <tr>
                   <th><input type="checkbox" checked={visibleRows.length > 0 && visibleRows.every((row) => selected.has(row.id))} onChange={(e) => setSelected(e.target.checked ? new Set(visibleRows.map((row) => row.id)) : new Set())} /></th>
-                  <th>#</th><th>Status</th><th>Datum</th><th>Beschreibung</th><th>Art</th><th>Sphäre</th><th>Konto</th><th>Brutto</th><th>Budget</th><th>Zweckbindung</th><th>Tags</th><th>Duplikat</th><th>Hinweis</th>
+                  <th>#</th><th>Status</th><th>Datum</th><th>Beschreibung</th><th>Art</th><th>{general ? 'Kategorie' : 'Sphäre'}</th><th>Konto</th><th>Brutto</th><th>Budget</th><th>Zweckbindung</th><th>Tags</th><th>Duplikat</th><th>Hinweis</th>
                 </tr>
               </thead>
               <tbody>
@@ -441,10 +450,11 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
                     <td><input value={row.values.date ?? ''} onChange={(e) => updateRow(row.id, 'date', e.target.value)} /></td>
                     <td><input value={row.values.description ?? ''} onChange={(e) => updateRow(row.id, 'description', e.target.value)} /></td>
                     <td><select value={row.values.type ?? ''} onChange={(e) => updateRow(row.id, 'type', e.target.value)}><option value="">-</option><option value="IN">IN</option><option value="OUT">OUT</option><option value="TRANSFER">TRANSFER</option><option value="INTERNAL">INTERNAL</option></select></td>
-                    <td><select value={row.values.sphere ?? 'IDEELL'} onChange={(e) => updateRow(row.id, 'sphere', e.target.value)}><option value="IDEELL">IDEELL</option><option value="ZWECK">ZWECK</option><option value="VERMOEGEN">VERMOEGEN</option><option value="WGB">WGB</option></select></td>
+                    <td>{general ? <input aria-label="Kategorie" list="import-categories" value={row.values.category ?? ''} onChange={e => updateRow(row.id, 'category', e.target.value)} /> : <select value={row.values.sphere ?? 'IDEELL'} onChange={(e) => updateRow(row.id, 'sphere', e.target.value)}><option value="IDEELL">IDEELL</option><option value="ZWECK">ZWECK</option><option value="VERMOEGEN">VERMOEGEN</option><option value="WGB">WGB</option></select>}</td>
                     <td>
                       <select value={row.values.paymentAccount ?? ''} onChange={(e) => updateLookupRow(row.id, 'paymentAccount', e.target.value)}>
                         <option value="">- Konto wählen -</option>
+                        {row.values.paymentAccount && !analysis.lookup.paymentAccounts.some(item => item.label === row.values.paymentAccount) && <option value={row.values.paymentAccount}>{row.values.paymentAccount}</option>}
                         {analysis.lookup.paymentAccounts.map((item) => <option key={item.id} value={item.label}>{item.label}</option>)}
                       </select>
                     </td>
@@ -452,12 +462,14 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
                     <td>
                       <select value={row.values.budget ?? ''} onChange={(e) => updateLookupRow(row.id, 'budget', e.target.value)}>
                         <option value="">- Budget wählen -</option>
+                        {row.values.budget && !analysis.lookup.budgets.some(item => item.label === row.values.budget) && <option value={row.values.budget}>{row.values.budget}</option>}
                         {analysis.lookup.budgets.map((item) => <option key={item.id} value={item.label}>{item.label}</option>)}
                       </select>
                     </td>
                     <td>
                       <select value={row.values.earmarkCode ?? ''} onChange={(e) => updateLookupRow(row.id, 'earmarkCode', e.target.value)}>
                         <option value="">- Zweckbindung wählen -</option>
+                        {row.values.earmarkCode && !analysis.lookup.earmarks.some(item => item.label === row.values.earmarkCode) && <option value={row.values.earmarkCode}>{row.values.earmarkCode}</option>}
                         {analysis.lookup.earmarks.map((item) => <option key={item.id} value={item.label}>{item.label}</option>)}
                       </select>
                     </td>

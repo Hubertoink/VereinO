@@ -1,0 +1,38 @@
+.modal-overlay.import-log-overlay {
+  align-items: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.modal.import-log-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: min(900px, 100%);
+  min-width: 0;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* The header meets the outer frame; the body owns the content inset. */
+.import-log-modal > .modal-header-bar::before {
+  content: none;
+}
+
+.import-log-modal__body {
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 20px 16px;
+}
+
+.import-log-modal__body table {
+  min-width: 700px;
+}
+
+@media (max-width: 600px) {
+  .import-log-modal__body {
+    padding: 12px 16px 16px;
+  }
+}
