@@ -2,8 +2,9 @@ import React from 'react'
 import { navItems } from '../../utils/navItems'
 import { getNavIcon } from '../../utils/navIcons'
 import type { NavItem, NavKey } from '../../utils/navItems'
+import { useNavigationMenu, type NavigationMenuProps } from './useNavigationMenu'
 
-interface TopNavProps {
+interface TopNavProps extends NavigationMenuProps {
   activePage: NavKey
   onNavigate: (page: NavKey) => void
   navIconColorMode: 'color' | 'mono'
@@ -16,9 +17,11 @@ interface TopNavProps {
   aiBusy?: boolean
 }
 
-export function TopNav({ activePage, onNavigate, navIconColorMode, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, dueRecurringBookingsCount = 0, showBadges = true, items = navItems, aiBusy = false }: TopNavProps) {
+export function TopNav({ activePage, onNavigate, navIconColorMode, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, dueRecurringBookingsCount = 0, showBadges = true, items = navItems, aiBusy = false, ...menuProps }: TopNavProps) {
+  const navigationMenu = useNavigationMenu({ ...menuProps, navIconColorMode })
   return (
-    <nav aria-label="Hauptmenü (oben)" className="top-nav">
+    <nav aria-label="Hauptmenü (oben)" className="top-nav" onContextMenu={navigationMenu.onContextMenu}>
+      {navigationMenu.menu}
       {items.map((item, idx) => {
         const isActive = activePage === item.key
         const isAiRunning = aiBusy && item.key === 'KI'

@@ -3412,6 +3412,10 @@ function AppInner() {
         {isTopNav ? (
           <div className="app-header__nav no-drag" style={{ WebkitAppRegion: 'no-drag' } as any}>
             <TopNav
+              availableItems={getProfileNavigationItems(organizationProfile)}
+              visibleNavItems={visibleNavItems}
+              requiredNavItems={requiredNavItems}
+              onVisibleNavItemsChange={setVisibleNavItems}
               activePage={activePage}
               onNavigate={setActivePage}
               navIconColorMode={navIconColorMode}
@@ -3433,6 +3437,10 @@ function AppInner() {
       </header>
       {!isTopNav && (
           <AppSidebar
+            availableItems={getProfileNavigationItems(organizationProfile)}
+            visibleNavItems={visibleNavItems}
+            requiredNavItems={requiredNavItems}
+            onVisibleNavItemsChange={setVisibleNavItems}
             activePage={activePage}
             onNavigate={setActivePage}
             navIconColorMode={navIconColorMode}

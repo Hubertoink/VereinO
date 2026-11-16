@@ -7,6 +7,7 @@ import { SidebarAccounts } from './SidebarAccounts'
 import { SidebarRecentAssignments, type SidebarAssignmentKind } from './SidebarRecentAssignments'
 import { SidebarBankImports } from './SidebarBankImports'
 import { SidebarMembershipFees } from './SidebarMembershipFees'
+import type { NavigationMenuProps } from './useNavigationMenu'
 
 const sectionsStorageKey = 'ui.sidebarSectionsCollapsed'
 function readCollapsedSections(): Partial<Record<NavKey, boolean>> {
@@ -19,7 +20,7 @@ function readCollapsedSections(): Partial<Record<NavKey, boolean>> {
   } catch { return {} }
 }
 
-export interface SideNavProps {
+export interface SideNavProps extends NavigationMenuProps {
   activePage: NavKey
   onNavigate: (page: NavKey) => void
   navIconColorMode: 'color' | 'mono'

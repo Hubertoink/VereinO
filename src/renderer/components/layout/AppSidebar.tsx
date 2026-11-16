@@ -3,8 +3,10 @@ import { SideNav, type SideNavProps } from './SideNav'
 import './sidebar.css'
 import { createPortal } from 'react-dom'
 import { ChangelogModal } from '../modals/ChangelogModal'
+import { useNavigationMenu } from './useNavigationMenu'
 
 export function AppSidebar(props: SideNavProps) {
+  const navigationMenu = useNavigationMenu(props)
   const [appVersion, setAppVersion] = useState('')
   const [showChangelog, setShowChangelog] = useState(false)
   useEffect(() => {
@@ -38,6 +40,7 @@ export function AppSidebar(props: SideNavProps) {
   return <>
     {narrow && overlayOpen && <div className="sidebar-backdrop" aria-hidden="true" onClick={() => setOverlayOpen(false)} />}
     <aside ref={aside} className={`app-sidebar ${collapsed ? 'app-sidebar--collapsed' : 'app-sidebar--expanded'}${narrow && overlayOpen ? ' app-sidebar--overlay' : ''}`} role={narrow && overlayOpen ? 'dialog' : undefined} aria-modal={narrow && overlayOpen ? true : undefined} aria-label={narrow && overlayOpen ? 'Navigation' : undefined}
+      onContextMenu={navigationMenu.onContextMenu}
       onKeyDown={event => {
         if (!narrow || !overlayOpen) return
         if (event.key === 'Escape') { event.preventDefault(); setOverlayOpen(false) }
@@ -49,6 +52,7 @@ export function AppSidebar(props: SideNavProps) {
       }}>
       <SideNav {...props} appVersion={appVersion} onOpenChangelog={() => { setOverlayOpen(false); setShowChangelog(true) }} collapsed={collapsed} onToggleCollapse={() => narrow ? setOverlayOpen(value => !value) : props.onToggleCollapse?.()} onNavigate={page => { props.onNavigate(page); setOverlayOpen(false) }} onSelectAccount={props.onSelectAccount ? id => { props.onSelectAccount?.(id); setOverlayOpen(false) } : undefined} onSelectBankAccount={props.onSelectBankAccount ? id => { props.onSelectBankAccount?.(id); setOverlayOpen(false) } : undefined} onSelectMembershipFees={props.onSelectMembershipFees ? () => { props.onSelectMembershipFees?.(); setOverlayOpen(false) } : undefined} onSelectAssignment={props.onSelectAssignment ? (kind, id) => { props.onSelectAssignment?.(kind, id); setOverlayOpen(false) } : undefined} />
     </aside>
+    {navigationMenu.menu}
     {showChangelog && createPortal(<ChangelogModal appVersion={appVersion} onClose={() => setShowChangelog(false)} />, document.body)}
   </>
 }

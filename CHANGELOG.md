@@ -7,6 +7,19 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-11-16
+
+### Hinzugefügt
+
+- Ein Klick auf die Prozentanzeige in der PDF-Belegvorschau öffnet eine kompakte Zoomsteuerung mit Minus, Plus, Schieberegler und Zurücksetzen. Die Vergrößerung lässt sich zwischen 25 und 400 Prozent einstellen.
+- Per Rechtsklick auf das Seiten- oder Topmenü lassen sich die sichtbaren Module direkt auswählen. Die Auswahl gilt für beide Menüvarianten und wird pro Organisation gespeichert; erforderliche Bereiche bleiben erreichbar.
+
+### Behoben
+
+- Die Zoomsteuerung erscheint über dem Belegfenster. Escape schließt zunächst die Steuerung und gibt den Fokus an die Prozentanzeige zurück.
+- Vergrößerte PDF-Seiten bleiben bis zum linken Rand scrollbar und werden nicht durch die Vorschau zusammengeschoben.
+- Die Modulauswahl bleibt am Fensterrand sichtbar und öffnet beim Rechtsklick kein zweites Kontextmenü.
+
 ## [4.17.0] - 2026-11-15
 
 ### Hinzugefügt

@@ -1,4 +1,5 @@
 import ModalHeader, { ModalCloseButton } from '../ModalHeader'
+import ReceiptZoomControl from '../ReceiptZoomControl'
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconExternalLink, IconDownload, IconPlus, IconChevronLeft, IconChevronRight, IconTrash, IconFile, IconPhoto as IconImage, IconReceipt2, IconCalendar, IconWallet, IconCategory, IconTag, IconArrowDown, IconArrowUp, IconArrowsExchange, IconPaperclip } from '@tabler/icons-react'
@@ -503,7 +504,7 @@ export default function AttachmentsModal({
                                                     >
                                                         <IconChevronLeft size={17} aria-hidden="true" />
                                                     </button>
-                                                    <button type="button" className="btn ghost" title="Strg + Mausrad zum Zoomen · Klicken zum Zurücksetzen" aria-label="PDF Zoom zurücksetzen" onClick={() => setPdfZoom(1)}>{Math.round(pdfZoom * 100)} %</button>
+                                                    <ReceiptZoomControl key={selectedId} value={pdfZoom} onChange={setPdfZoom} />
                                                     <span className="attachments-modal__pdf-page">Seite {pdfMeta.page} / {pdfMeta.numPages}</span>
                                                     <button
                                                         className="attachments-modal__icon-btn"

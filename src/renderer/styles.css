@@ -16118,9 +16118,9 @@ button.filter-totals-stat {
 .attachments-modal__pdf-controls .btn { font-size: 11px; padding: 4px; }
 .attachments-modal__pdf-page { min-width: 80px; text-align: center; }
 .attachments-modal__toolbar-actions { display: flex; gap: 2px; flex-shrink: 0; }
-.attachments-modal__preview-area { flex: 1; min-height: 0; display: flex; align-items: flex-start; justify-content: center; overflow: auto; padding: 20px; }
+.attachments-modal__preview-area { flex: 1; min-height: 0; display: flex; align-items: flex-start; justify-content: safe center; overflow: auto; padding: 20px; }
 .attachments-modal__preview-img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; box-shadow: 0 4px 20px #0002; }
-.attachments-modal__preview-canvas { background: white; border-radius: 6px; box-shadow: 0 4px 20px #0002; }
+.attachments-modal__preview-canvas { flex-shrink: 0; margin-inline: auto; background: white; border-radius: 6px; box-shadow: 0 4px 20px #0002; }
 .attachments-modal__no-preview, .attachments-modal__no-selection { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; color: var(--text-dim); font-size: 13px; text-align: center; }
 .attachments-modal__no-preview > svg, .attachments-modal__no-selection > svg { width: 36px; height: 36px; opacity: .6; }
 .attachments-modal__no-preview-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }

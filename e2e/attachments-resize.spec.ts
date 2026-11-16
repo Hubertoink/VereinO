@@ -3,12 +3,13 @@ import { build } from 'esbuild'
 import { readFile, mkdtemp, writeFile, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { PDFDocument } from 'pdf-lib'
 
 let script: string
 let css: string
 
 test.beforeAll(async () => {
-  css = await readFile('src/renderer/styles.css', 'utf8')
+  css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/compactPopover.css'].map(file => readFile(file, 'utf8')))).join('\n')
   script = (await build({
     stdin: {
       resolveDir: process.cwd(), loader: 'tsx', contents: `
@@ -37,11 +38,11 @@ test.beforeAll(async () => {
     },
     bundle: true, write: false, platform: 'browser', jsx: 'automatic',
     loader: { '.css': 'empty' },
-    external: ['pdfjs-dist/legacy/build/pdf'],
     define: { 'process.env.NODE_ENV': '"production"' },
     plugins: [{ name: 'attachment-fixtures', setup(builder) {
+      builder.onResolve({ filter: /^pdfjs-dist\/legacy\/build\/pdf$/ }, () => ({ path: path.resolve('node_modules/pdfjs-dist/legacy/build/pdf.mjs') }))
       builder.onResolve({ filter: /pdf\.worker/ }, args => ({ path: args.path, namespace: 'worker' }))
-      builder.onLoad({ filter: /.*/, namespace: 'worker' }, () => ({ contents: 'export default "unused-worker"', loader: 'js' }))
+      builder.onLoad({ filter: /.*/, namespace: 'worker' }, () => ({ contents: 'export default "https://attachments.test/pdf.worker.mjs"', loader: 'js' }))
       builder.onResolve({ filter: /\/context\/useToast$/ }, args => ({ path: args.path, namespace: 'toast' }))
       builder.onLoad({ filter: /.*/, namespace: 'toast' }, () => ({ contents: 'export const useToast = () => ({ notify: () => {} })', loader: 'js' }))
     } }]
@@ -49,6 +50,7 @@ test.beforeAll(async () => {
 })
 
 test.beforeEach(async ({ page }) => {
+  await page.route('https://attachments.test/pdf.worker.mjs', async route => route.fulfill({ contentType: 'text/javascript', headers: { 'Access-Control-Allow-Origin': '*' }, body: await readFile('node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'utf8') }))
   await page.setViewportSize({ width: 1600, height: 1000 })
   await page.setContent('<html data-theme="light"><div id="root"></div></html>')
   await page.addStyleTag({ content: css })
@@ -100,6 +102,7 @@ test('resize release stays open in the installed Electron renderer', async () =>
   const app = await electron.launch({ args: [main], env })
   try {
     const page = await app.firstWindow()
+    await page.locator('#root').waitFor({ state: 'attached' })
     await page.addStyleTag({ content: css })
     await page.addScriptTag({ content: script })
     await expect(page.locator('.attachments-modal__content')).toBeVisible()
@@ -179,6 +182,36 @@ test('pressing inside and releasing outside keeps the modal open', async ({ page
 })
 
 test('Escape still closes the modal', async ({ page }) => {
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.attachments-modal')).toHaveCount(0)
+})
+
+test('PDF zoom resizes the rendered page and Escape only dismisses its popup', async ({ page }, info) => {
+  const pdf = await PDFDocument.create()
+  pdf.addPage([595, 842]).drawText('Zoom-Testbeleg', { x: 40, y: 780, size: 24 })
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: 'Beleg hinzufügen', exact: true }).click()
+  await (await chooser).setFiles({ name: 'Beleg.pdf', mimeType: 'application/pdf', buffer: Buffer.from(await pdf.save()) })
+  const canvas = page.locator('.attachments-modal__preview-canvas')
+  const trigger = page.getByRole('button', { name: 'PDF Zoom einstellen' })
+  await expect(trigger).toBeVisible()
+  await expect.poll(() => canvas.evaluate(el => el.style.width)).not.toBe('')
+  const original = (await canvas.boundingBox())!
+  await trigger.click()
+  const popup = page.getByRole('dialog', { name: 'Zoom', exact: true })
+  await popup.getByRole('slider', { name: 'Zoomstufe' }).fill('200')
+  await expect.poll(async () => (await canvas.boundingBox())!.width).toBeGreaterThan(original.width * 1.9)
+  // The enlarged page must remain reachable from its left edge.
+  expect(await canvas.evaluate(el => el.getBoundingClientRect().left - el.parentElement!.getBoundingClientRect().left)).toBeGreaterThanOrEqual(0)
+  await page.screenshot({ path: info.outputPath('receipt-zoom.png') })
+  await page.keyboard.press('Escape')
+  await expect(popup).toHaveCount(0)
+  await expect(page.getByRole('dialog', { name: 'Belege', exact: true })).toBeVisible()
+  await expect(trigger).toBeFocused()
+  await trigger.click()
+  await popup.getByRole('button', { name: 'Zurücksetzen' }).click()
+  await expect.poll(async () => (await canvas.boundingBox())!.width).toBe(original.width)
+  await page.keyboard.press('Escape')
   await page.keyboard.press('Escape')
   await expect(page.locator('.attachments-modal')).toHaveCount(0)
 })
