@@ -7,6 +7,13 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-11-16
+
+### Behoben
+
+- Die Bankimport-Tabelle nutzt bei schmalerem Inhaltsbereich kompaktere Spalten. Bei 1920 × 1200 Pixeln mit 150 Prozent Windows-Skalierung passt sie auch neben die ausgeklappte Seitenleiste ohne unnötigen horizontalen Scrollbalken.
+- In der Sammelprüfung der KI-Vorschläge erscheint bei blockierten Vorschlägen nur der maßgebliche Prüfgrund, ohne zusätzliche doppelte Kurzfassung. Der Prüftext verwendet eine neutrale Textfarbe statt Gelb.
+
 ## [5.0.0] - 2026-11-16
 
 ### Hinzugefügt

@@ -43,9 +43,9 @@
 @media (max-width: 1200px) {
   .app-main:has(.bank-import-container) { scrollbar-gutter: auto; }
 }
-.bank-master-table { overflow-x: auto; min-width: 0; }
+.bank-master-table { overflow-x: auto; min-width: 0; container: bank-ledger / inline-size; }
 /* Expanded rows must never participate in calculating the column widths. */
-.bank-master-table .bank-table { min-width: 960px; table-layout: fixed; }
+.bank-master-table .bank-table { min-width: 820px; table-layout: fixed; }
 .bank-master-table .bank-column-details { width: 64px; }
 .bank-master-table .bank-column-status { width: 105px; }
 .bank-master-table .bank-column-date { width: 116px; }
@@ -53,6 +53,18 @@
 .bank-master-table .bank-column-account { width: 128px; }
 .bank-master-table .bank-column-type { width: 88px; }
 .bank-master-table .bank-column-amount { width: 126px; }
+@container bank-ledger (max-width: 1050px) {
+  .bank-master-table .bank-column-details { width: 54px; }
+  .bank-master-table .bank-column-status { width: 98px; }
+  .bank-master-table .bank-column-date { width: 80px; }
+  .bank-master-table .bank-column-assignment { width: 116px; }
+  .bank-master-table .bank-column-account { width: 104px; }
+  .bank-master-table .bank-column-type { width: 76px; }
+  .bank-master-table .bank-column-amount { width: 132px; }
+  .bank-master-table .bank-table thead th,
+  .bank-master-table .bank-table tr[data-bank-transaction-id] > td { padding-inline: 8px; }
+  .bank-master-table .bank-assignment-cell { flex-wrap: wrap; gap: 4px; }
+}
 .bank-master-table .bank-table td:nth-child(6) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bank-sort-button { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 4px 0; display: inline-flex; gap: 6px; align-items: center; }
 .bank-expand { min-width: 30px; font-size: 18px; }

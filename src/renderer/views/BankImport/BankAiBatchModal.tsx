@@ -263,7 +263,7 @@ export default function BankAiBatchModal({ transactions, page, scope = 'aktuelle
                   : blockers.length ? <span className="bank-ai-batch-warning">{blockers.join(' ')}</span> : <HoverTooltip content="Zur Übernahme bereit">
                     {({ ref, props }) => <span ref={ref} {...props} tabIndex={0} role="img" aria-label="Zur Übernahme bereit" className="bank-ai-batch-ready"><IconCircleCheckFilled size={23} aria-hidden="true" /></span>}
                   </HoverTooltip>}
-                  {!!warnings.length && <small className="bank-ai-batch-hint">Hinweis: {warnings.join(' ')}</small>}</td>
+                  {!blockers.length && !!warnings.length && <small className="bank-ai-batch-hint">Hinweis: {warnings.join(' ')}</small>}</td>
                 <td><div className="bank-ai-batch-actions"><button className="btn bank-ai-batch-action" disabled={busy} aria-expanded={showDetails} aria-label={`Details zu Bankbeleg ${id}`} onClick={() => setExpanded(showDetails ? null : id)}>{showDetails ? 'Zuklappen' : editable ? 'Prüfen / Bearbeiten' : 'Ansehen'}<IconChevronRight size={16} aria-hidden="true" className={showDetails ? 'is-expanded' : undefined} /></button>
                   {!!blockers.length && <button className="btn bank-ai-batch-action" disabled={busy} onClick={() => onReview(suggestion?.action === 'CREATE_BOOKING' && candidate
                     ? { ...transaction, aiSuggestion: { ...suggestion, bookingCandidate: candidate } } : transaction)}>Einzeln prüfen</button>}</div></td>

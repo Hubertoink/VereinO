@@ -221,6 +221,32 @@ test('long expanded details preserve every column and wrap within the table', as
   }
 })
 
+test('bank list fits beside an expanded sidebar at Windows 150 percent scaling', async ({ page }, info) => {
+  // 1920 × 1200 physical pixels at 150% gives a 1280 × 800 CSS viewport.
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.locator('.app-main').evaluate(el => { el.style.marginLeft = '260px' })
+  await page.evaluate(() => (window as any).renderBankTest('list', { transaction: {
+    counterparty: 'Arlt Computer-Produkte GmbH', purpose: 'Belegnr 2496676 Kundennr 2741878',
+    amount: 3998.40, possibleDuplicateCount: 1, matchScore: 100,
+    aiSuggestion: { reason: 'Passende Buchung gefunden.' }
+  } }))
+  const region = page.getByRole('region', { name: 'Bankbelege', exact: true })
+  const row = page.locator('[data-bank-transaction-id="77"]')
+  for (const width of [1280, 1192]) {
+    await page.setViewportSize({ width, height: 800 })
+    await expect(row).toBeVisible()
+    expect(await region.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+    const right = (await region.boundingBox())!
+    const amount = (await row.locator('td').last().boundingBox())!
+    expect(amount.x + amount.width).toBeLessThanOrEqual(right.x + right.width + 1)
+    expect(await row.locator('td').last().evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+    await row.getByRole('button', { name: 'Bankbeleg 77: Details anzeigen', exact: true }).click()
+    expect(await region.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+    await page.screenshot({ path: info.outputPath(`scaled-bank-list-${width}.png`) })
+    await row.getByRole('button', { name: 'Bankbeleg 77: Details schließen', exact: true }).click()
+  }
+})
+
 
 test('AI review passes imported originals separately from edited proposal values', async ({ page }) => {
   await page.evaluate(() => {

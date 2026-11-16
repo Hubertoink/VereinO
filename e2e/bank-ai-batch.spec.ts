@@ -27,10 +27,12 @@ test.beforeAll(async () => {
         Object.assign(transactions[0].aiSuggestion.bookingCandidate,{type:'IN',grossAmount:25,description:'Mitgliedsbeitrag Niko Dubio'})
       }
       if (options.single) transactions.splice(1)
+      if (options.manual) transactions[0].aiSuggestion = { action: 'NEEDS_MANUAL_REVIEW', reason: 'Zwecktext ist mehrdeutig. Keine eindeutige Zuordnung möglich.', warnings: [], evidence: [] }
       const rows = transactions.map(transaction => ({ transaction, token: 'a'.repeat(64), commentsEnabled: !!options.comments,
         candidate: transaction.aiSuggestion.bookingCandidate ? { ...transaction.aiSuggestion.bookingCandidate, note: options.comments ? 'Referenz BREF-123' : '' } : null,
         targetDescription: 'Verpflegung Jugendhaus', warnings: transaction.id === 1 ? ['Kein Budget zugeordnet.'] : [],
         blockers: transaction.id === 3 ? ['Mögliche Doppelbuchung. Bitte einzeln prüfen.'] : options.missingCategory && transaction.id === 1 ? ['Eine Kategorie ist erforderlich.'] : [] }))
+      if (options.manual) Object.assign(rows[0], { blockers: [transactions[0].aiSuggestion.reason], warnings: ['Zwecktext ist unklar. Keine eindeutige Kategorisierung möglich.'] })
       window.api = {
         payments: { previewAllocation: async () => rows[0].membershipPreview },
         bankTransactions: {
@@ -71,6 +73,21 @@ test.beforeEach(async ({ page }) => {
   await page.goto('http://batch.test/')
   await page.addStyleTag({ content: css })
   await page.addScriptTag({ content: script })
+})
+
+test('manual review shows one neutral explanation and remains blocked', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.evaluate(() => (window as any).renderBatch({ manual: true, single: true }))
+  const row = page.locator('.bank-ai-batch-table tbody tr').first()
+  await expect(row.getByText('Zwecktext ist mehrdeutig. Keine eindeutige Zuordnung möglich.', { exact: true })).toHaveCount(1)
+  await expect(row.locator('.bank-ai-batch-hint')).toHaveCount(0)
+  await expect(row.getByRole('checkbox')).toBeDisabled()
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(theme => { document.documentElement.dataset.theme = theme }, theme)
+    const colors = await row.locator('.bank-ai-batch-warning').evaluate(el => ({ actual: getComputedStyle(el).color, expected: getComputedStyle(el.closest('tr')!.querySelector('small')!).color }))
+    expect(colors.actual).toBe(colors.expected)
+    await page.screenshot({ path: info.outputPath(`manual-review-${theme}.png`), animations: 'disabled' })
+  }
 })
 
 test('requires selection, excludes blockers, shows results and retries only failed rows', async ({ page }, info) => {

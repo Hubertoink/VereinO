@@ -45,7 +45,7 @@
 .bank-ai-batch-member-name { display: block; margin-top: 4px; }
 .bank-ai-batch-amount--in, .bank-ai-batch-success { color: var(--success); }
 .bank-ai-batch-amount--out, .bank-ai-batch-error { color: var(--danger); }
-.bank-ai-batch-warning { color: var(--warning); }
+.bank-ai-batch-warning { color: var(--text-dim); }
 .bank-ai-batch-ready { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: var(--success); border-radius: 50%; }
 .bank-ai-batch-ready:focus-visible { outline: 2px solid var(--success); outline-offset: 2px; }
 .bank-ai-batch-done { background: color-mix(in srgb, var(--success) 6%, var(--surface)); }
