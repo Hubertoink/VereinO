@@ -30,7 +30,7 @@ export default function MetaFilterModal({ open, onClose, budgets, earmarks, sphe
   if (!open) return null
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-inset-header" onClick={(e) => e.stopPropagation()}>
         <ModalHeader
           title="Filter wählen"
           onClose={onClose}

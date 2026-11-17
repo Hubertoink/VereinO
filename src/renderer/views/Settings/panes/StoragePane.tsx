@@ -301,7 +301,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
       {/* Import comparison modal */}
       {importPick && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => !busyImport && setImportPick(null)}>
-          <div className="modal modal-wide modal-grid" onClick={e => e.stopPropagation()}>
+          <div className="modal modal-inset-header modal-wide modal-grid" onClick={e => e.stopPropagation()}>
             <ModalHeader
               className="modal-header"
               title="Import vergleichen"
@@ -386,7 +386,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
       {/* Delete All Confirmation Modal */}
       {showDeleteAll && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal modal-grid">
+          <div className="modal modal-inset-header modal-grid">
             <ModalHeader
               className="modal-header"
               title="Alle Buchungen löschen"
@@ -434,7 +434,7 @@ export function StoragePane({ notify }: StoragePaneProps) {
       {/* Delete Organization Confirmation Modal */}
       {showDeleteOrg && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal modal-grid">
+          <div className="modal modal-inset-header modal-grid">
             <ModalHeader
               className="modal-header"
               title="Organisation löschen"

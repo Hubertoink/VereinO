@@ -671,7 +671,7 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
             aria-modal="true"
             style={{ zIndex: 10000 }}
           >
-            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
+            <div className="modal modal-inset-header" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
               <ModalHeader
                 title="Import abgeschlossen — einige Zeilen konnten nicht übernommen werden"
                 onClose={() => setShowErrorsModal(false)}

@@ -48,7 +48,7 @@ export default function BookingPopupFrame({
   const [anchorStyle, setAnchorStyle] = useState<React.CSSProperties | undefined>()
   const modalClassName = compact
     ? `modal compact-booking-flyout compact-booking-popup ${className}`
-    : `modal booking-modal quick-add-modal ${className}`
+    : `modal modal-inset-header booking-modal quick-add-modal ${className}`
   useLayoutEffect(() => {
     if (!compact || !anchorToTrigger) return
     const activeElement = document.activeElement

@@ -203,7 +203,7 @@ export default function TaxExemptionModal({ onClose, onSaved }: TaxExemptionModa
 
   return createPortal(
     <div className="modal-overlay taxex-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="modal taxex-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-inset-header taxex-modal" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <ModalHeader
           className="taxex-header"

@@ -823,7 +823,7 @@ export default function AdvancesView() {
 
       {settleOpen && detail && (
         <div className="modal-overlay" onClick={() => setSettleOpen(false)} role="dialog" aria-modal="true">
-          <div className="modal standard-floating-modal advances-form-modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal modal-inset-header standard-floating-modal advances-form-modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
             <ModalHeader title="Vorschuss auflösen" onClose={() => setSettleOpen(false)} closeOnEscape={false} />
             <div className="helper">Offener Betrag: {eurFmt.format(detail.status === 'OPEN' ? detail.openAmount : 0)}</div>
             <div className="row">
@@ -894,7 +894,7 @@ export default function AdvancesView() {
           role="dialog"
           aria-modal="true"
         >
-          <div className="modal" style={{ maxWidth: 520, display: 'grid', gap: 12 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal modal-inset-header" style={{ maxWidth: 520, display: 'grid', gap: 12 }} onClick={(e) => e.stopPropagation()}>
             <ModalHeader
               title="Vorschuss löschen"
               onClose={() => setDeleteAdvanceConfirmOpen(false)}
@@ -923,7 +923,7 @@ export default function AdvancesView() {
           role="dialog"
           aria-modal="true"
         >
-          <div className="modal" style={{ maxWidth: 520, display: 'grid', gap: 12 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal modal-inset-header" style={{ maxWidth: 520, display: 'grid', gap: 12 }} onClick={(e) => e.stopPropagation()}>
             <ModalHeader
               title="Buchung entfernen"
               onClose={() => setDeletePurchaseConfirm(null)}

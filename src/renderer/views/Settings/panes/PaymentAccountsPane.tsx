@@ -169,7 +169,7 @@ export function PaymentAccountsPane({ paymentAccounts, setPaymentAccounts, notif
 
       {deleteConfirm && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, display: 'grid', gap: 12 }}>
+          <div className="modal modal-inset-header" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, display: 'grid', gap: 12 }}>
             <ModalHeader
               title="Konto löschen"
               onClose={() => setDeleteConfirm(null)}

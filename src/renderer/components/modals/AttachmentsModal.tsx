@@ -631,7 +631,7 @@ export default function AttachmentsModal({
                 {/* Delete confirmation modal */}
                 {confirmDelete && (
                     <div className="modal-overlay" onClick={() => setConfirmDelete(null)} role="dialog" aria-modal="true">
-                        <div className="modal modal-grid" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+                        <div className="modal modal-inset-header modal-grid" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
                             <ModalHeader
                               className="modal-header"
                               title="Datei löschen"

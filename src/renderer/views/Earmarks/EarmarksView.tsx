@@ -183,7 +183,7 @@ export default function EarmarksView({
       {/* Archive Confirm Modal */}
       {archiveConfirm && (
         <div className="modal-overlay" onClick={() => setArchiveConfirm(null)} role="dialog" aria-modal="true">
-          <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal modal-inset-header" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
             <ModalHeader
               title={<>{archiveConfirm.isActive ? 'Zweckbindung archivieren?' : 'Zweckbindung wiederherstellen?'}</>}
               onClose={() => setArchiveConfirm(null)}

@@ -3914,7 +3914,8 @@ svg text {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-1);
-  padding: 16px;
+  --modal-inline-inset: 16px;
+  padding: var(--modal-inline-inset);
   max-height: 80vh;
   overflow: auto;
   -webkit-app-region: no-drag;
@@ -4179,7 +4180,8 @@ svg text {
 .booking-modal {
   width: min(1100px, 96vw);
   max-height: 94vh;
-  padding: 12px;
+  --modal-inline-inset: 12px;
+  padding: var(--modal-inline-inset);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -4323,7 +4325,8 @@ svg text {
   min-height: 0;
   margin: auto;
   box-sizing: border-box;
-  padding: 8px;
+  --modal-inline-inset: 8px;
+  padding: var(--modal-inline-inset);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -5766,13 +5769,15 @@ body.detached-quick-add-body #root {
 @media (max-width: 1040px) {
   .booking-modal {
     width: min(96vw, 100%);
-    padding: 12px;
+    --modal-inline-inset: 12px;
+    padding: var(--modal-inline-inset);
   }
 }
 @media (max-width: 880px) {
   .booking-modal {
     width: min(96vw, 100%);
-    padding: 12px;
+    --modal-inline-inset: 12px;
+    padding: var(--modal-inline-inset);
   }
 }
 
@@ -16529,7 +16534,8 @@ button.filter-totals-stat {
 .donations-info-modal {
   max-width: 440px;
   width: 90vw;
-  padding: 20px 24px;
+  --modal-inline-inset: 24px;
+  padding: 20px var(--modal-inline-inset);
   animation: modal-in 0.15s ease-out;
 }
 
@@ -16765,11 +16771,13 @@ button.filter-totals-stat {
 @media (max-width: 740px) {
   .modal {
     width: min(98vw, 100%);
-    padding: 12px;
+    --modal-inline-inset: 12px;
+    padding: var(--modal-inline-inset);
   }
   .booking-modal {
     width: min(98vw, 100%);
-    padding: 10px;
+    --modal-inline-inset: 10px;
+    padding: var(--modal-inline-inset);
   }
   .fee-modal {
     width: min(98vw, 100%);
@@ -16847,7 +16855,9 @@ button.filter-totals-stat {
 }
 
 /* ── Changelog Modal ── */
-.changelog-modal {
+.modal.changelog-modal {
+  padding: 0;
+  overflow: hidden;
   max-width: 600px;
   max-height: 80vh;
   display: flex;
@@ -16876,7 +16886,8 @@ button.filter-totals-stat {
 .changelog-content {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 2px 4px;
+  min-height: 0;
+  padding: 16px 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -21741,7 +21752,7 @@ html.receipt-widget-document::before { content: none !important; display: none !
 
 /* Donation receipt editor: shared modal controls with a live document pane. */
 .modal.donations-modal { width: min(1440px, 96vw); max-width: 1440px; height: 92vh; padding: 0; }
-.donations-modal-sticky { padding: 18px 22px 14px; }
+.donations-modal-sticky { padding: 0; border-bottom: 0; border-radius: 0 !important; }
 .donations-modal-sticky .modal-header { margin: 0; }
 .donations-workspace { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(360px, 1fr); flex: 1; min-height: 0; }
 .donations-modal-body { padding: 16px 20px; min-height: 0; align-content: start; gap: 12px; }
@@ -21779,7 +21790,6 @@ html.receipt-widget-document::before { content: none !important; display: none !
   .donations-modal-section .row, .donations-checks-grid-2col { grid-template-columns: 1fr; }
   .donations-footer { flex-direction: column; align-items: stretch; }
   .donations-footer > .flex { justify-content: flex-end; }
-  .donations-modal-sticky { padding: 14px; }
   .donations-modal-sticky .modal-header { align-items: flex-start; gap: 8px; }
   .donations-template-link { white-space: normal; }
   .donations-modal-body { padding: 12px; }

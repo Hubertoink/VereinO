@@ -59,7 +59,7 @@ export default function BankImportRemapDialog({ batchId, onClose, onApplied, not
   }
 
   return createPortal(<div className="modal-overlay bank-import-remap-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !saving) onClose() }}>
-    <div className="modal bank-import-remap-dialog" role="dialog" aria-modal="true" aria-label="Spaltenzuordnungen aktualisieren">
+    <div className="modal modal-inset-header bank-import-remap-dialog" role="dialog" aria-modal="true" aria-label="Spaltenzuordnungen aktualisieren">
       <ModalHeader
         className="bank-import-remap-header"
         title="Spaltenzuordnungen aktualisieren"

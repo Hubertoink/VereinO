@@ -62,7 +62,7 @@ export function CategoriesPane({ notify }: OrgPaneProps) {
       })}
     </div>}
     {editCategory && <CategoryModal value={editCategory} onClose={() => setEditCategory(null)} onSaved={() => { void onSaved() }} notify={notify} />}
-    {archiveConfirm && <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setArchiveConfirm(null)}><div className="modal" style={{ maxWidth: 480, display: 'grid', gap: 12 }} onClick={(event) => event.stopPropagation()}><ModalHeader
+    {archiveConfirm && <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setArchiveConfirm(null)}><div className="modal modal-inset-header" style={{ maxWidth: 480, display: 'grid', gap: 12 }} onClick={(event) => event.stopPropagation()}><ModalHeader
                                                                                                                                                                                                                                                         title={<>{archiveConfirm.isActive ? 'Kategorie archivieren' : 'Kategorie reaktivieren'}</>}
                                                                                                                                                                                                                                                         onClose={() => setArchiveConfirm(null)}
                                                                                                                                                                                                                                                         closeLabel="Schließen"

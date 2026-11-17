@@ -1254,7 +1254,7 @@ export default function JournalView({
                 {/* Edit Modal */}
                 {editRow && (
                     <div className="modal-overlay journal-edit-modal-overlay">
-                        <div className="modal booking-modal journal-edit-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal modal-inset-header booking-modal journal-edit-modal" onClick={(e) => e.stopPropagation()}>
                             <ModalHeader className="journal-edit-modal__header" >
                                 <h2 style={{ margin: 0 }}>
                                     {(() => {
@@ -1932,7 +1932,7 @@ export default function JournalView({
                                 {/* Confirmation Modal for Attachment Deletion */}
                                 {confirmDeleteAttachment && (
                                     <div className="modal-overlay" onClick={() => setConfirmDeleteAttachment(null)} role="dialog" aria-modal="true">
-                                        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
+                                        <div className="modal modal-inset-header" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
                                             <ModalHeader
                                               title="Anhang löschen"
                                               onClose={() => setConfirmDeleteAttachment(null)}
@@ -1995,7 +1995,7 @@ export default function JournalView({
                 {/* Delete Modal */}
                 {deleteRow && (
                     <div className="modal-overlay" onClick={() => setDeleteRow(null)} style={{ alignItems: 'center', paddingTop: 0, zIndex: 16000 }}>
-                        <div className="modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal modal-inset-header" onClick={(e) => e.stopPropagation()}>
                             <ModalHeader
                               title={<>{allowVoucherDeletion ? 'Buchung löschen' : 'Buchung stornieren'}</>}
                               onClose={() => setDeleteRow(null)}

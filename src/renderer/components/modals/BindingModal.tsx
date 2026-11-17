@@ -160,7 +160,7 @@ export default function BindingModal({ value, onClose, onSaved }: { value: Bindi
         </div>
       {askDelete && v.id && (
         <div className="modal-overlay" onClick={() => setAskDelete(false)} role="dialog" aria-modal="true">
-          <div className="modal delete-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal modal-inset-header delete-modal" onClick={(e) => e.stopPropagation()}>
             <ModalHeader
               className="delete-modal-header"
               title="Zweckbindung löschen"

@@ -343,7 +343,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
   const years = availableYears.length > 0 ? availableYears : [currentYear]
 
   const content = (
-      <div className={flyout ? 'export-options-flyout' : 'modal'} onClick={(e) => e.stopPropagation()} style={flyout ? undefined : { maxWidth: 900, width: '95vw' }}>
+      <div className={flyout ? 'export-options-flyout' : 'modal modal-inset-header'} onClick={(e) => e.stopPropagation()} style={flyout ? undefined : { maxWidth: 900, width: '95vw' }}>
         <ModalHeader >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>

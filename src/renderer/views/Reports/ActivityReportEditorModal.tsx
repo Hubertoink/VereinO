@@ -528,7 +528,7 @@ export default function ActivityReportEditorModal({ open, onClose, fiscalYear, s
 
       {deleteConfirm && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
-          <div className="modal" style={{ maxWidth: 420, display: 'grid', gap: 12 }} onClick={(event) => event.stopPropagation()}>
+          <div className="modal modal-inset-header" style={{ maxWidth: 420, display: 'grid', gap: 12 }} onClick={(event) => event.stopPropagation()}>
             <ModalHeader
               title="Tätigkeitsbericht löschen"
               onClose={() => setDeleteConfirm(null)}

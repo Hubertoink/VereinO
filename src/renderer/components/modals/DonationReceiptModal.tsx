@@ -362,7 +362,7 @@ export default function DonationReceiptModal({ notify, defaults, initialDraft, o
 
             {infoModal && verwendungInfos[infoModal] && createPortal(
               <div className="modal-overlay" onClick={() => setInfoModal(null)}>
-                <div className="modal donations-info-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+                <div className="modal modal-inset-header donations-info-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
                   <ModalHeader
                     className="modal-header"
                     title={<>{verwendungInfos[infoModal].title}</>}

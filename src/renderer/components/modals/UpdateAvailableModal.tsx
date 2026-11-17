@@ -25,7 +25,7 @@ export default function UpdateAvailableModal({ state, onClose, onDownload, onIns
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="modal update-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-inset-header update-modal" onClick={(e) => e.stopPropagation()}>
         <ModalHeader
           className="modal-header"
           title="Update verfügbar"

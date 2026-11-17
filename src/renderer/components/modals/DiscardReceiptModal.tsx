@@ -43,7 +43,7 @@ export default function DiscardReceiptModal({
   return createPortal(
     <div className="modal-overlay receipt-discard-overlay" onClick={onCancel}>
       <section
-        className="modal receipt-discard-modal"
+        className="modal modal-inset-header receipt-discard-modal"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="receipt-discard-title"

@@ -295,7 +295,8 @@ test('bank AI review keeps the shared title bar and close action visible while s
   const header = modal.locator('.modal-header-bar')
   const before = await header.boundingBox()
   const modalBounds = await modal.boundingBox()
-  expect(before!.height).toBeLessThanOrEqual(64)
+  // The shared title bar includes a subtitle and 16px vertical padding.
+  expect(before!.height).toBeLessThanOrEqual(80)
   expect(Math.abs(before!.width - modalBounds!.width)).toBeLessThanOrEqual(2)
   expect(Math.abs(before!.y - modalBounds!.y)).toBeLessThanOrEqual(1)
   expect(await header.evaluate(element => getComputedStyle(element).borderBottomLeftRadius)).toBe('0px')

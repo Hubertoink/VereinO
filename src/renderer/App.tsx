@@ -1276,23 +1276,11 @@ function DetachedQuickAddWindow() {
             style={{ zIndex: 16000, alignItems: 'center', paddingTop: 0 }}
           >
             <div
-              className="modal"
+              className="modal modal-inset-header"
               onClick={(e) => e.stopPropagation()}
               style={{ width: 'min(460px, 92vw)' }}
             >
-              <header
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: 8
-                }}
-              >
-                <h2 style={{ margin: 0 }}>Buchung stornieren</h2>
-                <button className="btn danger" onClick={() => setConfirmDetailReverse(false)}>
-                  Schließen
-                </button>
-              </header>
+              <ModalHeader title="Buchung stornieren" onClose={() => setConfirmDetailReverse(false)} />
               <p>
                 Möchtest du die Buchung{' '}
                 <strong>
@@ -1426,7 +1414,7 @@ function DetachedQuickAddWindow() {
         {confirmDeleteEdit && !editMutationBlockReason && (
           <div className="modal-overlay" role="dialog" aria-modal="true" style={{ zIndex: 10000 }}>
             <div
-              className="modal"
+              className="modal modal-inset-header"
               onClick={(e) => e.stopPropagation()}
               style={{ maxWidth: 520, display: 'grid', gap: 12 }}
             >
@@ -3696,7 +3684,7 @@ function AppInner() {
       )}
       {showOpenBookingTabsClosePrompt && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal booking-close-guard-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal modal-inset-header booking-close-guard-modal" onClick={(e) => e.stopPropagation()}>
             <ModalHeader
               className="booking-close-guard-modal__header"
               title="Offene Buchungstabs"

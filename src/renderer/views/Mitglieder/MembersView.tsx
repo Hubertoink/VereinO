@@ -988,7 +988,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
             {missingRequired.length > 0 && (
                 createPortal(
                     <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setMissingRequired([])}>
-                        <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
+                        <div className="modal modal-inset-header" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
                             <ModalHeader
                               title="Pflichtfelder fehlen"
                               onClose={() => setMissingRequired([])}
@@ -1011,7 +1011,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
             )}
             {deleteConfirm && (
                 <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
-                    <div className="modal" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
+                    <div className="modal modal-inset-header" onClick={(e)=>e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
                         <ModalHeader title="Mitglied löschen" onClose={() => setDeleteConfirm(null)} closeOnEscape={false} />
                         <div className="card" style={{ padding: 10 }}>
                             <div style={{ marginBottom: 6 }}>Soll das folgende Mitglied wirklich gelöscht werden?</div>
@@ -1208,7 +1208,7 @@ function PaymentsAssignModal({ onClose }: { onClose: () => void }) {
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal booking-modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
+            <div className="modal modal-inset-header booking-modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 10 }}>
                 <ModalHeader 
                     title="Mitgliedsbeiträge zuordnen" 
                     onClose={onClose} 

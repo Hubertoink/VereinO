@@ -403,7 +403,7 @@ function ManualAssignmentModal({
       aria-modal="true"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
-      <div className="modal bank-manual-assign-modal">
+      <div className="modal modal-inset-header bank-manual-assign-modal">
         <ModalHeader
           className="bank-modal-header"
           title="Manuelle Zuweisung"
@@ -551,7 +551,7 @@ function BankImportResultModal({
       aria-modal="true"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
-      <div className="modal bank-import-result-modal">
+      <div className="modal modal-inset-header bank-import-result-modal">
         <ModalHeader
           className="bank-modal-header"
           title="Import geprüft"
@@ -1171,7 +1171,7 @@ function BankCheckModal({
       aria-labelledby="bank-check-modal-title"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
-      <div className="modal bank-check-modal">
+      <div className="modal modal-inset-header bank-check-modal">
         <ModalHeader
           className="bank-modal-header"
           title="Ohne Buchung erledigen"

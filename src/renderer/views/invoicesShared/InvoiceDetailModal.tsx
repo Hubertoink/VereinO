@@ -114,7 +114,7 @@ export default function InvoiceDetailModal({
 
   return createPortal(
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Rechnungsdetails" onClick={onClose}>
-      <div className="modal invoices-detail-grid invoice-detail-refined" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 860 }}>
+      <div className="modal modal-inset-header invoices-detail-grid invoice-detail-refined" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 860 }}>
         <ModalHeader className="invoices-detail-header">
           <h2 style={{ margin: 0 }}>{detail?.voucherType === 'IN' ? 'Forderung' : 'Verbindlichkeit'} {detail?.invoiceNo ? `#${detail.invoiceNo}` : (detail ? `#${detail.id}` : '')}</h2>
           <div className="invoices-detail-header-actions">
@@ -250,7 +250,7 @@ export default function InvoiceDetailModal({
       </div>
       {deleteConfirm && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
+          <div className="modal modal-inset-header" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
             <ModalHeader title="Datei entfernen" subtitle={deleteConfirm.fileName} onClose={() => setDeleteConfirm(null)} />
             <div>Diese Datei wirklich aus der Verbindlichkeit entfernen?</div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>

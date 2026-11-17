@@ -14,7 +14,7 @@ export default function BankAiRecheckModal({ count, page, onClose, onConfirm }: 
     return () => previous?.focus()
   }, [])
   return createPortal(<div className="modal-overlay bank-import-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
-    <div className="modal bank-ai-recheck-modal" ref={dialog} role="dialog" aria-modal="true" aria-labelledby="bank-ai-recheck-title" aria-describedby="bank-ai-recheck-description"
+    <div className="modal modal-inset-header bank-ai-recheck-modal" ref={dialog} role="dialog" aria-modal="true" aria-labelledby="bank-ai-recheck-title" aria-describedby="bank-ai-recheck-description"
       onKeyDown={event => {
         if (event.key !== 'Tab') return
         const buttons = Array.from(dialog.current?.querySelectorAll('button') || [])

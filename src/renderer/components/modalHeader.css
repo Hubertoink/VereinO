@@ -19,14 +19,11 @@
   color: var(--text);
 }
 .modal-header-bar > :first-child { min-width: 0; }
-/* Older dialogs scroll inside a padded container. Cover that top inset so
-   scrolled content cannot peek out above the sticky title bar. */
-.modal > .modal-header-bar::before {
-  content: '';
-  position: absolute;
-  inset: -32px 0 100%;
-  background: var(--surface);
-  pointer-events: none;
+/* Legacy dialogs keep their body inset. Only their title bar spans the frame;
+   removing the top inset also makes sticky headers meet the scrollport edge. */
+.modal.modal-inset-header { padding-top: 0; }
+.modal-inset-header > .modal-header-bar.modal-header-bar.modal-header-bar {
+  margin-inline: calc(-1 * var(--modal-inline-inset));
 }
 .modal-header-bar .modal-header-bar__heading { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .modal-header-bar__titles { min-width: 0; }

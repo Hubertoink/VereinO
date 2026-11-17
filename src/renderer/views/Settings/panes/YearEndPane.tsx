@@ -191,7 +191,7 @@ export function YearEndPane({ notify }: YearEndPaneProps) {
 
       {confirmAction && (
         <div className="modal-overlay" onClick={() => setConfirmAction(null)} role="dialog" aria-modal="true">
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
+          <div className="modal modal-inset-header" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520, display: 'grid', gap: 12 }}>
             <ModalHeader
               title={<>{confirmAction.type === 'close' ? 'Jahr abschließen' : 'Periode wieder öffnen'}</>}
               onClose={() => setConfirmAction(null)}

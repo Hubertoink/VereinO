@@ -935,7 +935,7 @@ export default function InvoicesView({ registerPageShortcuts, initialTask }: Inv
         const typeName = isIn ? 'Forderung' : 'Verbindlichkeit'
         return (
           <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setShowPayModal(null)}>
-            <div className="modal payment-modal-grid" onClick={(e) => e.stopPropagation()}>
+            <div className="modal modal-inset-header payment-modal-grid" onClick={(e) => e.stopPropagation()}>
               <ModalHeader
                 title="Zahlung hinzufügen"
                 subtitle={`${showPayModal.invoiceNo ? `${typeName} ${showPayModal.invoiceNo}` : `${typeName} #${showPayModal.id}`} · ${showPayModal.party || ''}`}
@@ -967,7 +967,7 @@ export default function InvoicesView({ registerPageShortcuts, initialTask }: Inv
 
       {showPaymentMethodModal && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setShowPaymentMethodModal(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500, textAlign: 'center' }}>
+          <div className="modal modal-inset-header" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500, textAlign: 'center' }}>
             <ModalHeader title="Zahlweg festlegen" subtitle={`Verbindlichkeit #${showPaymentMethodModal.invoiceId}`} onClose={() => setShowPaymentMethodModal(null)} />
             <div className="helper" style={{ marginBottom: 24 }}>Die Verbindlichkeit wird automatisch verbucht. Bitte wählen Sie den Zahlweg:</div>
             <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginBottom: 16 }}>
@@ -1040,7 +1040,7 @@ export default function InvoicesView({ registerPageShortcuts, initialTask }: Inv
 
       {deleteConfirm && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setDeleteConfirm(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
+          <div className="modal modal-inset-header" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
             <ModalHeader title="Verbindlichkeit löschen" subtitle={`${deleteConfirm.invoiceNo ? `Nr. ${deleteConfirm.invoiceNo}` : `#${deleteConfirm.id}`} · ${deleteConfirm.party || ''}`} onClose={() => setDeleteConfirm(null)} />
             <div>Diese Verbindlichkeit wirklich löschen?</div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
@@ -1054,7 +1054,7 @@ export default function InvoicesView({ registerPageShortcuts, initialTask }: Inv
 
       {postToVoucherModal && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setPostToVoucherModal(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
+          <div className="modal modal-inset-header" onClick={(e) => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
             <ModalHeader title="Als Buchung hinzufügen" subtitle={`${postToVoucherModal.invoiceNo ? `Verbindlichkeit ${postToVoucherModal.invoiceNo}` : `Verbindlichkeit #${postToVoucherModal.id}`}`} onClose={() => setPostToVoucherModal(null)} />
             <div style={{ marginBottom: 16 }}><strong>{postToVoucherModal.party}</strong></div>
             <div className="helper" style={{ marginBottom: 16 }}>Diese bezahlte Verbindlichkeit als Buchung hinzufügen?</div>

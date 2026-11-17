@@ -513,7 +513,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
 
       {showErrorsModal && result && createPortal(
         <div className="modal-overlay" onClick={() => setShowErrorsModal(false)} role="dialog" aria-modal="true" style={{ zIndex: 10000 }}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
+          <div className="modal modal-inset-header" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
             <ModalHeader
               title="Import abgeschlossen"
               onClose={() => setShowErrorsModal(false)}

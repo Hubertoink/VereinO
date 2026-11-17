@@ -7,6 +7,12 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.2.2] - 2026-11-17
+
+### Behoben
+
+- Modal-Header schließen im Changelog und weiteren älteren Dialogen bündig mit dem Rahmen ab, auch beim Scrollen und in schmalen Fenstern. Die Innenabstände der Inhalte bleiben erhalten.
+
 ## [5.2.1] - 2026-11-17
 
 ### Behoben

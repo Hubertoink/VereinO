@@ -16,7 +16,7 @@ export default function TimeFilterModal({ open, onClose, yearsAvail, from, to, o
   if (!open) return null
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-inset-header" onClick={(e) => e.stopPropagation()}>
         <ModalHeader
           title="Zeitraum wählen"
           onClose={onClose}

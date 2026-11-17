@@ -21,7 +21,7 @@ export default function TagsManagerModal({ onClose, notify, onChanged }: { onClo
     const colorSwatch = (c?: string | null) => c ? (<span title={c} style={{ display: 'inline-block', width: 16, height: 16, borderRadius: 4, background: c, verticalAlign: 'middle' }} />) : '—'
     return createPortal(
         <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 'min(860px, 96vw)' }}>
+            <div className="modal modal-inset-header" onClick={(e) => e.stopPropagation()} style={{ width: 'min(860px, 96vw)' }}>
                 <ModalHeader title="Tags verwalten" subtitle="Schlagwörter und ihre Verwendung in Buchungen." icon={<IconTags size={22} />} onClose={onClose} actions={<>
                     <button className="btn" onClick={refresh} disabled={busy}>Aktualisieren</button>
                     <button className="btn primary" onClick={() => setEdit({ name: '', color: null })}>+ Neu</button>

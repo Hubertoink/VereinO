@@ -657,7 +657,7 @@ export default function RecurringBookingsView({ notify, initialTask }: { notify:
 
       {pendingAction && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="recurring-confirm-title">
-          <div className="modal recurring-confirm-modal">
+          <div className="modal modal-inset-header recurring-confirm-modal">
             <ModalHeader
               className="recurring-modal-header"
               title={<>{pendingAction.kind === 'skip' ? 'Fälligkeit überspringen?' : pendingAction.kind === 'pause' ? 'Dauerbuchung pausieren?' : 'Dauerbuchung beenden?'}</>}
@@ -675,7 +675,7 @@ export default function RecurringBookingsView({ notify, initialTask }: { notify:
 
       {booking && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="recurring-book-title">
-          <div className="modal recurring-book-modal">
+          <div className="modal modal-inset-header recurring-book-modal">
             <ModalHeader
               className="recurring-modal-header"
               title="Dauerbuchung buchen"

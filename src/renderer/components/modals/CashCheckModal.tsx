@@ -199,7 +199,7 @@ export default function CashCheckModal(props: {
 
   return createPortal(
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640, display: 'grid', gap: 12 }}>
+      <div className="modal modal-inset-header" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640, display: 'grid', gap: 12 }}>
         <ModalHeader
           title="Neue Kassenprüfung"
           onClose={onClose}

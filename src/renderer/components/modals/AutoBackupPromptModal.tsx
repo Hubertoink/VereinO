@@ -9,7 +9,7 @@ export default function AutoBackupPromptModal({ intervalDays, onClose, onBackupN
   const busy = submitting || !!progress?.active
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" onClick={busy ? undefined : onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
+      <div className="modal modal-inset-header" onClick={e => e.stopPropagation()} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
         <ModalHeader
           title="Automatische Sicherung"
           onClose={onClose}

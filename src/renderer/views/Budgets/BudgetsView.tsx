@@ -200,7 +200,7 @@ export default function BudgetsView({
       {/* Archive Confirm Modal */}
       {archiveConfirm && (
         <div className="modal-overlay" onClick={() => setArchiveConfirm(null)} role="dialog" aria-modal="true">
-          <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal modal-inset-header" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
             <ModalHeader
               title={<>{archiveConfirm.isArchived ? 'Budget wiederherstellen?' : 'Budget archivieren?'}</>}
               onClose={() => setArchiveConfirm(null)}
