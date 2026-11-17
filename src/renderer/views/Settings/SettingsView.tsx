@@ -117,6 +117,8 @@ export function SettingsView(props: SettingsProps) {
         {activeTile === 'general' && (
           <GeneralPane
             organizationProfile={props.organizationProfile}
+            sidebarBookingActions={props.sidebarBookingActions}
+            setSidebarBookingActions={props.setSidebarBookingActions}
             navLayout={props.navLayout}
             setNavLayout={props.setNavLayout}
             navIconColorMode={props.navIconColorMode}

@@ -137,9 +137,10 @@ export default function PageTutorials({ page, bookingView, setBookingView, openS
       setCard(null); visitShown.current = true
       setMenu({ page: target, trigger, x: event instanceof MouseEvent && event.clientX ? event.clientX : rect.right, y: event instanceof MouseEvent && event.clientY ? event.clientY : rect.bottom })
     }
-    document.addEventListener('contextmenu', open)
+    // Page-specific actions take precedence over the navigation's module menu.
+    document.addEventListener('contextmenu', open, true)
     document.addEventListener('keydown', open, true)
-    return () => { document.removeEventListener('contextmenu', open); document.removeEventListener('keydown', open, true) }
+    return () => { document.removeEventListener('contextmenu', open, true); document.removeEventListener('keydown', open, true) }
   }, [])
 
   useEffect(() => {

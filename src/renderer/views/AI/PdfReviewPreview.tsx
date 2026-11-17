@@ -7,12 +7,18 @@ type PdfJsModule = typeof import('pdfjs-dist/legacy/build/pdf')
 export function PdfReviewPreview({
   fileName,
   dataBase64,
-  initialPage = 1
+  initialPage = 1,
+  fit = 'width',
+  onRendered
 }: {
   fileName: string
   dataBase64: string
   initialPage?: number
+  fit?: 'width' | 'page'
+  onRendered?: () => void
 }) {
+  const onRenderedRef = useRef(onRendered)
+  useEffect(() => { onRenderedRef.current = onRendered }, [onRendered])
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const pdfJsRef = useRef<PdfJsModule | null>(null)
@@ -22,6 +28,18 @@ export function PdfReviewPreview({
   const [pageCount, setPageCount] = useState(0)
   const [zoom, setZoom] = useState(1)
   const [error, setError] = useState('')
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const observer = new ResizeObserver(entries => {
+      const width = Math.floor(entries[0].contentRect.width), height = Math.floor(entries[0].contentRect.height)
+      setViewportSize(current => current.width === width && current.height === height ? current : { width, height })
+    })
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -71,7 +89,9 @@ export function PdfReviewPreview({
         if (cancelled || !canvasRef.current) return
         const naturalViewport = pdfPage.getViewport({ scale: 1 })
         const availableWidth = Math.max(280, (viewportRef.current?.clientWidth || 560) - 28)
-        const fittedScale = Math.min(1.45, Math.max(0.66, availableWidth / naturalViewport.width))
+        const fittedScale = fit === 'page'
+          ? Math.min((viewportSize.width || availableWidth) / naturalViewport.width, Math.max(1, viewportSize.height) / naturalViewport.height)
+          : Math.min(1.45, Math.max(0.66, availableWidth / naturalViewport.width))
         const viewport = pdfPage.getViewport({ scale: fittedScale * zoom })
         const outputScale = Math.min(window.devicePixelRatio || 1, 2)
         const canvas = canvasRef.current
@@ -88,6 +108,7 @@ export function PdfReviewPreview({
         })
         renderTaskRef.current = task
         await task.promise
+        if (!cancelled) onRenderedRef.current?.()
       } catch (renderError: any) {
         if (!cancelled && renderError?.name !== 'RenderingCancelledException') {
           setError(renderError?.message || 'PDF-Seite konnte nicht angezeigt werden.')
@@ -101,7 +122,7 @@ export function PdfReviewPreview({
         renderTaskRef.current?.cancel?.()
       } catch {}
     }
-  }, [document, page, zoom])
+  }, [document, page, zoom, fit, viewportSize])
 
   if (error) return <div className="ai-pdf-preview__error">PDF-Vorschau nicht möglich: {error}</div>
 

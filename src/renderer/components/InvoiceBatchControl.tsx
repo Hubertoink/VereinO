@@ -1,3 +1,7 @@
+import { IconFiles, IconPlus, IconSparkles } from '@tabler/icons-react'
+import { createPortal } from 'react-dom'
+import type { ReactElement } from 'react'
+import { useSidebarFlyoutPosition } from '../hooks/useSidebarFlyoutPosition'
 import ModalHeader from './ModalHeader'
 import { useInvoicePaste } from '../hooks/useInvoicePaste'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -36,12 +40,15 @@ export default function InvoiceBatchControl({
   paymentAccounts,
   variant = 'floating'
 }: {
-  variant?: 'floating' | 'inline'
+  variant?: 'floating' | 'inline' | 'sidebar'
   onNewInvoice: (file: File, guidance?: InvoiceAiGuidance) => void | Promise<void>
   onReview: (id: number) => void
   notify: (type: 'success' | 'error' | 'info' | 'warn', text: string) => void
   paymentAccounts: Array<{ id: number; name: string; kind?: string | null; isActive?: number }>
 }) {
+  const sidebarPosition = useSidebarFlyoutPosition(variant === 'sidebar', 390)
+  const renderFlyout = (element: ReactElement) => variant === 'sidebar' ? createPortal(element, document.body) : element
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const singleInputRef = useRef<HTMLInputElement | null>(null)
   const singleSurfaceRef = useRef<HTMLElement | null>(null)
@@ -60,6 +67,15 @@ export default function InvoiceBatchControl({
     void window.api.classifications.primary.list().then((result) => { if (active) setClassification(result) }).catch(() => {})
     return () => { active = false }
   }, [])
+  useEffect(() => {
+    if (variant !== 'sidebar' || (!open && !singleOpen)) return
+    const close = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      event.preventDefault(); event.stopPropagation(); setOpen(false); setSingleOpen(false); triggerRef.current?.focus()
+    }
+    document.addEventListener('keydown', close)
+    return () => document.removeEventListener('keydown', close)
+  }, [variant, open, singleOpen])
   const isGeneral = classification?.profile === 'GENERAL'
   const [guidanceInstructions, setGuidanceInstructions] = useState('')
   const [guidanceDefaults, setGuidanceDefaults] = useState<NonNullable<InvoiceAiGuidance['defaults']>>({})
@@ -225,7 +241,8 @@ export default function InvoiceBatchControl({
 
   return (
     <div
-      className={`invoice-batch-control${variant === 'inline' ? ' invoice-batch-control--inline' : ''}${dragging || singleDragging ? ' invoice-batch-control--dragging' : ''}`}
+      className={`invoice-batch-control${variant === 'inline' ? ' invoice-batch-control--inline' : variant === 'sidebar' ? ' invoice-batch-control--sidebar' : ''}${dragging || singleDragging ? ' invoice-batch-control--dragging' : ''}`}
+      onKeyDown={event => { if (variant === 'sidebar' && event.key === 'Tab') event.stopPropagation() }}
       onPointerDownCapture={(event) => { lastInsidePointerDownRef.current = event.nativeEvent }}
       onDragEnter={(event) => {
         event.preventDefault()
@@ -256,7 +273,8 @@ export default function InvoiceBatchControl({
       <div className="invoice-split-fab" role="group" aria-label="Rechnungen erfassen">
         <button
           className="invoice-split-fab__new"
-          onClick={() => {
+          onClick={event => {
+            triggerRef.current = event.currentTarget
             if (!singleOpen) {
               allowBatchAutoOpenRef.current = false
               window.dispatchEvent(new Event('invoice-upload-flyout-opened'))
@@ -265,16 +283,19 @@ export default function InvoiceBatchControl({
             setSingleError('')
             setSingleOpen((value) => !value)
           }}
-          title="Einzelne Rechnung erfassen"
+          aria-label={variant === 'sidebar' ? 'KI-Buchung' : undefined}
+          title={variant === 'sidebar' ? 'KI-Buchung' : 'Einzelne Rechnung erfassen'}
           aria-expanded={singleOpen}
         >
-          <svg className="invoice-split-fab__plus" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-            <path d="M12 4v16M4 12h16" />
-          </svg><span className="invoice-split-fab__label">{variant === 'inline' ? 'Beleg auslesen' : 'Rechnung'}</span>
+          <span className="invoice-split-fab__icon" aria-hidden="true">
+            <IconPlus className="invoice-split-fab__plus" size={18} stroke={1.5} />
+            {variant === 'sidebar' && <IconSparkles className="invoice-split-fab__ai-mark" size={11} stroke={1.8} />}
+          </span><span className="invoice-split-fab__label">{variant === 'sidebar' ? 'KI-Buchung' : variant === 'inline' ? 'Beleg auslesen' : 'Rechnung'}</span>
         </button>
         <button
           className="invoice-split-fab__batch"
-          onClick={() => {
+          onClick={event => {
+            triggerRef.current = event.currentTarget
             if (!open) {
               allowBatchAutoOpenRef.current = true
               window.dispatchEvent(new Event('invoice-upload-flyout-opened'))
@@ -283,13 +304,12 @@ export default function InvoiceBatchControl({
             setSingleError('')
             setOpen((value) => !value)
           }}
+          aria-label={variant === 'sidebar' ? 'Batch-KI' : undefined}
           title="Mehrere PDF-Rechnungen vorbereiten"
           aria-expanded={open}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M7 2h7l4 4v16H7z"/><path d="M14 2v5h5M10 13h5M12.5 10.5v5"/>
-          </svg>
-          {variant === 'inline' && <span>Batch-KI</span>}
+          <IconFiles size={20} stroke={1.8} aria-hidden="true" />
+          {variant !== 'floating' && <span>Batch-KI</span>}
           {rows.length > 0 && <span className="invoice-split-fab__badge">{rows.length}</span>}
         </button>
       </div>
@@ -314,8 +334,8 @@ export default function InvoiceBatchControl({
         onChange={(event) => void importFiles(Array.from(event.target.files || []))}
       />
 
-      {singleOpen && (
-        <section ref={singleSurfaceRef} className="invoice-batch-flyout invoice-single-upload-flyout" aria-label="Rechnung hochladen">
+      {singleOpen && renderFlyout(
+        <section ref={singleSurfaceRef} style={sidebarPosition} className={`invoice-batch-flyout invoice-single-upload-flyout${variant === 'sidebar' ? ' invoice-batch-flyout--sidebar' : ''}`} aria-label="Rechnung hochladen">
           <ModalHeader
             title="Rechnung erfassen"
             subtitle="Eine Rechnung zur Erkennung auswählen"
@@ -366,8 +386,8 @@ export default function InvoiceBatchControl({
         </section>
       )}
 
-      {open && (
-        <section className="invoice-batch-flyout" aria-label="KI-Rechnungsentwürfe">
+      {open && renderFlyout(
+        <section style={sidebarPosition} className={`invoice-batch-flyout${variant === 'sidebar' ? ' invoice-batch-flyout--sidebar' : ''}`} aria-label="KI-Rechnungsentwürfe">
           <ModalHeader
             title="KI-Rechnungsentwürfe"
             subtitle={<>{readyCount ? `${readyCount} bereit` : duplicateCount ? `${duplicateCount} mögliche${duplicateCount === 1 ? 's' : ''} Duplikat${duplicateCount === 1 ? '' : 'e'}` : busyCount ? `${busyCount} in Vorbereitung` : 'Keine offenen Entwürfe'}</>}

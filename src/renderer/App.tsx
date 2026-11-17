@@ -33,6 +33,8 @@ import { TopNav } from './components/layout/TopNav'
 import { AppSidebar } from './components/layout/AppSidebar'
 import WindowControls from './components/layout/WindowControls'
 import OrgSwitcher from './components/common/OrgSwitcher'
+import { SidebarBookingActions } from './components/layout/SidebarBookingActions'
+import { useSidebarFlyoutPosition } from './hooks/useSidebarFlyoutPosition'
 import InvoiceBatchControl from './components/InvoiceBatchControl'
 import CompactBookingFlyout from './components/CompactBookingFlyout'
 import QuickAddModal from './components/modals/QuickAddModal'
@@ -1500,6 +1502,8 @@ function AppInner() {
   const {
     navLayout,
     setNavLayout,
+    sidebarBookingActions,
+    setSidebarBookingActions,
     sidebarCollapsed,
     setSidebarCollapsed,
     colorTheme,
@@ -1548,6 +1552,8 @@ function AppInner() {
 
   // Effective layout: user preference wins when wide enough, side-nav forced when narrow
   const effectiveNavLayout = narrowOverride && navLayout === 'top' ? 'left' : navLayout
+  const useSidebarActions = navLayout === 'left' && sidebarBookingActions
+  const sidebarFlyoutPosition = useSidebarFlyoutPosition(useSidebarActions, 560)
 
   const [organizationProfile, setOrganizationProfile] = useState<OrganizationProfile>('NONPROFIT')
 
@@ -2181,6 +2187,8 @@ function AppInner() {
       if (target.closest([
         '.compact-booking-flyout-anchor',
         '.bank-draft-source',
+        '.booking-attachment-preview',
+        '.sidebar-booking-actions',
         '.fab-buchung',
         '.select-dropdown__menu--portal',
         '.party-selector__menu--portal',
@@ -3060,6 +3068,7 @@ function AppInner() {
       </header>
       {!isTopNav && (
           <AppSidebar
+            footerActions={useSidebarActions ? <SidebarBookingActions onNewBooking={triggerBookingEntry} onNewInvoice={openJournalInvoiceScan} onReview={id => void reviewBatchInvoice(id)} notify={notify} paymentAccounts={paymentAccounts} /> : undefined}
             availableItems={getProfileNavigationItems(organizationProfile)}
             visibleNavItems={visibleNavItems}
             requiredNavItems={requiredNavItems}
@@ -3314,7 +3323,7 @@ function AppInner() {
             />
           )}
           {isPlusBookings && (
-            <BookingsPlusView onFilterChange={updateBookingLinkFilter} onResetFilters={resetBookingLinkFilters} calendarSelection={plusCalendarSelection} onCalendarSelectionChange={setPlusCalendarSelection} jumpRevision={bookingJumpRevision} externalFilters={bookingLinkFilters} flashId={flashId} fmtDate={fmtDate} showBookingDraftTabs={showBookingDraftTabs} bookingDraftTabs={bookingDraftTabs} onOpenBookingDraft={openBookingDraftTab} onCloseBookingDraft={closeBookingDraftTab} onNewBooking={openBookingEntry} onEditBooking={openPlusEdit} bookingEntryPresentation={bookingEntryPresentation} onNewInvoice={openJournalInvoiceScan} onReviewInvoice={(id) => void reviewBatchInvoice(id)} notify={notify} paymentAccounts={paymentAccounts} budgets={budgetsForEdit} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} closedUntil={periodLock?.closedUntil} generalProfile={organizationProfile === 'GENERAL'} />
+            <BookingsPlusView showCreationActions={!useSidebarActions} onFilterChange={updateBookingLinkFilter} onResetFilters={resetBookingLinkFilters} calendarSelection={plusCalendarSelection} onCalendarSelectionChange={setPlusCalendarSelection} jumpRevision={bookingJumpRevision} externalFilters={bookingLinkFilters} flashId={flashId} fmtDate={fmtDate} showBookingDraftTabs={showBookingDraftTabs} bookingDraftTabs={bookingDraftTabs} onOpenBookingDraft={openBookingDraftTab} onCloseBookingDraft={closeBookingDraftTab} onNewBooking={openBookingEntry} onEditBooking={openPlusEdit} bookingEntryPresentation={bookingEntryPresentation} onNewInvoice={openJournalInvoiceScan} onReviewInvoice={(id) => void reviewBatchInvoice(id)} notify={notify} paymentAccounts={paymentAccounts} budgets={budgetsForEdit} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} closedUntil={periodLock?.closedUntil} generalProfile={organizationProfile === 'GENERAL'} />
           )}
           {activePage === 'Dauerbuchungen' && (
             <RecurringBookingsView notify={notify} initialTask={dashboardTaskTarget} />
@@ -3339,6 +3348,8 @@ function AppInner() {
               setDateFmt={setDateFmt}
               sidebarCollapsed={sidebarCollapsed}
               setSidebarCollapsed={setSidebarCollapsed}
+              sidebarBookingActions={sidebarBookingActions}
+              setSidebarBookingActions={setSidebarBookingActions}
               navLayout={navLayout}
               setNavLayout={setNavLayout}
               navIconColorMode={navIconColorMode}
@@ -3521,7 +3532,7 @@ function AppInner() {
       {plusEditQa && bookingEntryPresentation === 'flyout' && !plusEditExpanded && (
         <>
           <div className="compact-booking-flyout-dismiss compact-booking-flyout-dismiss--dimmed" aria-hidden="true" />
-          <div className="compact-booking-flyout-anchor">
+          <div className="compact-booking-flyout-anchor" style={sidebarFlyoutPosition}>
             <CompactBookingFlyout notify={notify}
               key={`edit-${plusEditQa.id}`}
               title="Buchung bearbeiten"
@@ -3594,7 +3605,7 @@ function AppInner() {
         <div className={`compact-booking-flyout-dismiss compact-booking-flyout-dismiss--dimmed${shortcutBookingFlyout ? ' compact-booking-flyout-dismiss--shortcut' : ''}`} aria-hidden="true" />
       )}
       {quickAdd && activeDraftKind === 'booking' && effectiveBookingEntryPresentation === 'flyout' && !forceFullBookingDialog && (
-        <div className={`compact-booking-flyout-anchor${shortcutBookingFlyout ? ' compact-booking-flyout-anchor--shortcut' : ''}${isClassicBookings ? ' compact-booking-flyout-anchor--journal' : ''}${fabNearJournalEnd ? ' compact-booking-flyout-anchor--journal-end' : ''}`}>
+        <div style={sidebarFlyoutPosition} className={`compact-booking-flyout-anchor${shortcutBookingFlyout ? ' compact-booking-flyout-anchor--shortcut' : ''}${isClassicBookings ? ' compact-booking-flyout-anchor--journal' : ''}${fabNearJournalEnd ? ' compact-booking-flyout-anchor--journal-end' : ''}`}>
           <CompactBookingFlyout notify={notify}
             key={activeDraftId ?? 'compact-quick-add'}
             qa={qa}
@@ -3710,7 +3721,7 @@ function AppInner() {
       )}
       {/* removed: Confirm mark as paid modal */}
       {/* Journal action */}
-      {isClassicBookings ? (
+      {!useSidebarActions && (isClassicBookings ? (
         <div
           className={`journal-fab-cluster${fabNearJournalEnd ? ' journal-fab-cluster--journal-end' : ''}`}
           role="group"
@@ -3747,7 +3758,7 @@ function AppInner() {
             <span className="fab-buchung-text">Buchung</span>
           </button>
         )
-      )}
+      ))}
       {/* Auto-backup prompt modal (renderer) */}
       {autoBackupPrompt && (
         <AutoBackupPromptModal

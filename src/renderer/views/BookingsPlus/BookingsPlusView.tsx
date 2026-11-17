@@ -32,6 +32,7 @@ type Props = {
     onOpenBookingDraft?: (id: string) => void
     onCloseBookingDraft?: (id: string) => void
     fmtDate: (date: string) => string
+    showCreationActions?: boolean
     onNewBooking: () => void
     onEditBooking: (row: BookingPlusRow) => void | Promise<void>
     bookingEntryPresentation: 'modal' | 'flyout' | 'detached'
@@ -55,7 +56,7 @@ const signedMoney = new Intl.NumberFormat('de-DE', { style: 'currency', currency
 const prettyDate = (date: string) => new Date(`${date.slice(0, 10)}T12:00:00`).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })
 const limit = 20
 
-export default function BookingsPlusView({ onFilterChange, calendarSelection, onCalendarSelectionChange, externalFilters, jumpRevision, flashId, showBookingDraftTabs, bookingDraftTabs = [], onOpenBookingDraft, onCloseBookingDraft, fmtDate, onNewBooking, onEditBooking, bookingEntryPresentation, onNewInvoice, onReviewInvoice, notify, paymentAccounts, budgets, earmarks, tagDefs, allowVoucherDeletion, closedUntil, generalProfile }: Props) {
+export default function BookingsPlusView({ showCreationActions = true, onFilterChange, calendarSelection, onCalendarSelectionChange, externalFilters, jumpRevision, flashId, showBookingDraftTabs, bookingDraftTabs = [], onOpenBookingDraft, onCloseBookingDraft, fmtDate, onNewBooking, onEditBooking, bookingEntryPresentation, onNewInvoice, onReviewInvoice, notify, paymentAccounts, budgets, earmarks, tagDefs, allowVoucherDeletion, closedUntil, generalProfile }: Props) {
     const draftTabsRef = useRef<HTMLDivElement>(null)
     const activeDraftId = bookingDraftTabs.find(draft => draft.isActive)?.id
     useEffect(() => {
@@ -440,7 +441,7 @@ export default function BookingsPlusView({ onFilterChange, calendarSelection, on
                     </div>
                     <BookingDetailPopover label="Buchungsfilter" trigger={<><IconFilter size={16} /><span>Filter</span>{activeFilterCount > 0 && <span className="bp-filter-count">{activeFilterCount}</span>}</>} triggerClassName="bp-filter-trigger" panelClassName="bp-filters-popover">{filterContent}</BookingDetailPopover>
                 </div>
-                <div className="bp-invoice-tools"><button className="btn primary bp-new" onClick={onNewBooking}><IconPlus size={19} />Neue Buchung</button><InvoiceBatchControl variant="inline" onNewInvoice={onNewInvoice} onReview={onReviewInvoice} notify={batchNotify} paymentAccounts={paymentAccounts} /></div>
+                {showCreationActions && <div className="bp-invoice-tools"><button className="btn primary bp-new" onClick={onNewBooking}><IconPlus size={19} />Neue Buchung</button><InvoiceBatchControl variant="inline" onNewInvoice={onNewInvoice} onReview={onReviewInvoice} notify={batchNotify} paymentAccounts={paymentAccounts} /></div>}
             </div>
             <div className="booking-filter-summary" aria-label="Aktive Buchungsfilter">{hasActiveFilters && <span>Aktive Filter:</span>}{stornoPairIds && <button type="button" aria-label="Original + Storno: Filter entfernen" onClick={() => { setStornoPairIds(null); setPage(1) }}>Original + Storno <span aria-hidden="true">×</span></button>}{(Object.keys(filters) as Array<keyof Filter>).filter(key => filters[key] && !(generalProfile && key === 'sphere') && !(!generalProfile && key === 'classification')).map(key => {
                 const color = activeFilterColors[key]

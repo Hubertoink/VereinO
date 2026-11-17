@@ -7,6 +7,24 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.2.0] - 2026-11-17
+
+### Hinzugefügt
+
+- Optionale Buchungsaktionen über den Einstellungen in der Seitenleiste: Buchung erstellen, KI-Buchung und Batch-KI bleiben ein- und ausgeklappt erreichbar. Die Flyouts öffnen neben der Seitenleiste.
+- Bild- und PDF-Anhänge erscheinen bei ausreichend Platz als große, rahmenlose Lightbox neben dem Buchungsformular. Ein Klick auf den Dateinamen wechselt die Vorschau oder öffnet sie erneut; eine weiche, wellenförmige Entfaltung führt vom Anhang zur Vorschau. A4-PDFs passen in die verfügbare Fensterhöhe.
+
+### Geändert
+
+- Die Seitenleiste klappt ihre Unterbereiche weich auf und zu. Tabler-Icons, eine kleine KI-Markierung und einzeln gerundete Hover-Flächen vereinheitlichen die Buchungsaktionen. Reduzierte Bewegung wird berücksichtigt.
+
+### Behoben
+
+- Rechtsklick auf „Buchungen“ öffnet wieder die Auswahl zwischen Klassisch und Plus. Die seitenspezifischen Aktionen für Buchungen und Bankimport haben Vorrang vor der Modulauswahl, sowohl im Seitenmenü als auch im oberen Menü.
+- Die klassische Buchungstabelle nutzt die volle Breite ihres Rahmens. Seitensteuerung und Tabellenwerkzeuge behalten ihren Innenabstand.
+- Die Lightbox bleibt beim Wechsel der Anhänge ruhig: kein vorzeitiges Aufblitzen von Bildern, PDFs oder Ladehinweisen; Dateiauswahl und Schließen-Button bleiben sichtbar an derselben Position. Ein erneuter Klick auf den bereits sichtbaren Anhang startet keine weitere Animation.
+- Die Hover-Rahmen der Anhangsaktionen im klassischen Buchungsmodal werden nicht mehr abgeschnitten.
+
 ## [5.1.0] - 2026-11-17
 
 ### Hinzugefügt

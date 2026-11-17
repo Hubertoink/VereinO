@@ -18,3 +18,7 @@
 /* Use the space below the booking form instead of reserving room for the FAB. */
 .compact-booking-flyout-anchor:not(.advances-purchase-flyout-anchor) { bottom: 12px; }
 .compact-booking-flyout-anchor:not(.advances-purchase-flyout-anchor) > .compact-booking-flyout { max-height: calc(100dvh - 80px); }
+
+.compact-booking-files .compact-booking-file-preview { min-width: 0; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: inherit; text-align: left; }
+.compact-booking-files .compact-booking-file-preview:hover { color: var(--text); text-decoration: underline; }
+.compact-booking-files button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }

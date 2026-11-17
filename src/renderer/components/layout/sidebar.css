@@ -4,7 +4,7 @@
 .app-sidebar > .side-nav { height: 100%; min-height: 0; padding: 0; gap: 8px; }
 .side-nav .sidebar-toggle { flex: 0 0 34px; min-height: 34px; display: flex; align-items: center; justify-content: center; padding: 6px; color: var(--text-dim); }
 .side-nav--expanded .sidebar-toggle { justify-content: space-between; padding-inline: 10px; font-size: 12px; }
-.sidebar-nav-scroll { display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow-y: auto; overflow-x: hidden; flex: 1 1 auto; padding: 5px 2px; scrollbar-width: thin; }
+.sidebar-nav-scroll { display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow-y: auto; overflow-x: hidden; flex: 1 1 auto; padding: 5px 2px; scrollbar-width: thin; overflow-anchor: none; }
 .sidebar-nav-scroll { scrollbar-color: transparent transparent; }
 .sidebar-nav-scroll:hover { scrollbar-color: color-mix(in srgb, var(--text-dim) 45%, transparent) transparent; }
 .sidebar-nav-scroll::-webkit-scrollbar-track, .sidebar-nav-scroll::-webkit-scrollbar-corner { background: transparent; }
@@ -12,7 +12,7 @@
 .sidebar-nav-scroll:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text-dim) 45%, transparent); }
 .sidebar-nav-scroll::-webkit-scrollbar-button { display: none; background: transparent; }
 .sidebar-nav-scroll .nav-divider { align-self: stretch; flex: 0 0 1px; }
-.side-nav .side-nav-btn { flex: 0 0 auto; width: 100%; min-height: 38px; height: auto; padding: 7px; }
+.side-nav .side-nav-btn { display: flex; align-items: center; flex: 0 0 auto; width: 100%; min-height: 38px; height: 38px; padding: 7px; }
 .side-nav--expanded .side-nav-btn { display: flex; justify-content: flex-start; gap: 10px; text-align: left; }
 .side-nav--expanded .nav-label { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .side-nav--expanded .nav-badge { position: static; flex: 0 0 auto; margin-left: auto; }
@@ -39,7 +39,7 @@
 .sidebar-accounts-message { margin: 7px 6px; font-size: 11px; color: var(--text-dim); }
 .sidebar-accounts-more { display: block; padding: 6px; font-size: 11px; color: var(--text-dim); text-align: left; }
 .sidebar-backdrop { grid-row: 2; grid-column: 1 / -1; z-index: 1100; background: rgb(0 0 0 / 20%); }
-.app-sidebar--expanded .nav-label, .sidebar-accounts, .sidebar-recent-assignments { animation: sidebar-content-in 200ms ease-out both; }
+.app-sidebar--expanded .nav-label { animation: sidebar-content-in 200ms ease-out both; }
 @keyframes sidebar-content-in { from { opacity: 0; transform: translateX(-5px); } to { opacity: 1; transform: translateX(0); } }
 .sidebar-recent-assignments { margin: 0 3px 7px 17px; border-left: 1px solid var(--border); padding-left: 9px; }
 .sidebar-recent-assignment { display: grid; gap: 4px; width: 100%; padding: 7px 6px; border: 0; border-radius: 5px; background: transparent; color: var(--text-dim); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
@@ -71,9 +71,17 @@ body:has(.app-sidebar--expanded) .shortcut-global-flyout { left: 272px; width: m
 }
 @media (prefers-reduced-motion: reduce) {
   .app-root-grid--side, .app-root-grid > .app-sidebar, body:has(.app-root-grid--side) .leader-shortcut-trigger { transition: none; }
-  .app-sidebar--expanded .nav-label, .sidebar-accounts, .sidebar-recent-assignments { animation: none; }
+  .app-sidebar--expanded .nav-label { animation: none; }
 }
 
 .sidebar-version { display: block; width: 100%; border: 0; border-radius: 5px; background: transparent; color: var(--text-dim); padding: 5px 8px; font: inherit; font-size: 10px; text-align: left; cursor: pointer; }
 .sidebar-version:hover, .sidebar-version:focus-visible { color: var(--text); background: color-mix(in srgb, var(--accent) 9%, transparent); }
 .side-nav--collapsed .sidebar-version { padding-inline: 0; text-align: center; font-size: 9px; }
+
+/* Animate the space occupied by details, so following module icons move with it.
+   A stable inner width avoids transient multi-line captions as the rail widens. */
+.sidebar-section { display: grid; flex: 0 0 auto; grid-template-rows: 0fr; opacity: 0; margin-top: -4px; transition: grid-template-rows 240ms cubic-bezier(.2,.7,.2,1), opacity 180ms ease, margin-top 240ms ease; }
+.sidebar-section--open { grid-template-rows: 1fr; opacity: 1; margin-top: 0; }
+.sidebar-section-clip { min-height: 0; overflow: hidden; }
+.sidebar-section-content { width: 240px; }
+@media (prefers-reduced-motion: reduce) { .sidebar-section { transition: none; } }

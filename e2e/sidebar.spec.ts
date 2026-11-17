@@ -5,10 +5,11 @@ import fs from 'node:fs/promises'
 let script: string
 let css: string
 test.beforeAll(async () => {
-  css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/shortcuts/shortcuts.css', 'src/renderer/components/layout/sidebar.css'].map(file => fs.readFile(file, 'utf8')))).join('\n')
+  css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/shortcuts/shortcuts.css', 'src/renderer/components/layout/sidebar.css', 'src/renderer/components/layout/sidebarBookingActions.css'].map(file => fs.readFile(file, 'utf8')))).join('\n')
   const result = await build({ jsx: 'automatic', stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
     import React, { useState, useEffect } from 'react'
     import { createRoot } from 'react-dom/client'
+    import { SidebarBookingActions } from './src/renderer/components/layout/SidebarBookingActions'
     import { AppSidebar } from './src/renderer/components/layout/AppSidebar'
     import { LeaderShortcuts } from './src/renderer/components/shortcuts/LeaderShortcuts'
     import { navItems, getProfileNavigationItems } from './src/renderer/utils/navItems'
@@ -36,7 +37,7 @@ test.beforeAll(async () => {
         { id: 3, name: 'PayPal', balance: -125, kind: 'PAYPAL', isActive: 1 },
         { id: 4, name: 'Rücklagenkonto mit sehr langem Namen', balance: 1000000.24, kind: 'BANK', isActive: 1 }
       ]
-      window.api = { app: { version: async () => ({ version: '4.11.0' }) },
+      window.api = { classifications: { primary: { list: async () => ({ values: [] }) } }, ai: { invoiceBatch: { onChanged: () => () => {}, list: async () => ({ rows: [], aiAvailable: true }) } }, app: { version: async () => ({ version: '4.11.0' }) },
         members: { list: async input => {
           window.feeRequests.push(input)
           const summary = { ...window.feeSummary }
@@ -69,7 +70,7 @@ test.beforeAll(async () => {
         useEffect(() => { localStorage.setItem('sidebarCollapsed', String(collapsed)) }, [collapsed])
         return <><div className="app-root-grid app-root-grid--side">
           <header className="app-header"><button>KommerzO</button></header>
-          <AppSidebar activePage={active} onNavigate={setActive} collapsed={collapsed} onToggleCollapse={() => setCollapsed(v => !v)} items={items} navIconColorMode="color" openBankImportsCount={6} openInvoicesCount={3} selectedAccountId={account} onSelectAccount={id => { setAccount(id); setActive('Buchungen') }} onSelectAssignment={(kind, id) => { window.assignmentSelection = { kind, id }; setActive('Buchungen') }} onSelectBankAccount={options.bankImports ? id => { window.bankSelection = id; setActive('Bankimport') } : undefined} onSelectMembershipFees={options.membershipFees ? () => { window.feeSelection = { kind: 'members', filter: 'overdue' }; setActive('Mitglieder') } : undefined} />
+          <AppSidebar footerActions={options.bookingActions ? <SidebarBookingActions onNewBooking={() => { window.bookingOpened = true }} onNewInvoice={() => {}} onReview={() => {}} notify={() => {}} paymentAccounts={[]} /> : undefined} activePage={active} onNavigate={setActive} collapsed={collapsed} onToggleCollapse={() => setCollapsed(v => !v)} items={items} navIconColorMode="color" openBankImportsCount={6} openInvoicesCount={3} selectedAccountId={account} onSelectAccount={id => { setAccount(id); setActive('Buchungen') }} onSelectAssignment={(kind, id) => { window.assignmentSelection = { kind, id }; setActive('Buchungen') }} onSelectBankAccount={options.bankImports ? id => { window.bankSelection = id; setActive('Bankimport') } : undefined} onSelectMembershipFees={options.membershipFees ? () => { window.feeSelection = { kind: 'members', filter: 'overdue' }; setActive('Mitglieder') } : undefined} />
           <main className="app-main"><h1>{active}</h1><button onClick={() => setAccount(null)}>Kontofilter entfernen</button><p data-testid="filter">{account || 'Alle Konten'}</p><div className="card" style={{padding:24}}>Buchungsübersicht</div></main>
         </div><LeaderShortcuts commands={[]} /></>
       }
@@ -425,4 +426,75 @@ test('migrates the previous account collapse preference', async ({ page }) => {
   await expect(page.locator('.sidebar-account')).toHaveCount(3)
   await page.evaluate(() => (window as any).renderSidebar())
   await expect(page.getByRole('button', { name: 'Buchungen: Inhalte einklappen' })).toHaveAttribute('aria-expanded', 'true')
+})
+
+
+test('sidebar booking actions use package icons and rounded independent hover surfaces in both modes', async ({ page }, info) => {
+  await page.evaluate(() => (window as any).renderSidebar({ bookingActions: true }))
+  const actions = page.getByRole('group', { name: 'Buchungsaktionen', exact: true })
+  const ai = actions.getByRole('button', { name: 'KI-Buchung', exact: true })
+  const batch = actions.getByRole('button', { name: 'Batch-KI', exact: true })
+  await expect(actions).toBeVisible()
+  await expect(batch.locator('.tabler-icon-files')).toBeVisible()
+  await expect(ai.locator('.tabler-icon-sparkles')).toBeVisible()
+  for (const collapsed of [false, true]) {
+    if (collapsed) await page.getByRole('button', { name: 'Seitenleiste einklappen', exact: true }).click()
+    await expect(page.locator('.app-sidebar')).toHaveCSS('width', collapsed ? '64px' : '260px')
+    for (const button of [ai, batch]) {
+      const before = await button.evaluate(el => getComputedStyle(el).backgroundColor)
+      await button.hover()
+      await expect.poll(() => button.evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe(before)
+      expect(await button.evaluate(el => parseFloat(getComputedStyle(el).borderTopLeftRadius))).toBeGreaterThan(0)
+      const bounds = await button.boundingBox()
+      const sidebar = await page.locator('.app-sidebar').boundingBox()
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(sidebar!.x + sidebar!.width)
+      await expect(ai.locator('.tabler-icon-sparkles')).toBeVisible()
+      await page.screenshot({ path: info.outputPath(`actions-${collapsed ? 'collapsed' : 'expanded'}-${button === ai ? 'ai' : 'batch'}.png`) })
+      await page.mouse.move(900, 300)
+    }
+    await ai.click()
+    // The sidebar flyout is portalled so the rail's clipping cannot cut it off.
+    await expect(page.locator('.invoice-single-upload-flyout')).toBeVisible()
+    const panel = await page.locator('.invoice-single-upload-flyout').boundingBox()
+    const sidebar = await page.locator('.app-sidebar').boundingBox()
+    expect(panel!.x).toBeGreaterThanOrEqual(sidebar!.x + sidebar!.width)
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.invoice-single-upload-flyout')).toHaveCount(0)
+    await expect(ai).toBeFocused()
+    await batch.click()
+    await expect(page.getByRole('region', { name: 'KI-Rechnungsentwürfe', exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('region', { name: 'KI-Rechnungsentwürfe', exact: true })).toHaveCount(0)
+    await expect(batch).toBeFocused()
+  }
+})
+
+test('sidebar details animate module movement without intermediate wrapping and respect reduced motion', async ({ page }) => {
+  await page.evaluate(() => { localStorage.setItem('sidebarCollapsed', 'true'); (window as any).renderSidebar({ assignments: true }) })
+  const samples = await page.evaluate(async () => {
+    const toggle = document.querySelector<HTMLButtonElement>('.sidebar-toggle')!
+    const module = document.querySelector<HTMLElement>('[data-shortcut-nav="Dauerbuchungen"]')!
+    const points: Array<{ time: number; y: number }> = []
+    const start = performance.now()
+    points.push({ time: 0, y: module.getBoundingClientRect().top })
+    toggle.click()
+    await new Promise<void>(resolve => {
+      const sample = () => {
+        points.push({ time: performance.now() - start, y: module.getBoundingClientRect().top })
+        if (performance.now() - start < 400) requestAnimationFrame(sample)
+        else resolve()
+      }
+      requestAnimationFrame(sample)
+    })
+    return points
+  })
+  const start = samples[0].y
+  const end = samples[samples.length - 1].y
+  expect(end - start).toBeGreaterThan(50)
+  expect(samples.filter(s => s.y > start + 5 && s.y < end - 5).length).toBeGreaterThan(2)
+  expect(Math.max(...samples.map(s => s.y))).toBeLessThanOrEqual(end + 1)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await expect(page.locator('.sidebar-section').first()).toHaveCSS('transition-duration', '0s')
+  await page.getByRole('button', { name: 'Seitenleiste einklappen', exact: true }).click()
+  await expect(page.locator('.sidebar-accounts')).toHaveCount(0)
 })

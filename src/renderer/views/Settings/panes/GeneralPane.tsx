@@ -16,6 +16,8 @@ import { SettingsPageHeader, SettingsSection, SettingsRow } from '../components'
  */
 export function GeneralPane({
   organizationProfile,
+  sidebarBookingActions = false,
+  setSidebarBookingActions,
   navLayout,
   setNavLayout,
   navIconColorMode,
@@ -320,6 +322,15 @@ export function GeneralPane({
                   </button>
                 </div>
               </div>
+
+              {navLayout === 'left' && <label className="settings-toggle-card" htmlFor="toggle-sidebar-booking-actions">
+                <span className="settings-toggle-card__copy">
+                  <strong>Buchungsaktionen in der Seitenleiste</strong>
+                  <span>Buchung erstellen, KI-Buchung und Batch über den Einstellungen anzeigen – auch bei eingeklappter Navigation.</span>
+                </span>
+                <input id="toggle-sidebar-booking-actions" role="switch" className="toggle" type="checkbox" checked={sidebarBookingActions}
+                  onChange={event => setSidebarBookingActions?.(event.target.checked)} />
+              </label>}
 
               <label className="settings-toggle-card" htmlFor="toggle-menu-icons">
                 <span className="settings-toggle-card__copy">

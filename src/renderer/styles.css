@@ -7016,11 +7016,13 @@ textarea:focus {
 .invoice-batch-control--dragging .invoice-split-fab { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 25%, transparent); }
 .invoice-split-fab button { border: 0; color: inherit; background: transparent; cursor: pointer; }
 .invoice-split-fab__new { min-width: 48px; padding: 0 13px; display: flex; align-items: center; justify-content: center; gap: 0; transition: background .2s, gap .25s; }
+.invoice-split-fab__icon { position: relative; display: inline-flex; flex: 0 0 20px; width: 20px; height: 20px; align-items: center; justify-content: center; }
+.invoice-split-fab__ai-mark { position: absolute; right: -4px; top: -4px; }
 .invoice-split-fab__plus { display: block; flex-shrink: 0; }
 .invoice-split-fab__label { max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width .25s, opacity .2s; }
-.invoice-batch-control:not(.invoice-batch-control--inline) .invoice-split-fab:hover .invoice-split-fab__new { gap: 8px; }
+.invoice-batch-control:not(.invoice-batch-control--inline):not(.invoice-batch-control--sidebar) .invoice-split-fab:hover .invoice-split-fab__new { gap: 8px; }
 .invoice-split-fab:hover .invoice-split-fab__label { max-width: 100px; opacity: 1; }
-.invoice-split-fab__batch { width: 42px; position: relative; display: grid; place-items: center; border-left: 1px solid color-mix(in oklab, #b475ff 44%, var(--border)) !important; color: color-mix(in oklab, #b475ff 78%, white) !important; background: color-mix(in oklab, #b475ff 10%, transparent) !important; }
+.invoice-batch-control:not(.invoice-batch-control--sidebar) .invoice-split-fab__batch { width: 42px; position: relative; display: grid; place-items: center; border-left: 1px solid color-mix(in oklab, #b475ff 44%, var(--border)) !important; color: color-mix(in oklab, #b475ff 78%, white) !important; background: color-mix(in oklab, #b475ff 10%, transparent) !important; }
 .invoice-split-fab button:hover, .invoice-split-fab button:focus-visible { background: color-mix(in oklab, var(--warning) 22%, transparent); outline: none; }
 .invoice-split-fab__badge { position: absolute; top: 3px; right: 3px; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; border-radius: 10px; background: var(--accent); color: white; font-size: 10px; font-weight: 700; }
 .invoice-batch-flyout { position: absolute; right: 0; bottom: 58px; width: min(390px, calc(100vw - 32px)); max-height: min(520px, calc(100vh - 150px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: color-mix(in oklab, var(--surface) 96%, transparent); box-shadow: 0 24px 70px rgba(0,0,0,.38); backdrop-filter: blur(18px); color: var(--text); }
@@ -11194,7 +11196,6 @@ button.dashboard-task-strip__item:hover {
   color: var(--accent);
   border-color: color-mix(in oklab, var(--accent) 30%, var(--border));
   background: color-mix(in oklab, var(--accent) 12%, var(--surface));
-  transform: translateY(-1px);
 }
 
 .quick-add-modal .attachment-icon-btn--danger:hover,
@@ -20159,6 +20160,19 @@ textarea {
   border-color: var(--border);
   background: var(--surface);
   box-shadow: none;
+  padding: 0;
+}
+
+.journal-view .journal-table-card > .pagination-bar {
+  margin: 16px 16px 10px;
+}
+
+.journal-view .journal-table-card > :is(.booking-table-tools, .journal-compact-toolbar) {
+  padding-inline: 16px;
+}
+
+.journal-view .journal-table-card > .journal-table-scroll-wrapper {
+  padding-bottom: 0;
 }
 
 .quick-add-modal .summary-card.booking-ai-summary,

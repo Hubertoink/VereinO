@@ -133,6 +133,8 @@ export interface SettingsProps {
   setDateFmt: (f: DateFmt) => void
   sidebarCollapsed: boolean
   setSidebarCollapsed: (b: boolean) => void
+  sidebarBookingActions?: boolean
+  setSidebarBookingActions?: (value: boolean) => void
   navLayout: NavLayout
   setNavLayout: (v: NavLayout) => void
   navIconColorMode: NavIconColorMode
@@ -185,6 +187,8 @@ export interface SettingsProps {
 
 export interface GeneralPaneProps {
   organizationProfile: OrganizationProfile
+  sidebarBookingActions?: boolean
+  setSidebarBookingActions?: (value: boolean) => void
   navLayout: NavLayout
   setNavLayout: (v: NavLayout) => void
   navIconColorMode: NavIconColorMode

@@ -90,6 +90,8 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     return stored === 'left' || stored === 'top' ? stored : 'left'
   })
 
+  const [sidebarBookingActions, setSidebarBookingActions] = useState(() => localStorage.getItem('ui.sidebarBookingActions') === 'true')
+  useEffect(() => { safeLocalStorageSet('ui.sidebarBookingActions', String(sidebarBookingActions)) }, [sidebarBookingActions])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem('sidebarCollapsed')
     return stored === 'true'
@@ -472,6 +474,8 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       value={{
         navLayout,
         setNavLayout,
+        sidebarBookingActions,
+        setSidebarBookingActions,
         sidebarCollapsed,
         setSidebarCollapsed,
         colorTheme,

@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { build } from 'esbuild'
 import fs from 'node:fs/promises'
+import { PDFDocument } from 'pdf-lib'
+import path from 'node:path'
 
 let script: string
 let css: string
@@ -10,6 +12,7 @@ test.beforeAll(async () => {
   css += '\n' + await fs.readFile('src/renderer/components/booking/bankDraftSource.css', 'utf8') + '\n' + await fs.readFile('src/renderer/components/compactBookingFlyout.css', 'utf8')
   css += '\n' + await fs.readFile('src/renderer/components/common/party.css', 'utf8')
   css += '\n' + await fs.readFile('src/renderer/components/modalHeader.css', 'utf8')
+  css += '\n' + await fs.readFile('src/renderer/components/booking/bookingAttachmentPreview.css', 'utf8')
   const result = await build({ jsx: 'automatic',
     stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
       import React from 'react'
@@ -29,6 +32,7 @@ test.beforeAll(async () => {
         const fileInputRef = React.useRef(null)
         window.changePresentation = setPresentation
         window.currentQa = hook.qa
+        window.setAttachments = hook.setFiles
         window.newDraft = () => hook.openQuickAdd()
         window.parkDraft = hook.parkQuickAdd
         window.replaceDraft = () => hook.updateDraft(hook.activeDraftId, { qa: { type: 'OUT',
@@ -63,7 +67,11 @@ test.beforeAll(async () => {
               fmtDate={d => d} eurFmt={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })} />
       }
       createRoot(document.getElementById('root')).render(<ToastProvider><Harness /></ToastProvider>)
-    ` }, bundle: true, write: false, platform: 'browser', loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' }
+    ` }, bundle: true, write: false, platform: 'browser', plugins: [{ name: 'pdf-worker-url', setup(builder) {
+      builder.onResolve({ filter: /^pdfjs-dist\/legacy\/build\/pdf$/ }, () => ({ path: path.resolve('node_modules/pdfjs-dist/legacy/build/pdf.mjs') }))
+      builder.onResolve({ filter: /pdf\.worker.*\?url$/ }, args => ({ path: args.path, namespace: 'worker-url' }))
+      builder.onLoad({ filter: /.*/, namespace: 'worker-url' }, () => ({ contents: 'export default "http://booking.test/pdf.worker.mjs"', loader: 'js' }))
+    } }], loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' }
   })
   script = result.outputFiles[0].text
 })
@@ -71,6 +79,7 @@ test.beforeAll(async () => {
 test.beforeEach(async ({ page }) => {
   page.on('pageerror', error => console.error(error.message))
   await page.route('http://booking.test/**', route => route.fulfill({ contentType: 'text/html', body: '<html data-theme="dark"><div id="root"></div></html>' }))
+  await page.route('http://booking.test/pdf.worker.mjs', async route => route.fulfill({ contentType: 'text/javascript', body: await fs.readFile('node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'utf8') }))
   await page.goto('http://booking.test/')
   await page.addStyleTag({ content: css })
   await page.addStyleTag({ content: '* { animation: none !important; transition: none !important; }' })
@@ -405,3 +414,224 @@ test('changing the counterparty does not copy the original IBAN into another par
   await editor.getByText('Zahlung & Steuer', { exact: true }).click()
   await expect(editor.getByLabel('IBAN', { exact: true })).toHaveValue('')
 })
+
+
+for (const theme of ['light', 'dark']) {
+  test(`attachment lightbox: ${theme}, image and A4 PDF fit the window independently of the form`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 1600, height: 1000 })
+    await page.addStyleTag({ content: await fs.readFile('src/renderer/views/AI/AIView.css', 'utf8') })
+    await page.evaluate(value => {
+      document.documentElement.dataset.theme = value
+      const canvas = document.createElement('canvas')
+      canvas.width = 595; canvas.height = 842
+      const ctx = canvas.getContext('2d')!
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 595, 842)
+      ctx.fillStyle = '#17191d'; ctx.font = 'bold 32px sans-serif'; ctx.fillText('RECHNUNG', 48, 80)
+      ctx.font = '18px sans-serif'; ctx.fillText('VereinO · Material', 48, 150)
+      ctx.fillText('Gesamt: 119,00 €', 48, 550)
+      canvas.toBlob(blob => (window as any).setAttachments([new File([blob!], 'Rechnung A4.png', { type: 'image/png' }), new File([blob!], 'Zweiter Anhang.png', { type: 'image/png' })]))
+    }, theme)
+    const preview = page.getByRole('complementary', { name: 'Belegvorschau' })
+    const img = preview.getByRole('img', { name: 'Beleg: Rechnung A4.png' })
+    await expect(img).toBeVisible()
+    await expect.poll(() => img.evaluate(el => (el as HTMLImageElement).naturalHeight)).toBe(842)
+    await expect(preview).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+    await expect(preview).toHaveCSS('border-top-width', '0px')
+    const lightbox = (await preview.boundingBox())!
+    const form = (await page.locator('.compact-booking-flyout-anchor').boundingBox())!
+    expect(lightbox.height).toBeGreaterThan(form.height)
+    expect(lightbox.y).toBeGreaterThanOrEqual(12)
+    expect(lightbox.y + lightbox.height).toBeLessThanOrEqual(988)
+    expect(lightbox.x + lightbox.width).toBeLessThan(form.x)
+    await page.screenshot({ path: testInfo.outputPath(`lightbox-image-${theme}.png`) })
+    await page.getByRole('button', { name: 'Einnahme', exact: true }).click()
+    await page.getByRole('button', { name: /Anhang · 2/ }).click()
+    await page.getByRole('button', { name: 'Zweiter Anhang.png anzeigen', exact: true }).click()
+    await expect(preview.getByRole('img', { name: 'Beleg: Zweiter Anhang.png' })).toBeVisible()
+    await preview.getByRole('button', { name: 'Belegvorschau schließen' }).click()
+    await expect(preview).toHaveCount(0)
+    await page.getByRole('button', { name: 'Zweiter Anhang.png anzeigen', exact: true }).click()
+    await expect(preview.getByRole('img', { name: 'Beleg: Zweiter Anhang.png' })).toBeVisible()
+    await page.getByRole('button', { name: 'Rechnung A4.png anzeigen', exact: true }).click()
+    await expect(img).toBeVisible()
+    const menuBounds = await preview.locator('header').boundingBox()
+    const closeBounds = await preview.getByRole('button', { name: 'Belegvorschau schließen' }).boundingBox()
+    await page.getByRole('button', { name: 'Rechnung A4.png entfernen', exact: true }).click()
+    await expect(preview.getByRole('img', { name: 'Beleg: Zweiter Anhang.png' })).toBeVisible()
+    expect(await preview.locator('header').boundingBox()).toEqual(menuBounds)
+    expect(await preview.getByRole('button', { name: 'Belegvorschau schließen' }).boundingBox()).toEqual(closeBounds)
+    const pdf = await PDFDocument.create()
+    pdf.addPage([595, 842]).drawText('RECHNUNG - Seite 1', { x: 48, y: 760, size: 24 })
+    pdf.addPage([595, 842]).drawText('Seite 2', { x: 48, y: 760, size: 24 })
+    await page.evaluate(base64 => {
+      const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+      ;(window as any).setAttachments([new File([bytes], 'Rechnung A4.pdf', { type: 'application/pdf' })])
+    }, await pdf.saveAsBase64())
+    const canvas = preview.locator('canvas')
+    await expect(preview.getByText('Seite 1 / 2')).toBeVisible()
+    await expect.poll(() => canvas.evaluate(el => el.height)).toBeGreaterThan(500)
+    const viewport = (await preview.locator('.ai-pdf-preview__viewport').boundingBox())!
+    const paper = (await canvas.boundingBox())!
+    expect(paper.width).toBeLessThanOrEqual(viewport.width)
+    expect(paper.height).toBeLessThanOrEqual(viewport.height)
+    const firstPagePixels = await canvas.evaluate(el => el.toDataURL())
+    await preview.getByRole('button', { name: 'Nächste Seite' }).click()
+    await expect(preview.getByText('Seite 2 / 2')).toBeVisible()
+    await expect.poll(() => canvas.evaluate(el => el.toDataURL())).not.toBe(firstPagePixels)
+    await page.screenshot({ path: testInfo.outputPath(`lightbox-pdf-${theme}.png`) })
+    await page.setViewportSize({ width: 800, height: 700 })
+    await expect(preview).toHaveCount(0)
+    await page.setViewportSize({ width: 1600, height: 1000 })
+    await expect(preview).toBeVisible()
+    await preview.getByRole('button', { name: 'Belegvorschau schließen' }).click()
+    await expect(preview).toHaveCount(0)
+    await expect(page.getByRole('group', { name: 'Buchungsart wählen' })).toBeVisible()
+  })
+}
+
+
+test('clicking an attachment unfolds a sheet and skips the wave for reduced motion', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await page.evaluate(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 200; canvas.height = 300
+    const context = canvas.getContext('2d')!
+    context.fillStyle = '#e5e7eb'; context.fillRect(0, 0, 200, 300)
+    context.fillStyle = '#111'; context.font = '20px sans-serif'; context.fillText('Rechnung', 20, 40)
+    canvas.toBlob(blob => (window as any).setAttachments([
+      new File([blob!], 'Erster Beleg.png', { type: 'image/png' }),
+      new File([blob!], 'Zweiter Beleg.png', { type: 'image/png' })
+    ]))
+    ;(window as any).revealCount = 0
+    new MutationObserver(records => {
+      for (const record of records) for (const node of record.addedNodes) {
+        if (node instanceof HTMLElement && node.classList.contains('attachment-reveal-wave')) (window as any).revealCount++
+      }
+    }).observe(document.body, { childList: true })
+  })
+  await page.getByRole('button', { name: 'Einnahme', exact: true }).click()
+  await page.getByRole('button', { name: /Anhang · 2/ }).click()
+  const menuBefore = await page.locator('.booking-attachment-preview > header').boundingBox()
+  await page.evaluate(() => {
+    const frames: Array<{ x: number; y: number; width: number; height: number; opacity: number }> = []
+    ;(window as any).menuFrames = frames
+    ;(window as any).sampleMenu = true
+    const sample = () => {
+      const menu = document.querySelector('.booking-attachment-preview > header')
+      if (menu) {
+        const { x, y, width, height } = menu.getBoundingClientRect()
+        let opacity = 1
+        for (let el: Element | null = menu; el; el = el.parentElement) opacity *= Number(getComputedStyle(el).opacity)
+        frames.push({ x, y, width, height, opacity })
+      }
+      if ((window as any).sampleMenu) requestAnimationFrame(sample)
+    }
+    requestAnimationFrame(sample)
+  })
+  await page.getByRole('button', { name: 'Zweiter Beleg.png anzeigen', exact: true }).click()
+  const wave = page.locator('.attachment-reveal-wave')
+  const preview = page.getByRole('complementary', { name: 'Belegvorschau' })
+  await expect(wave).toBeVisible()
+  await expect(wave).toHaveCSS('pointer-events', 'none')
+  await expect.poll(() => wave.evaluate((canvas: HTMLCanvasElement) => {
+    const bytes = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data
+    return bytes.some((value, index) => index % 4 === 3 && value > 0)
+  })).toBe(true)
+  await page.evaluate(() => { (window as any).activeReveal = document.querySelector('.attachment-reveal-wave') })
+  await page.getByRole('button', { name: 'Zweiter Beleg.png anzeigen', exact: true }).click()
+  expect(await page.evaluate(() => document.querySelector('.attachment-reveal-wave') === (window as any).activeReveal)).toBe(true)
+  expect(await page.evaluate(() => (window as any).revealCount)).toBe(1)
+  await page.screenshot({ path: testInfo.outputPath('attachment-wave.png') })
+  await expect(wave).toHaveCount(0)
+  await expect(preview).toHaveCSS('opacity', '1')
+  const menuFrames = await page.evaluate(() => { (window as any).sampleMenu = false; return (window as any).menuFrames })
+  expect(menuFrames.length).toBeGreaterThan(5)
+  for (const { opacity, ...bounds } of menuFrames) {
+    expect(opacity).toBe(1)
+    expect(bounds).toEqual(menuBefore)
+  }
+  await expect(preview.getByRole('img', { name: 'Beleg: Zweiter Beleg.png' })).toBeVisible()
+  await page.getByRole('button', { name: 'Zweiter Beleg.png anzeigen', exact: true }).dblclick()
+  expect(await page.evaluate(() => (window as any).revealCount)).toBe(1)
+  await expect(wave).toHaveCount(0)
+  await preview.getByRole('button', { name: 'Belegvorschau schließen' }).click()
+  await expect(preview).toHaveCount(0)
+  await page.getByRole('button', { name: 'Zweiter Beleg.png anzeigen', exact: true }).click()
+  await expect(wave).toBeVisible()
+  await expect(wave).toHaveCount(0)
+  expect(await page.evaluate(() => (window as any).revealCount)).toBe(2)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.getByRole('button', { name: 'Erster Beleg.png anzeigen' , exact: true }).click()
+  await expect(preview.getByRole('img', { name: 'Beleg: Erster Beleg.png' })).toBeVisible()
+  expect(await page.evaluate(() => (window as any).revealCount)).toBe(2)
+})
+
+
+for (const kind of ['image', 'pdf']) {
+  test(`attachment reveal: ${kind} never flashes at its destination while loading`, async ({ page }) => {
+    await page.setViewportSize({ width: 1600, height: 1000 })
+    const pdf = await PDFDocument.create()
+    pdf.addPage([595, 842]).drawText('Rechnung', { x: 40, y: 760, size: 24 })
+    if (kind === 'pdf') {
+      await page.route('http://booking.test/pdf.worker.mjs', async route => {
+        await new Promise(resolve => setTimeout(resolve, 150))
+        await route.fulfill({ contentType: 'text/javascript', body: await fs.readFile('node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'utf8') })
+      })
+    }
+    await page.evaluate(async ({ kind, pdf }) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 200; canvas.height = 300
+      const ctx = canvas.getContext('2d')!
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 200, 300)
+      const blob = await new Promise<Blob>(resolve => canvas.toBlob(blob => resolve(blob!)))
+      const target = kind === 'image' ? new File([blob], 'Ziel.png', { type: 'image/png' })
+        : new File([Uint8Array.from(atob(pdf), c => c.charCodeAt(0))], 'Ziel.pdf', { type: 'application/pdf' })
+      ;(window as any).setAttachments([new File([blob], 'Start.png', { type: 'image/png' }), target])
+    }, { kind, pdf: await pdf.saveAsBase64() })
+    await page.getByRole('button', { name: 'Einnahme', exact: true }).click()
+    await page.getByRole('button', { name: /Anhang · 2/ }).click()
+    await expect(page.getByRole('img', { name: 'Beleg: Start.png' })).toBeVisible()
+    await page.evaluate(kind => {
+      const state = { flashes: 0, pendingFrames: 0, sawWave: false, stop: false }
+      ;(window as any).revealFrames = state
+      const sample = () => {
+        const preview = document.querySelector('.booking-attachment-preview')
+        if (document.querySelector('.attachment-reveal-wave')) state.sawWave = true
+        if (preview?.hasAttribute('data-reveal-pending')) {
+          state.pendingFrames++
+          const media = preview.querySelector('img, canvas')
+          let opacity = 1
+          for (let el = media; el; el = el.parentElement) opacity *= Number(getComputedStyle(el).opacity)
+          if (media && !state.sawWave && opacity > 0) state.flashes++
+        }
+        if (!state.stop) requestAnimationFrame(sample)
+      }
+      requestAnimationFrame(sample)
+      if (kind === 'image') {
+        // Hold the ready notification after the browser has decoded the image.
+        const hold = (event: Event) => {
+          const img = event.target
+          if (!(img instanceof HTMLImageElement) || img.alt !== 'Beleg: Ziel.png') return
+          event.stopImmediatePropagation()
+          document.removeEventListener('load', hold, true)
+          ;(window as any).releaseImage = () => img.dispatchEvent(new Event('load'))
+        }
+        document.addEventListener('load', hold, true)
+      }
+    }, kind)
+    await page.getByRole('button', { name: `${kind === 'image' ? 'Ziel.png' : 'Ziel.pdf'} anzeigen`, exact: true }).click()
+    if (kind === 'image') {
+      await page.waitForFunction(() => typeof (window as any).releaseImage === 'function')
+      await expect(page.getByRole('img', { name: 'Beleg: Ziel.png' })).toHaveCSS('opacity', '0')
+      await expect.poll(() => page.evaluate(() => (window as any).revealFrames.pendingFrames)).toBeGreaterThan(1)
+      await page.evaluate(() => (window as any).releaseImage())
+    }
+    await expect(page.locator('.attachment-reveal-wave')).toBeVisible()
+    await expect(page.locator('.attachment-reveal-wave')).toHaveCount(0)
+    const frames = await page.evaluate(() => { (window as any).revealFrames.stop = true; return (window as any).revealFrames })
+    expect(frames.pendingFrames).toBeGreaterThan(0)
+    expect(frames.flashes).toBe(0)
+    await expect(page.locator('.booking-attachment-preview')).toHaveCSS('opacity', '1')
+    await expect(page.locator('.booking-attachment-preview').locator('img, canvas')).toHaveCSS('opacity', '1')
+  })
+}

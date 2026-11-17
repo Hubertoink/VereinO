@@ -20,7 +20,23 @@ function readCollapsedSections(): Partial<Record<NavKey, boolean>> {
   } catch { return {} }
 }
 
+// Keep the contents alive until the closing transition finishes. Mount on demand
+// so an initially collapsed sidebar does not load hidden account/assignment data.
+function SidebarSection({ id, open, children }: { id: string; open: boolean; children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(open)
+  useEffect(() => {
+    if (open) { setMounted(true); return }
+    const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 240
+    const timer = window.setTimeout(() => setMounted(false), delay)
+    return () => window.clearTimeout(timer)
+  }, [open])
+  return <div id={id} className={`sidebar-section${open && mounted ? ' sidebar-section--open' : ''}`} aria-hidden={!open} ref={element => { if (element) element.inert = !open }}>
+    <div className="sidebar-section-clip"><div className="sidebar-section-content">{mounted && children}</div></div>
+  </div>
+}
+
 export interface SideNavProps extends NavigationMenuProps {
+  footerActions?: React.ReactNode
   activePage: NavKey
   onNavigate: (page: NavKey) => void
   navIconColorMode: 'color' | 'mono'
@@ -42,7 +58,7 @@ export interface SideNavProps extends NavigationMenuProps {
   onOpenChangelog?: () => void
 }
 
-export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, onToggleCollapse, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, dueRecurringBookingsCount = 0, showBadges = true, items = navItems, aiBusy = false, selectedAccountId, onSelectAccount, onSelectAssignment, onSelectBankAccount, onSelectMembershipFees, appVersion, onOpenChangelog }: SideNavProps) {
+export function SideNav({ footerActions, activePage, onNavigate, navIconColorMode, collapsed, onToggleCollapse, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, dueRecurringBookingsCount = 0, showBadges = true, items = navItems, aiBusy = false, selectedAccountId, onSelectAccount, onSelectAssignment, onSelectBankAccount, onSelectMembershipFees, appVersion, onOpenChangelog }: SideNavProps) {
   const [closedSections, setClosedSections] = useState(readCollapsedSections)
   const sectionId = useId()
   useEffect(() => {
@@ -68,12 +84,12 @@ export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, o
         {expanded ? <IconChevronDown size={16} aria-hidden="true" /> : <IconChevronRight size={16} aria-hidden="true" />}
       </button>}
       </div>
-      {!collapsed && hasContents && <div id={contentId} hidden={!expanded}>
-        {expanded && item.key === 'Buchungen' && onSelectAccount && <SidebarAccounts selectedId={activePage === 'Buchungen' ? selectedAccountId : null} onSelect={onSelectAccount} />}
-        {expanded && item.key === 'Bankimport' && onSelectBankAccount && <SidebarBankImports onSelect={onSelectBankAccount} />}
-        {expanded && item.key === 'Mitglieder' && onSelectMembershipFees && <SidebarMembershipFees onSelect={onSelectMembershipFees} />}
-        {expanded && onSelectAssignment && (item.key === 'Budgets' || item.key === 'Zweckbindungen') && <SidebarRecentAssignments kind={item.key === 'Budgets' ? 'budget' : 'earmark'} onSelect={onSelectAssignment} />}
-      </div>}
+      {hasContents && <SidebarSection id={contentId} open={!collapsed && expanded}>
+        {item.key === 'Buchungen' && onSelectAccount && <SidebarAccounts selectedId={activePage === 'Buchungen' ? selectedAccountId : null} onSelect={onSelectAccount} />}
+        {item.key === 'Bankimport' && onSelectBankAccount && <SidebarBankImports onSelect={onSelectBankAccount} />}
+        {item.key === 'Mitglieder' && onSelectMembershipFees && <SidebarMembershipFees onSelect={onSelectMembershipFees} />}
+        {onSelectAssignment && (item.key === 'Budgets' || item.key === 'Zweckbindungen') && <SidebarRecentAssignments kind={item.key === 'Budgets' ? 'budget' : 'earmark'} onSelect={onSelectAssignment} />}
+      </SidebarSection>}
     </React.Fragment>
   }
   return (
@@ -88,6 +104,7 @@ export function SideNav({ activePage, onNavigate, navIconColorMode, collapsed, o
         </React.Fragment>)}
       </div>
       <div className="sidebar-nav-footer">
+        {footerActions}
         {items.filter(item => item.group === 'system').map(renderItem)}
         {appVersion && onOpenChangelog && <button type="button" className="sidebar-version" onClick={onOpenChangelog} title={`Version ${appVersion} · Changelog anzeigen`} aria-label={`Version ${appVersion}, Changelog anzeigen`}>{collapsed ? `v${appVersion}` : `VereinO · v${appVersion}`}</button>}
       </div>

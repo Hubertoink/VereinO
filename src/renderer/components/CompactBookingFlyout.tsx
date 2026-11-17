@@ -1,3 +1,5 @@
+import { canPreviewAttachment, type AttachmentPreviewRequest } from '../utils/attachmentPreview'
+import BookingAttachmentPreview from './booking/BookingAttachmentPreview'
 import CategoryIcon from './common/CategoryIcon'
 import ModalHeader, { ModalCloseButton } from './ModalHeader'
 import { useBankDraftSourceHighlight } from '../hooks/useBankDraftSourceHighlight'
@@ -174,6 +176,7 @@ export default function CompactBookingFlyout({
   const amountInputRef = useRef<HTMLInputElement | null>(null)
   const hasTypeSelectionStep = useRef(qa.bookingTypeSelected !== undefined).current
   const editorRef = useRef<HTMLElement>(null)
+  const [attachmentPreviewRequest, setAttachmentPreviewRequest] = useState<AttachmentPreviewRequest>()
   const [selectedHeight, setSelectedHeight] = useState<number>()
   const dateInputRef = useRef<HTMLInputElement | null>(null)
   const [visibleSections, setVisibleSections] = useState(() => initialSections(qa, files))
@@ -548,6 +551,7 @@ export default function CompactBookingFlyout({
       </ModalHeader>
 
       <BankDraftSourcePanel source={qa.bankReviewSource} anchorRef={editorRef} active={bankSource.active} />
+      <BookingAttachmentPreview files={files} editorRef={editorRef} request={attachmentPreviewRequest} />
       <form className="compact-booking-flyout__form" noValidate onSubmit={(event) => { event.preventDefault(); save() }}>
         <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(event) => onDropFiles(event.target.files)} />
         <div className="compact-booking-flyout__body">
@@ -823,7 +827,7 @@ export default function CompactBookingFlyout({
             <div className="compact-booking-optional-section" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); onDropFiles(event.dataTransfer.files) }}>
               <div className="compact-booking-section-title"><strong>Anhänge</strong><button type="button" onClick={() => removeSection('attachments')} aria-label="Anhänge entfernen">×</button></div>
               <button type="button" className="compact-booking-add-row" onClick={openFilePicker}>+ Datei auswählen</button>
-              {!!files.length && <div className="compact-booking-files">{files.map((file, index) => <span key={`${file.name}-${index}`}>{file.name}<button type="button" onClick={() => setFiles(files.filter((_, fileIndex) => fileIndex !== index))} aria-label={`${file.name} entfernen`}>×</button></span>)}</div>}
+              {!!files.length && <div className="compact-booking-files">{files.map((file, index) => <span key={`${file.name}-${index}`}><button type="button" className="compact-booking-file-preview" disabled={!canPreviewAttachment(file)} onClick={event => { const { x, y, width, height } = event.currentTarget.getBoundingClientRect(); setAttachmentPreviewRequest({ file, origin: { x, y, width, height } }) }} aria-label={`${file.name} anzeigen`} title={canPreviewAttachment(file) ? `${file.name} anzeigen` : 'Für diesen Dateityp ist keine Vorschau verfügbar.'}>{file.name}</button><button type="button" onClick={() => setFiles(files.filter((_, fileIndex) => fileIndex !== index))} aria-label={`${file.name} entfernen`}>×</button></span>)}</div>}
             </div>
           )}
           </BookingOptionalArea>

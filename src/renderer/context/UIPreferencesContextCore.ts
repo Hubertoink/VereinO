@@ -13,6 +13,8 @@ export type BookingEntryPresentation = 'modal' | 'flyout' | 'detached'
 interface UIPreferencesContextValue {
   navLayout: NavLayout
   setNavLayout: (val: NavLayout) => void
+  sidebarBookingActions: boolean
+  setSidebarBookingActions: (value: boolean) => void
   sidebarCollapsed: boolean
   setSidebarCollapsed: (val: boolean) => void
   colorTheme: ColorTheme
