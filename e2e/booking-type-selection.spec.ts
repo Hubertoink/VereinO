@@ -29,6 +29,8 @@ test.beforeAll(async () => {
         const { notify } = useToast()
         const hook = useQuickAdd('2026-09-25', async () => ({ id: 1 }), undefined, undefined, true)
         const [presentation, setPresentation] = React.useState('flyout')
+        const [draftTabsEnabled, setDraftTabsEnabled] = React.useState(false)
+        window.enableDraftTabs = () => setDraftTabsEnabled(true)
         const fileInputRef = React.useRef(null)
         window.changePresentation = setPresentation
         window.currentQa = hook.qa
@@ -60,8 +62,8 @@ test.beforeAll(async () => {
           ] }
         if (!hook.quickAdd) return null
         return presentation === 'flyout'
-          ? <div className="compact-booking-flyout-anchor"><CompactBookingFlyout key={hook.activeDraftId} {...props} afterSaveDefault="close" draftTabsEnabled={false}
-              draftTabs={[]} activeDraftId={hook.activeDraftId} onSelectDraft={() => {}} onNewDraft={() => hook.openQuickAdd()}
+          ? <div className="compact-booking-flyout-anchor"><CompactBookingFlyout key={hook.activeDraftId} {...props} afterSaveDefault="close" draftTabsEnabled={draftTabsEnabled}
+              draftTabs={hook.bookingDrafts.map((draft, index) => ({ id: draft.id, label: '#' + (index + 1), title: 'Entwurf' }))} activeDraftId={hook.activeDraftId} onSelectDraft={hook.reopenDraft} onNewDraft={() => hook.openQuickAdd()}
               onExpand={() => setPresentation('modal')} /></div>
           : <QuickAddModal key={hook.activeDraftId} {...props} windowMode={presentation === 'detached'}
               fmtDate={d => d} eurFmt={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })} />
@@ -633,5 +635,94 @@ for (const kind of ['image', 'pdf']) {
     expect(frames.flashes).toBe(0)
     await expect(page.locator('.booking-attachment-preview')).toHaveCSS('opacity', '1')
     await expect(page.locator('.booking-attachment-preview').locator('img, canvas')).toHaveCSS('opacity', '1')
+  })
+}
+
+
+test('attachments remain previewable after parking and switching draft tabs', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await page.evaluate(async () => {
+    ;(window as any).enableDraftTabs()
+    const canvas = document.createElement('canvas')
+    canvas.width = 200; canvas.height = 300
+    const blob = await new Promise<Blob>(resolve => canvas.toBlob(blob => resolve(blob!)))
+    ;(window as any).setAttachments([new File([blob], 'Entwurf.png', { type: 'image/png' })])
+  })
+  await page.getByRole('button', { name: 'Ausgabe', exact: true }).click()
+  const preview = page.getByRole('complementary', { name: 'Belegvorschau' })
+  await expect(preview.getByRole('img', { name: 'Beleg: Entwurf.png' })).toBeVisible()
+  await page.getByRole('button', { name: 'Buchungsflyout parken', exact: true }).click()
+  await expect(preview).toHaveCount(0)
+  await page.evaluate(() => (window as any).reopenDraft())
+  await page.getByRole('button', { name: 'Entwurf.png anzeigen', exact: true }).click()
+  await expect(preview.getByRole('img', { name: 'Beleg: Entwurf.png' })).toBeVisible()
+  await page.getByRole('button', { name: 'Neuen Buchungsreiter öffnen' }).click()
+  await expect(preview).toHaveCount(0)
+  await page.getByRole('button', { name: 'Buchungsreiter wechseln' }).click()
+  await page.getByRole('option', { name: '#1', exact: true }).click()
+  await page.getByRole('button', { name: 'Entwurf.png anzeigen', exact: true }).click()
+  await expect(preview.getByRole('img', { name: 'Beleg: Entwurf.png' })).toBeVisible()
+  await preview.getByRole('button', { name: 'Belegvorschau schließen' }).click()
+  await page.getByRole('button', { name: 'Entwurf.png anzeigen', exact: true }).click()
+  await expect(preview.getByRole('img', { name: 'Beleg: Entwurf.png' })).toBeVisible()
+})
+
+
+for (const kind of ['image', 'pdf']) {
+  test(`attachment placement: ${kind} uses space above a tall narrow window and follows resizing`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 1080, height: 1900 })
+    await page.addStyleTag({ content: '.compact-booking-flyout-anchor { left: 272px; right: auto; }' })
+    await page.evaluate(() => {
+      const sidebar = document.createElement('aside')
+      sidebar.className = 'app-sidebar'
+      sidebar.style.cssText = 'position:fixed;left:0;top:40px;width:260px;height:calc(100vh - 40px)'
+      document.body.append(sidebar)
+      const header = document.createElement('header')
+      header.className = 'app-header'
+      header.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:40px'
+      document.body.append(header)
+    })
+    const pdf = await PDFDocument.create()
+    pdf.addPage([595, 842]).drawText('Rechnung im Hochformat', { x: 40, y: 760, size: 24 })
+    await page.evaluate(async ({ kind, pdf }) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 595; canvas.height = 842
+      const ctx = canvas.getContext('2d')!
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 595, 842)
+      ctx.fillStyle = '#111'; ctx.font = '24px sans-serif'; ctx.fillText('Rechnung im Hochformat', 40, 80)
+      const blob = await new Promise<Blob>(resolve => canvas.toBlob(blob => resolve(blob!)))
+      const file = kind === 'image' ? new File([blob], 'Rechnung.png', { type: 'image/png' })
+        : new File([Uint8Array.from(atob(pdf), c => c.charCodeAt(0))], 'Rechnung.pdf', { type: 'application/pdf' })
+      ;(window as any).setAttachments([file])
+    }, { kind, pdf: await pdf.saveAsBase64() })
+    await page.getByRole('button', { name: 'Ausgabe', exact: true }).click()
+    const preview = page.getByRole('complementary', { name: 'Belegvorschau' })
+    const form = page.locator('.compact-booking-flyout')
+    await expect(preview).toBeVisible()
+    if (kind === 'pdf') await expect(preview.getByText('Seite 1 / 1')).toBeVisible()
+    else await expect(preview.getByRole('img')).toBeVisible()
+    const above = (await preview.boundingBox())!
+    const formBounds = (await form.boundingBox())!
+    expect(above.y).toBeGreaterThanOrEqual(52)
+    expect(above.x).toBeGreaterThanOrEqual(272)
+    expect(above.x + above.width).toBeLessThanOrEqual(1068)
+    expect(above.y + above.height).toBeLessThanOrEqual(formBounds.y - 12)
+    expect(above.height).toBeGreaterThan(600)
+    await page.screenshot({ path: testInfo.outputPath(`preview-above-${kind}.png`) })
+    await page.evaluate(() => (window as any).parkDraft())
+    await expect(preview).toHaveCount(0)
+    await page.evaluate(() => (window as any).reopenDraft())
+    await page.getByRole('button', { name: `Rechnung.${kind === 'image' ? 'png' : 'pdf'} anzeigen`, exact: true }).click()
+    await expect(preview).toBeVisible()
+    await page.setViewportSize({ width: 1080, height: 700 })
+    await expect(preview).toHaveCount(0)
+    await page.setViewportSize({ width: 1600, height: 1000 })
+    await expect(preview).toBeVisible()
+    await expect.poll(async () => {
+      const box = (await preview.boundingBox())!
+      const editor = (await form.boundingBox())!
+      return box.x >= editor.x + editor.width + 12
+    }).toBe(true)
+    await expect(preview.locator(kind === 'image' ? 'img' : 'canvas')).toBeVisible()
   })
 }

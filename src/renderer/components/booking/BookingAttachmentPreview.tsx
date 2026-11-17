@@ -24,23 +24,38 @@ export default function BookingAttachmentPreview({ files, editorRef, request }: 
   const cancelReveal = useRef<() => void>()
   const [readyFile, setReadyFile] = useState<File | null>(null)
 
-  useLayoutEffect(() => {
+  // A reopened draft already has files on mount. Wait until the parent form
+  // has attached its ref before measuring and installing observers.
+  useEffect(() => {
     const editor = editorRef.current
     if (!editor || !file || dismissed === file) { setPosition(null); return }
     const measure = () => {
       const rect = editor.getBoundingClientRect()
-      const rightSpace = window.innerWidth - rect.right - 24
       const sidebarRight = document.querySelector('.app-sidebar')?.getBoundingClientRect().right || 0
-      const leftSpace = rect.left - sidebarRight - 24
-      const right = rightSpace >= leftSpace
-      const width = Math.min(900, right ? rightSpace : leftSpace)
-      const top = 24
-      const left = right ? rect.right + 12 : rect.left - width - 12
+      const headerBottom = document.querySelector('.app-header')?.getBoundingClientRect().bottom || 0
+      const top = Math.max(24, headerBottom + 12)
+      const contentLeft = sidebarRight + 12
       const bankPanel = document.querySelector('.bank-draft-source')?.getBoundingClientRect()
-      const overlapsBank = bankPanel && bankPanel.width > 0 && left < bankPanel.right && left + width > bankPanel.left
-      setPosition(width >= 320 && window.innerHeight >= 400 && !overlapsBank
-        ? { left, top, width, height: window.innerHeight - 48 }
-        : null)
+      type Placement = { left: number; top: number; width: number; height: number }
+      const fits = (placement: Placement) => placement.width >= 320 && placement.height >= 320
+        && !(bankPanel && bankPanel.width > 0 && bankPanel.height > 0
+          && placement.left < bankPanel.right && placement.left + placement.width > bankPanel.left
+          && placement.top < bankPanel.bottom && placement.top + placement.height > bankPanel.top)
+      const rightWidth = Math.min(900, window.innerWidth - rect.right - 24)
+      const leftWidth = Math.min(900, rect.left - contentLeft - 12)
+      const sides: Placement[] = [
+        { left: rect.right + 12, top, width: rightWidth, height: window.innerHeight - top - 24 },
+        { left: rect.left - leftWidth - 12, top, width: leftWidth, height: window.innerHeight - top - 24 }
+      ]
+      const beside = sides.sort((a, b) => b.width - a.width).find(fits)
+      const aboveWidth = Math.min(900, window.innerWidth - contentLeft - 12)
+      const above: Placement = {
+        left: Math.max(contentLeft, Math.min(rect.left + (rect.width - aboveWidth) / 2, window.innerWidth - aboveWidth - 12)),
+        top,
+        width: aboveWidth,
+        height: rect.top - top - 12
+      }
+      setPosition(beside || (fits(above) ? above : null))
     }
     measure()
     let frame = 0

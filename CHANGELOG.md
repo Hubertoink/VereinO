@@ -7,6 +7,13 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.2.1] - 2026-11-17
+
+### Behoben
+
+- Anhangsvorschauen funktionieren auch nach dem Wiederöffnen geparkter Entwürfe und beim Wechsel zwischen Buchungsreitern.
+- Bei schmalen, hohen Fenstern nutzt die Belegvorschau den freien Platz oberhalb des Buchungsformulars, wenn seitlich kein ausreichend großer Bereich verfügbar ist.
+
 ## [5.2.0] - 2026-11-17
 
 ### Hinzugefügt
