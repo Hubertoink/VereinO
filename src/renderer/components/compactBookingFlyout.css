@@ -11,6 +11,7 @@
 .compact-booking-flyout .compact-booking-flyout__tab-switcher .input { flex: 1; min-width: 0; width: 0; height: 28px; min-height: 28px; padding: 4px 7px; font-size: 11px; }
 .compact-booking-flyout .compact-booking-flyout__tab-switcher .btn { flex: 0 0 26px; width: 26px; height: 28px; min-height: 28px; padding: 2px; }
 .compact-booking-flyout__header-actions { flex-shrink: 0; }
+.compact-booking-flyout .booking-date-input-wrap { display: grid; align-self: start; }
 .compact-booking-required { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; min-width: 0; }
 .compact-booking-required__badge { padding: 4px 7px; border: 1px solid color-mix(in srgb, var(--warning) 55%, var(--border)); border-radius: 3px; color: var(--text); background: color-mix(in srgb, var(--warning) 12%, var(--surface)); font-size: 10px; font-weight: 600; line-height: 1.2; }
 

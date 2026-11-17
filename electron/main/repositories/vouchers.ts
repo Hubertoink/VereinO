@@ -639,7 +639,7 @@ export function listRecentVouchers(limit = 20) {
     return rows.map(r => ({ ...r, tags: (r as any).tagsConcat ? String((r as any).tagsConcat).split('\u0001') : [] }))
 }
 
-export function listVouchersAdvanced(filters: {
+type AdvancedVoucherFilters = {
     limit?: number
     offset?: number
     sort?: 'ASC' | 'DESC'
@@ -656,116 +656,15 @@ export function listVouchersAdvanced(filters: {
     budgetId?: number
     q?: string
     tag?: string
-}) {
-    const d = getDb()
-    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, sphere, primaryClassificationValueId, type, from, to, earmarkId, budgetId, q, tag } = filters
-    let sql = `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere,
-                                        v.primary_classification_value_id as primaryClassificationValueId,
-                                        cv.name as primaryClassificationName, cv.color as primaryClassificationColor, cv.icon as primaryClassificationIcon,
-                                        v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo,
-                                        v.payment_account_id as paymentAccountId,
-                                        v.transfer_from_account_id as transferFromAccountId,
-                                        v.transfer_to_account_id as transferToAccountId,
-                                        (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.payment_account_id) as paymentAccountName,
-                                        (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.payment_account_id) as paymentAccountKind,
-                                        (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.payment_account_id) as paymentAccountColor,
-                                        (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.transfer_from_account_id) as transferFromAccountName,
-                                        (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.transfer_from_account_id) as transferFromAccountKind,
-                                        (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.transfer_from_account_id) as transferFromAccountColor,
-                                        (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountName,
-                                        (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountKind,
-                                        (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountColor,
-                                        v.description, v.note, v.counterparty, v.party_id as partyId,
-                                        v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
-                                        v.original_id as originalId,
-                                        (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = v.original_id) as originalVoucherNo,
-                                        v.reversed_by_id as reversedById,
-                                        (SELECT rv.voucher_no FROM vouchers rv WHERE rv.id = v.reversed_by_id) as reversedByVoucherNo,
-                                        (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
-                                        v.earmark_id as earmarkId,
-                                        v.earmark_amount as earmarkAmount,
-                                        (SELECT e.code FROM earmarks e WHERE e.id = v.earmark_id) as earmarkCode,
-                                        v.budget_id as budgetId,
-                                        v.budget_amount as budgetAmount,
-                                        (
-                                            SELECT CASE
-                                                WHEN b.name IS NOT NULL AND b.name <> '' THEN b.name
-                                                WHEN b.category_name IS NOT NULL AND b.category_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.category_name)
-                                                WHEN b.project_name IS NOT NULL AND b.project_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.project_name)
-                                                ELSE printf('%04d-%s-%s', v.year, v.sphere, COALESCE(b.category_id, COALESCE(b.project_id, COALESCE(b.earmark_id, ''))))
-                                            END FROM budgets b WHERE b.id = v.budget_id
-                                        ) as budgetLabel,
-                                        (SELECT b.color FROM budgets b WHERE b.id = v.budget_id) as budgetColor,
-                                        (
-                                            SELECT GROUP_CONCAT(t.name, '\u0001')
-                                            FROM voucher_tags vt JOIN tags t ON t.id = vt.tag_id
-                                            WHERE vt.voucher_id = v.id
-                                        ) as tagsConcat
-                         FROM vouchers v
-                         LEFT JOIN classification_values cv ON cv.id = v.primary_classification_value_id`
-    const params: any[] = []
-    const wh: string[] = []
-    if (paymentMethod) { wh.push('(v.payment_method = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from = ? OR v.transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
-    if (sphere) { wh.push('v.sphere = ?'); params.push(sphere) }
-    if (type) { wh.push('v.type = ?'); params.push(type) }
-    if (from) { wh.push('v.date >= ?'); params.push(from) }
-    if (to) { wh.push('v.date <= ?'); params.push(to) }
-    if (earmarkId) { wh.push('v.earmark_id = ?'); params.push(earmarkId) }
-    if (budgetId != null) {
-        wh.push('(EXISTS (SELECT 1 FROM voucher_budgets vb WHERE vb.voucher_id = v.id AND vb.budget_id = ?) OR v.budget_id = ?)')
-        params.push(budgetId, budgetId)
-    }
-    appendVoucherSearchFilter(wh, params, q, 'v')
-    if (tag) {
-        sql += ' JOIN voucher_tags vt ON vt.voucher_id = v.id JOIN tags t ON t.id = vt.tag_id'
-        wh.push('t.name = ?')
-        params.push(tag)
-    }
-    if (wh.length) sql += ' WHERE ' + wh.join(' AND ')
-    const dir = (sort === 'ASC' ? 'ASC' : 'DESC')
-    // Map sort key to SQL expression (include aliases from SELECT)
-    const orderExpr = (() => {
-        switch (sortBy) {
-            case 'description': return "COALESCE(v.description, '') COLLATE NOCASE"
-            case 'gross': return 'v.gross_amount'
-            case 'net': return 'v.net_amount'
-            case 'attachments': return 'fileCount'
-            case 'budget': return 'budgetLabel COLLATE NOCASE'
-            case 'earmark': return 'earmarkCode COLLATE NOCASE'
-            case 'payment': return "COALESCE(paymentAccountName, v.payment_method, '') COLLATE NOCASE"
-            case 'sphere': return 'v.sphere'
-            case 'date': default: return 'v.date'
-        }
-    })()
-    sql += ` ORDER BY ${orderExpr} ${dir}, v.id ${dir} LIMIT ? OFFSET ?`
-    params.push(limit, offset)
-    const rows = d.prepare(sql).all(...params) as any[]
-    // Map concatenated tags to array
-    return rows.map(r => ({ ...r, tags: (r as any).tagsConcat ? String((r as any).tagsConcat).split('\u0001') : [] }))
 }
 
-export function listVouchersAdvancedPaged(filters: {
-    limit?: number
-    offset?: number
+type PagedVoucherFilters = AdvancedVoucherFilters & {
     hasFiles?: boolean
-    sort?: 'ASC' | 'DESC'
-    // Extended sort keys
-    sortBy?: 'date' | 'description' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
-    paymentMethod?: 'BAR' | 'BANK'
-    paymentAccountId?: number | null
-    sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    primaryClassificationValueId?: number | null
-    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
-    from?: string
-    to?: string
-    earmarkId?: number
-    budgetId?: number
     voucherIds?: number[]
-    q?: string
-    tag?: string
-}): { rows: any[]; total: number } {
-    const d = getDb()
-    const { limit = 20, offset = 0, sort = 'DESC', sortBy, paymentMethod, paymentAccountId, sphere, primaryClassificationValueId, type, from, to, earmarkId, budgetId, voucherIds, q, tag } = filters
+}
+
+function buildAdvancedVoucherFilter(filters: PagedVoucherFilters) {
+    const { paymentMethod, paymentAccountId, sphere, primaryClassificationValueId, type, from, to, earmarkId, budgetId, voucherIds, q, tag } = filters
     const params: any[] = []
     const wh: string[] = []
     if (filters.hasFiles != null) {
@@ -775,7 +674,6 @@ export function listVouchersAdvancedPaged(filters: {
     if (paymentMethod) { wh.push('(v.payment_method = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from = ? OR v.transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
     if (paymentAccountId) { wh.push('(v.payment_account_id = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from_account_id = ? OR v.transfer_to_account_id = ?)))'); params.push(paymentAccountId, paymentAccountId, paymentAccountId) }
     if (sphere) { wh.push('v.sphere = ?'); params.push(sphere) }
-    if (primaryClassificationValueId != null) { wh.push('v.primary_classification_value_id = ?'); params.push(primaryClassificationValueId) }
     if (primaryClassificationValueId != null) { wh.push('v.primary_classification_value_id = ?'); params.push(primaryClassificationValueId) }
     if (type) { wh.push('v.type = ?'); params.push(type) }
     if (from) { wh.push('v.date >= ?'); params.push(from) }
@@ -797,79 +695,103 @@ export function listVouchersAdvancedPaged(filters: {
         params.push(tag)
     }
     const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
-    const total = (d.prepare(`SELECT COUNT(1) as c FROM vouchers v${joinSql}${whereSql}`).get(...params) as any)?.c || 0
-    // Determine ORDER BY expression
-    const orderExpr = (() => {
-        switch (sortBy) {
-            case 'description': return "COALESCE(v.description, '') COLLATE NOCASE"
-            case 'gross': return 'v.gross_amount'
-            case 'net': return 'v.net_amount'
-            case 'attachments': return 'fileCount'
-            case 'budget': return 'budgetLabel COLLATE NOCASE'
-            case 'earmark': return 'earmarkCode COLLATE NOCASE'
-            case 'payment': return "COALESCE(paymentAccountName, v.payment_method, '') COLLATE NOCASE"
-            case 'sphere': return 'v.sphere'
-            case 'date': default: return 'v.date'
-        }
-    })()
-    const rows = d.prepare(
-        `SELECT v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere,
-            v.primary_classification_value_id as primaryClassificationValueId,
-            cv.name as primaryClassificationName, cv.color as primaryClassificationColor, cv.icon as primaryClassificationIcon,
-            v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo,
-            v.payment_account_id as paymentAccountId,
-            v.transfer_from_account_id as transferFromAccountId,
-            v.transfer_to_account_id as transferToAccountId,
-            (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.payment_account_id) as paymentAccountName,
-            (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.payment_account_id) as paymentAccountKind,
-            (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.payment_account_id) as paymentAccountColor,
-            (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.transfer_from_account_id) as transferFromAccountName,
-            (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.transfer_from_account_id) as transferFromAccountKind,
-            (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.transfer_from_account_id) as transferFromAccountColor,
-            (SELECT pa.name FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountName,
-            (SELECT pa.kind FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountKind,
-            (SELECT pa.color FROM payment_accounts pa WHERE pa.id = v.transfer_to_account_id) as transferToAccountColor,
-            v.description, v.note, v.counterparty, v.party_id as partyId,
-            v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
-                v.original_id as originalId,
-                (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = v.original_id) as originalVoucherNo,
-                v.reversed_by_id as reversedById,
-                (SELECT rv.voucher_no FROM vouchers rv WHERE rv.id = v.reversed_by_id) as reversedByVoucherNo,
-                EXISTS(SELECT 1 FROM cash_checks cc WHERE cc.voucher_id = v.id) as isCashCheck,
-            EXISTS(SELECT 1 FROM member_advances ma WHERE ma.placeholder_voucher_id = v.id AND (ma.resolved_at IS NULL OR ma.resolved_at = '')) as isAdvancePlaceholder,
-                (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
-                v.earmark_id as earmarkId,
-                v.earmark_amount as earmarkAmount,
-                (SELECT e.code FROM earmarks e WHERE e.id = v.earmark_id) as earmarkCode,
-                v.budget_id as budgetId,
-                v.budget_amount as budgetAmount,
-                (
-                    SELECT CASE
-                        WHEN b.name IS NOT NULL AND b.name <> '' THEN b.name
-                        WHEN b.category_name IS NOT NULL AND b.category_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.category_name)
-                        WHEN b.project_name IS NOT NULL AND b.project_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.project_name)
-                        ELSE printf('%04d-%s-%s', v.year, v.sphere, COALESCE(b.category_id, COALESCE(b.project_id, COALESCE(b.earmark_id, ''))))
-                    END FROM budgets b WHERE b.id = v.budget_id
-                ) as budgetLabel,
-                (SELECT b.color FROM budgets b WHERE b.id = v.budget_id) as budgetColor,
-                (
-                    SELECT GROUP_CONCAT(t.name, '\u0001')
-                    FROM voucher_tags vt JOIN tags t ON t.id = vt.tag_id
-                    WHERE vt.voucher_id = v.id
-                ) as tagsConcat
-         FROM vouchers v
-         LEFT JOIN classification_values cv ON cv.id = v.primary_classification_value_id
-         ${joinSql}${whereSql}
-         ORDER BY ${orderExpr} ${sort === 'ASC' ? 'ASC' : 'DESC'}, v.id ${sort === 'ASC' ? 'ASC' : 'DESC'}
-         LIMIT ? OFFSET ?`
-    ).all(...params, limit, offset) as any[]
-    const mapped = rows.map(r => ({
-        ...r,
-        isCashCheck: !!(r as any).isCashCheck,
-        isAdvancePlaceholder: !!(r as any).isAdvancePlaceholder,
-        tags: (r as any).tagsConcat ? String((r as any).tagsConcat).split('\u0001') : []
+    return { params, joinSql, whereSql }
+}
+
+function advancedVoucherOrder(sortBy: AdvancedVoucherFilters['sortBy']) {
+    switch (sortBy) {
+        case 'description': return "COALESCE(v.description, '') COLLATE NOCASE"
+        case 'gross': return 'v.gross_amount'
+        case 'net': return 'v.net_amount'
+        case 'attachments': return 'fileCount'
+        case 'budget': return 'budgetLabel COLLATE NOCASE'
+        case 'earmark': return 'earmarkCode COLLATE NOCASE'
+        case 'payment': return "COALESCE(paymentAccountName, v.payment_method, '') COLLATE NOCASE"
+        case 'sphere': return 'v.sphere'
+        case 'date': default: return 'v.date'
+    }
+}
+
+function selectAdvancedVoucherRows(
+    d: DB,
+    filters: AdvancedVoucherFilters,
+    query: ReturnType<typeof buildAdvancedVoucherFilter>,
+    includeStateFlags: boolean
+) {
+    const { limit = 20, offset = 0 } = filters
+    const dir = filters.sort === 'ASC' ? 'ASC' : 'DESC'
+    const rows = d.prepare(`SELECT ${includeStateFlags ? `
+        EXISTS(SELECT 1 FROM cash_checks cc WHERE cc.voucher_id = v.id) as isCashCheck,
+        EXISTS(SELECT 1 FROM member_advances ma WHERE ma.placeholder_voucher_id = v.id AND (ma.resolved_at IS NULL OR ma.resolved_at = '')) as isAdvancePlaceholder,` : ''}
+        v.id, v.voucher_no as voucherNo, v.date, v.type, v.sphere,
+        v.primary_classification_value_id as primaryClassificationValueId,
+        cv.name as primaryClassificationName, cv.color as primaryClassificationColor, cv.icon as primaryClassificationIcon,
+        v.payment_method as paymentMethod, v.transfer_from as transferFrom, v.transfer_to as transferTo,
+        v.payment_account_id as paymentAccountId,
+        v.transfer_from_account_id as transferFromAccountId,
+        v.transfer_to_account_id as transferToAccountId,
+        paymentAccount.name as paymentAccountName,
+        paymentAccount.kind as paymentAccountKind,
+        paymentAccount.color as paymentAccountColor,
+        transferFromAccount.name as transferFromAccountName,
+        transferFromAccount.kind as transferFromAccountKind,
+        transferFromAccount.color as transferFromAccountColor,
+        transferToAccount.name as transferToAccountName,
+        transferToAccount.kind as transferToAccountKind,
+        transferToAccount.color as transferToAccountColor,
+        v.description, v.note, v.counterparty, v.party_id as partyId,
+        v.net_amount as netAmount, v.vat_rate as vatRate, v.vat_amount as vatAmount, v.gross_amount as grossAmount, v.amount_mode as amountMode,
+        v.original_id as originalId,
+        (SELECT ov.voucher_no FROM vouchers ov WHERE ov.id = v.original_id) as originalVoucherNo,
+        v.reversed_by_id as reversedById,
+        (SELECT rv.voucher_no FROM vouchers rv WHERE rv.id = v.reversed_by_id) as reversedByVoucherNo,
+        (SELECT COUNT(1) FROM voucher_files vf WHERE vf.voucher_id = v.id) as fileCount,
+        v.earmark_id as earmarkId,
+        v.earmark_amount as earmarkAmount,
+        (SELECT e.code FROM earmarks e WHERE e.id = v.earmark_id) as earmarkCode,
+        v.budget_id as budgetId,
+        v.budget_amount as budgetAmount,
+        (
+            SELECT CASE
+                WHEN b.name IS NOT NULL AND b.name <> '' THEN b.name
+                WHEN b.category_name IS NOT NULL AND b.category_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.category_name)
+                WHEN b.project_name IS NOT NULL AND b.project_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.project_name)
+                ELSE printf('%04d-%s-%s', v.year, v.sphere, COALESCE(b.category_id, COALESCE(b.project_id, COALESCE(b.earmark_id, ''))))
+            END FROM budgets b WHERE b.id = v.budget_id
+        ) as budgetLabel,
+        (SELECT b.color FROM budgets b WHERE b.id = v.budget_id) as budgetColor,
+        (
+            SELECT GROUP_CONCAT(t.name, '\u0001')
+            FROM voucher_tags vt JOIN tags t ON t.id = vt.tag_id
+            WHERE vt.voucher_id = v.id
+        ) as tagsConcat
+        FROM vouchers v
+        LEFT JOIN classification_values cv ON cv.id = v.primary_classification_value_id
+        LEFT JOIN payment_accounts paymentAccount ON paymentAccount.id = v.payment_account_id
+        LEFT JOIN payment_accounts transferFromAccount ON transferFromAccount.id = v.transfer_from_account_id
+        LEFT JOIN payment_accounts transferToAccount ON transferToAccount.id = v.transfer_to_account_id
+        ${query.joinSql}${query.whereSql}
+        ORDER BY ${advancedVoucherOrder(filters.sortBy)} ${dir}, v.id ${dir}
+        LIMIT ? OFFSET ?`).all(...query.params, limit, offset) as any[]
+    return rows.map(row => ({
+        ...row,
+        ...(includeStateFlags ? {
+            isCashCheck: !!row.isCashCheck,
+            isAdvancePlaceholder: !!row.isAdvancePlaceholder
+        } : {}),
+        tags: row.tagsConcat ? String(row.tagsConcat).split('\u0001') : []
     }))
-    return { rows: mapped, total }
+}
+
+export function listVouchersAdvanced(filters: AdvancedVoucherFilters) {
+    return selectAdvancedVoucherRows(getDb(), filters, buildAdvancedVoucherFilter(filters), false)
+}
+
+export function listVouchersAdvancedPaged(filters: PagedVoucherFilters): { rows: any[]; total: number } {
+    const d = getDb()
+    const query = buildAdvancedVoucherFilter(filters)
+    const total = (d.prepare(`SELECT COUNT(1) as c FROM vouchers v${query.joinSql}${query.whereSql}`).get(...query.params) as { c: number })?.c || 0
+    return { rows: selectAdvancedVoucherRows(d, filters, query, true), total }
 }
 
 type BatchVoucherFilterParams = {

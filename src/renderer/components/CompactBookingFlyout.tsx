@@ -1,14 +1,13 @@
 import CategoryIcon from './common/CategoryIcon'
 import ModalHeader, { ModalCloseButton } from './ModalHeader'
 import { useBankDraftSourceHighlight } from '../hooks/useBankDraftSourceHighlight'
+import { useBookingAiSuggestions } from '../hooks/useBookingAiSuggestions'
 import BankDraftSourcePanel from './booking/BankDraftSourcePanel'
 import './compactBookingFlyout.css'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { QA } from '../hooks/useQuickAdd'
+import type { BudgetAssignment, EarmarkAssignment } from '../../../shared/bookingAssignments'
 import {
-  AI_PATTERNS_CHANGED_EVENT,
-  buildAISuggestions,
-  readAISuggestionLearning,
   rememberBookingAIPattern,
   type BookingAISuggestion
 } from '../utils/bookingAiPatterns'
@@ -23,8 +22,6 @@ import { type BookingOptionalAction } from './booking/BookingOptionalActionBar'
 import BookingKindSwitch from './booking/BookingKindSwitch'
 
 type OptionalSection = 'budget' | 'earmark' | 'party' | 'tags' | 'comment' | 'attachments'
-type BudgetAssignment = { budgetId: number; amount: number }
-type EarmarkAssignment = { earmarkId: number; amount: number }
 
 type BudgetOption = {
   id: number
@@ -61,6 +58,7 @@ type Props = {
   setQa: (qa: QA) => void
   kindOptions?: Array<{ value: QA['type']; label: string }>
   onSave: () => void | Promise<void>
+  notify?: (type: 'info', text: string) => void
   onClose: () => void
   onExpand: () => void
   showExpand?: boolean
@@ -152,6 +150,7 @@ export default function CompactBookingFlyout({
     { value: 'INTERNAL', label: 'Intern' }
   ],
   onSave,
+  notify,
   onClose,
   onExpand,
   showExpand = true,
@@ -177,11 +176,8 @@ export default function CompactBookingFlyout({
   const editorRef = useRef<HTMLElement>(null)
   const [selectedHeight, setSelectedHeight] = useState<number>()
   const dateInputRef = useRef<HTMLInputElement | null>(null)
-  const aiAssistRef = useRef<HTMLDivElement | null>(null)
   const [visibleSections, setVisibleSections] = useState(() => initialSections(qa, files))
   const [classification, setClassification] = useState<null | { profile: string; label: string; values: Array<any> }>(null)
-  const [aiMenuOpen, setAiMenuOpen] = useState(false)
-  const [aiLearningVersion, setAiLearningVersion] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -218,50 +214,12 @@ export default function CompactBookingFlyout({
     ?? activeAccounts.find((account) => account.id !== defaultCash?.id)
     ?? activeAccounts[0]
 
-  const aiLearning = useMemo(() => readAISuggestionLearning(), [aiLearningVersion])
-  const aiSuggestions = useMemo(
-    () => buildAISuggestions({
-      description: qa.description || '',
-      grossAmount: gross,
-      currentTags: qa.tags || [],
-      currentType: qa.type,
-      currentSphere: qa.sphere,
-      currentBudgets: budgets.map((item) => ({ id: item.budgetId, amount: item.amount })),
-      currentEarmarks: assignedEarmarks.map((item) => ({ id: item.earmarkId, amount: item.amount })),
-      currentPaymentAccountId: qa.paymentAccountId || null,
-      currentTransferFromAccountId: qa.transferFromAccountId || null,
-      currentTransferToAccountId: qa.transferToAccountId || null,
-      tagDefs,
-      paymentAccounts: activeAccounts,
-      learning: aiLearning
-    }),
-    [activeAccounts, aiLearning, assignedEarmarks, budgets, gross, qa.description, qa.paymentAccountId, qa.sphere, qa.tags, qa.transferFromAccountId, qa.transferToAccountId, qa.type, tagDefs]
-  )
-
-  useEffect(() => {
-    const refreshLearning = () => setAiLearningVersion((value) => value + 1)
-    window.addEventListener(AI_PATTERNS_CHANGED_EVENT, refreshLearning)
-    window.addEventListener('storage', refreshLearning)
-    return () => {
-      window.removeEventListener(AI_PATTERNS_CHANGED_EVENT, refreshLearning)
-      window.removeEventListener('storage', refreshLearning)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!aiSuggestions.length) setAiMenuOpen(false)
-  }, [aiSuggestions.length])
-
-  useEffect(() => {
-    if (!aiMenuOpen) return
-    const closeOnOutside = (event: PointerEvent) => {
-      const target = event.target as Node | null
-      if (target && aiAssistRef.current?.contains(target)) return
-      setAiMenuOpen(false)
-    }
-    document.addEventListener('pointerdown', closeOnOutside)
-    return () => document.removeEventListener('pointerdown', closeOnOutside)
-  }, [aiMenuOpen])
+  const { aiAssistRef, aiMenuOpen, setAiMenuOpen, aiSuggestions } = useBookingAiSuggestions({
+    draft: qa,
+    grossAmount: gross,
+    tagDefs,
+    paymentAccounts: activeAccounts
+  })
 
   const invalidBudgetIds = new Set(
     budgets
@@ -323,11 +281,13 @@ export default function CompactBookingFlyout({
     || hasDuplicateBudgets || hasDuplicateEarmarks
     || hasBudgetOverAllocation || hasEarmarkOverAllocation
   const needsBookingType = qa.bookingTypeSelected === false
-  const saveBlocked = needsBookingType || !qa.date || hasInvalidAmount || hasMissingAccount || hasSameTransferAccount
+  const hasMissingCategory = classification?.profile === 'GENERAL' && qa.primaryClassificationValueId == null
+  const requiredFieldHint = !qa.date ? 'Bitte ein Buchungsdatum auswählen.' : hasMissingCategory ? 'Bitte eine Kategorie auswählen.' : null
+  const saveBlocked = needsBookingType || !qa.date || hasMissingCategory || hasInvalidAmount || hasMissingAccount || hasSameTransferAccount
     || hasInvalidAssignments || hasOutOfRange
     || (qa.type === 'INTERNAL' && !internalValidation.hasValidAssignments)
+  const saveDisabled = needsBookingType || (saveBlocked && !requiredFieldHint)
   const missingFields = [
-    ...(!qa.date ? [{ label: 'Datum', hint: 'Buchungsdatum wählen' }] : []),
     ...(hasInvalidAmount ? [{ label: 'Betrag', hint: 'Betrag größer als 0 € eingeben' }] : []),
     ...(qa.type === 'TRANSFER'
       ? [
@@ -337,7 +297,6 @@ export default function CompactBookingFlyout({
       : hasMissingAccount ? [{ label: 'Konto', hint: 'Buchungskonto wählen' }] : [])
   ]
   const validationMessage = (() => {
-    if (!qa.date) return 'Bitte ein Buchungsdatum wählen.'
     if (hasInvalidAmount) return 'Bitte einen Betrag größer als 0 € eingeben.'
     if (hasMissingAccount) return qa.type === 'TRANSFER' ? 'Bitte Quell- und Zielkonto wählen.' : 'Bitte ein Buchungskonto wählen.'
     if (hasSameTransferAccount) return 'Quell- und Zielkonto müssen verschieden sein.'
@@ -535,6 +494,8 @@ export default function CompactBookingFlyout({
   }
 
   const save = () => {
+    if (needsBookingType) return
+    if (requiredFieldHint) { notify?.('info', requiredFieldHint); return }
     if (saveBlocked) return
     rememberBookingAIPattern({
       description: qa.description || '',
@@ -587,7 +548,7 @@ export default function CompactBookingFlyout({
       </ModalHeader>
 
       <BankDraftSourcePanel source={qa.bankReviewSource} anchorRef={editorRef} active={bankSource.active} />
-      <form className="compact-booking-flyout__form" onSubmit={(event) => { event.preventDefault(); save() }}>
+      <form className="compact-booking-flyout__form" noValidate onSubmit={(event) => { event.preventDefault(); save() }}>
         <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(event) => onDropFiles(event.target.files)} />
         <div className="compact-booking-flyout__body">
           <BookingKindSwitch
@@ -603,7 +564,7 @@ export default function CompactBookingFlyout({
             <label className="compact-booking-field" {...bankSource.fieldProps('date')}>
               <span>Datum *</span>
               <span className="booking-date-input-wrap">
-                <input ref={dateInputRef} className="input" type="date" value={qa.date} onChange={(event) => patchQa({ date: event.target.value })} aria-label="Datum der Buchung" required />
+                <input ref={dateInputRef} className={`input${!qa.date ? ' input-error' : ''}`} type="date" value={qa.date} onChange={(event) => patchQa({ date: event.target.value })} aria-label="Datum der Buchung" aria-invalid={!qa.date} required />
                 <DatePickerButton inputRef={dateInputRef} ariaLabel="Kalender zur Datumsauswahl öffnen" />
               </span>
             </label>
@@ -615,6 +576,7 @@ export default function CompactBookingFlyout({
                   value={String(qa.primaryClassificationValueId ?? '')}
                   onChange={(value) => patchQa({ primaryClassificationValueId: value ? Number(value) : null })}
                   ariaLabel="Kategorie der Buchung"
+                  invalid={hasMissingCategory}
                   placeholder="Kategorie wählen"
                   options={classification.values.map((category) => ({
                     value: String(category.id),
@@ -930,7 +892,7 @@ export default function CompactBookingFlyout({
             </div>}
           </div>
           <div>
-            <button type="submit" className="btn primary" disabled={saveBlocked}>{saveLabel}</button>
+            <button type="submit" className="btn primary" disabled={saveDisabled}>{saveLabel}</button>
           </div>
         </footer>
         {needsBookingType && <div className="booking-type-overlay">

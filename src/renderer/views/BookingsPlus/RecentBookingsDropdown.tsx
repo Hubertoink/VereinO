@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import type { RendererApi } from '../../../types/api'
 import type { BookingPlusRow } from './bookingPlusHelpers'

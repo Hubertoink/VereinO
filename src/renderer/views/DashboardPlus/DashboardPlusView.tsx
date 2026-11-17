@@ -6,8 +6,8 @@ import DashboardInsights from './DashboardInsights'
 import DashboardAssistant from './DashboardAssistant'
 import DashboardTasks from './DashboardTasks'
 import type { DashboardTaskTarget } from '../../../../shared/dashboardTasks'
-import React, { useEffect, useId, useRef, useState } from 'react'
-import { IconArrowUpRight, IconArrowDownRight, IconBuildingBank, IconChevronRight, IconReceipt2, IconUsers, IconWallet } from '@tabler/icons-react'
+import { useEffect, useId, useRef, useState } from 'react';
+import { IconArrowUpRight, IconArrowDownRight, IconBuildingBank, IconReceipt2, IconUsers, IconWallet } from '@tabler/icons-react';
 import type { DashboardSnapshot } from '../../../../shared/dashboard'
 import { defaultReportScope, type ReportBookingSource } from '../../../../shared/aiReporting'
 import type { RendererApi } from '../../../types/api'

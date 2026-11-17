@@ -3,15 +3,15 @@
  * Generates annual financial reports with sphere separation for German non-profit organizations
  */
 
-import { BrowserWindow } from 'electron'
-import fs from 'node:fs/promises'
+import { writeReportPdf } from './reportPdf'
+import { escapeReportHtml as esc, voucherDescriptionHtml } from './reportHtml'
 import { summarizeVouchers, listVouchersAdvanced, cashBalance } from '../repositories/vouchers'
 import { listBindings, bindingUsage } from '../repositories/bindings'
 import { listBudgets, budgetUsage } from '../repositories/budgets'
 import { createExportPath, createExportStamp } from './exportPaths'
 import { getSetting } from './settings'
 import { getActivityReport, validateActivityReport } from '../repositories/activityReports'
-import { voucherStatusKind, voucherStatusText } from './voucherStatus'
+import { voucherStatusKind } from './voucherStatus'
 
 export interface FiscalReportOptions {
   fiscalYear: number
@@ -92,7 +92,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     const data = summarizeVouchers({ from, to, sphere: s.key as any, includeInternalVouchers } as any)
     const inData = data.byType.find((t: any) => t.key === 'IN') || { gross: 0, net: 0, vat: 0 }
     const outData = data.byType.find((t: any) => t.key === 'OUT') || { gross: 0, net: 0, vat: 0 }
-    
+
     return {
       sphere: s.key,
       sphereName: s.name,
@@ -178,20 +178,13 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
   }
 
   // Helper functions
-  const esc = (s: any) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as any)[c])
+
   const euro = (n: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(n)
   const nl2br = (s: any) => esc(s).replace(/\r?\n/g, '<br>')
-  const voucherDescriptionHtml = (row: any) => {
-    const status = voucherStatusText(row)
-    const kind = voucherStatusKind(row)
-    const description = String(row?.description || '').trim() || '—'
-    return `${esc(description)}${status ? `<div class="voucher-status voucher-status-${kind}">${esc(status)}</div>` : ''}`
-  }
-  
+
+
   const totalInGross = summary.byType.find((t: any) => t.key === 'IN')?.gross || 0
   const totalOutGross = Math.abs(summary.byType.find((t: any) => t.key === 'OUT')?.gross || 0)
-  const totalInNet = summary.byType.find((t: any) => t.key === 'IN')?.net || 0
-  const totalOutNet = Math.abs(summary.byType.find((t: any) => t.key === 'OUT')?.net || 0)
 
   // 3. Derive balances: Endbestand = Anfangsbestand + (IN - OUT)
   const yearMovement = (Number(totalInGross) || 0) - (Number(totalOutGross) || 0)
@@ -623,42 +616,12 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
 </body>
 </html>`
 
-  // Render to PDF
-  const win = new BrowserWindow({ 
-    show: false, 
-    width: 900, 
-    height: 10000, // Large height to accommodate all content
-    webPreferences: {
-      offscreen: true
-    }
+  await writeReportPdf({
+    html,
+    filePath,
+    windowOptions: { height: 10000, webPreferences: { offscreen: true } },
+    printOptions: { margins: { top: 0, bottom: 0, left: 0, right: 0 } }
   })
-  
-  await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
-  
-  // Wait for the page to fully render (especially important for large tables)
-  await new Promise<void>((resolve) => {
-    win.webContents.on('did-finish-load', () => {
-      // Additional delay to ensure all styles are applied
-      setTimeout(resolve, 300)
-    })
-    // Fallback timeout in case did-finish-load already fired
-    setTimeout(resolve, 1000)
-  })
-  
-  const buff = await win.webContents.printToPDF({ 
-    pageSize: 'A4', 
-    printBackground: true,
-    margins: {
-      top: 0,
-      bottom: 0,
-      left: 0,
-      right: 0
-    }
-  })
-  
-  await fs.writeFile(filePath, buff)
-  
-  try { win.destroy() } catch { }
 
   return { filePath }
 }

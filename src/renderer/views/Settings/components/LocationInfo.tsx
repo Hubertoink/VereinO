@@ -1,4 +1,4 @@
-import React from 'react'
+
 import { IconDatabase, IconFolder, IconFolderOpen, IconPaperclip } from '@tabler/icons-react'
 import { LocationInfo } from '../types'
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { IconPaperclip, IconCalendar, IconBuildingBank, IconLayoutGrid, IconList } from '@tabler/icons-react'
 import { addDataChangedListener } from '../utils/refresh'
 import AttachmentsModal from '../components/modals/AttachmentsModal'

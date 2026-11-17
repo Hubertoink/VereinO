@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Sphere, VoucherType, PaymentMethod } from './types'
+import { useReportChartWidth } from './useReportChartWidth'
+import { niceStep } from '../../../../shared/chartScale'
+import React, { useMemo, useRef, useState } from 'react'
+import type { ReportMonthlyModel } from './reportMonthlyData'
 import { useScrollToLatest } from '../../hooks/useScrollToLatest'
 
 function monthKeys(from?: string, to?: string): string[] {
@@ -22,74 +24,22 @@ function monthKeys(from?: string, to?: string): string[] {
   return out
 }
 
-export default function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
-  const [loading, setLoading] = useState(false)
-  const [inBuckets, setInBuckets] = useState<Array<{ month: string; gross: number }>>([])
-  const [outBuckets, setOutBuckets] = useState<Array<{ month: string; gross: number }>>([])
+export default function ReportsMonthlyChart(props: { activateKey?: number; from?: string; to?: string; data: ReportMonthlyModel; loading: boolean }) {
+  const { data, loading } = props
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const [containerW, setContainerW] = useState<number>(0)
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const measure = () => {
-      const w = el.clientWidth
-      if (w && Math.abs(w - containerW) > 1) setContainerW(w)
-    }
-    measure()
-    const ro = new ResizeObserver(() => measure())
-    ro.observe(el)
-    const onResize = () => measure()
-    const onVisibility = () => { if (document.visibilityState === 'visible') { setTimeout(measure, 0); setTimeout(measure, 120) } }
-    window.addEventListener('resize', onResize)
-    document.addEventListener('visibilitychange', onVisibility)
-    const t0 = setTimeout(measure, 0)
-    const t1 = setTimeout(measure, 120)
-    const t2 = setTimeout(measure, 360)
-    return () => { ro.disconnect(); window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', onVisibility); clearTimeout(t0); clearTimeout(t1); clearTimeout(t2) }
-  }, [loading])
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const measure = () => {
-      const w = el.clientWidth
-      if (w && Math.abs(w - containerW) > 1) setContainerW(w)
-    }
-    requestAnimationFrame(() => {
-      measure()
-      setTimeout(measure, 0)
-      setTimeout(measure, 120)
-      setTimeout(measure, 360)
-    })
-  }, [props.activateKey])
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    Promise.all([
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'IN', paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId }),
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'OUT', paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId })
-    ]).then(([inRes, outRes]) => {
-      if (cancelled) return
-      setInBuckets((props.type && props.type !== 'IN' ? [] : inRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
-      setOutBuckets((props.type && props.type !== 'OUT' ? [] : outRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
-    }).finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [props.from, props.to, props.sphere, props.type, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
+  const { containerRef, containerW } = useReportChartWidth(loading, props.activateKey)
 
   // Build the X-axis months based on filters
   // - With explicit from/to: show full continuous range (all months)
   // - Without from/to (default): show only months that actually have data
-  const months = (() => {
+  const months = useMemo(() => {
     if (props.from && props.to) {
       return monthKeys(props.from, props.to)
     }
     // No date filter: use only months that have buckets
-    const allMonths = new Set<string>()
-    inBuckets.forEach(b => allMonths.add(String(b.month)))
-    outBuckets.forEach(b => allMonths.add(String(b.month)))
-    if (allMonths.size === 0) {
+    if (data.months.length === 0) {
       // Fallback to current year if no data at all
       const now = new Date()
       const y = now.getUTCFullYear()
@@ -98,29 +48,24 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
         new Date(Date.UTC(y, 11, 31)).toISOString().slice(0, 10)
       )
     }
-    return Array.from(allMonths).sort()
-  })()
+    return data.months
+  }, [data.months, props.from, props.to])
   useScrollToLatest(containerRef, `${loading}:${props.activateKey}:${months.join(',')}`)
-  const inMap = new Map(inBuckets.map(b => [String(b.month), Number(b.gross) || 0]))
-  const outMap = new Map(outBuckets.map(b => [String(b.month), Math.abs(Number(b.gross) || 0)]))
-  const series = months.map(m => ({
-    month: m,
-    inGross: inMap.get(m) || 0,
-    outGross: -(outMap.get(m) || 0),
-  }))
-  const saldo = (() => {
-    let cum = 0
-    return series.map((s) => { cum += (s.inGross + s.outGross); return cum })
-  })()
-  const scaleVals = (() => {
-    const vals: number[] = []
-    for (const s of series) { vals.push(Math.abs(s.inGross)); vals.push(Math.abs(s.outGross)); }
-    for (const v of saldo) vals.push(v)
-    return vals
-  })()
-  const maxValRaw = Math.max(1, ...scaleVals)
-  const maxVal = maxValRaw
-  const minVal = Math.min(0, ...saldo, ...series.map(entry => entry.inGross))
+  const { series, saldo, maxVal, minVal } = useMemo(() => {
+    const series = months.map(month => ({
+      month,
+      inGross: data.incomeByMonth.get(month) || 0,
+      outGross: -Math.abs(data.expenseByMonth.get(month) || 0)
+    }))
+    let cumulative = 0
+    const saldo = series.map(row => { cumulative += row.inGross + row.outGross; return cumulative })
+    const scaleVals = series.flatMap(row => [Math.abs(row.inGross), Math.abs(row.outGross)]).concat(saldo)
+    return {
+      series, saldo,
+      maxVal: Math.max(1, ...scaleVals),
+      minVal: Math.min(0, ...saldo, ...series.map(entry => entry.inGross))
+    }
+  }, [data, months])
   const valueRange = maxVal - minVal
   const margin = { top: 22, right: 28, bottom: 48, left: 100 }
   const innerH = 180
@@ -158,20 +103,9 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   const yFor = (val: number) => yBase + (maxVal - val) / valueRange * innerH
   
   // Y-Achse Ticks
-  function niceStep(max: number) {
-    if (max <= 0) return 1
-    const exp = Math.floor(Math.log10(max))
-    const base = Math.pow(10, exp)
-    const m = max / base
-    let step = base
-    if (m <= 2) step = base / 5
-    else if (m <= 5) step = base / 2
-    const target = Math.max(1, Math.round(max / step))
-    if (target > 6) step *= 2
-    return step
-  }
+
   const yTicks = (() => {
-    const step = niceStep(valueRange)
+    const step = niceStep(valueRange, 6)
     const arr: number[] = []
     for (let v = Math.ceil(minVal / step) * step; v <= maxVal; v += step) arr.push(v)
     return arr

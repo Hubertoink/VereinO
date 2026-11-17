@@ -1,4 +1,4 @@
-import type { TTagsListOutput, TVouchersListOutput } from '../../../../electron/main/ipc/schemas'
+import type { TTagsListOutput } from '../../../../electron/main/ipc/schemas';
 import { normalizeLookup } from './aiText'
 import type { parseReportExportRequest } from './aiPromptIntents'
 import type { VoucherRow } from './aiViewTypes'

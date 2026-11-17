@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { IconFilter } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
 import FilterDropdown from './FilterDropdown'

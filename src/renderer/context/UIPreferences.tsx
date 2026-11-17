@@ -1,3 +1,4 @@
+import { normalizeLookup as normalizePersonName } from '../../../shared/textLookup'
 import { resolveOrganizationBookingView } from './organizationBookingView'
 import { markOrganizationReady } from '../utils/organizationTransition'
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react'
@@ -60,15 +61,7 @@ function getNikoBackgroundInitializedKey(orgId: string | null) {
   return `ui.nikoBackgroundInitialized.${orgId || 'local'}`
 }
 
-function normalizePersonName(value: unknown) {
-  return String(value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/ß/g, 'ss')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-}
+
 
 function isNikoBackgroundCashier(value: unknown) {
   return normalizePersonName(value) === 'merle beckord'

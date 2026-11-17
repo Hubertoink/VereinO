@@ -1,4 +1,5 @@
-import { FastifyError, FastifyReply, FastifyRequest } from 'fastify'
+import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify'
+import { ZodError } from 'zod'
 
 export function errorHandler(
   error: FastifyError,
@@ -14,6 +15,13 @@ export function errorHandler(
   })
 
   // Validation errors
+  if (error instanceof ZodError) {
+    return reply.status(400).send({
+      error: 'Validation Error',
+      message: 'Invalid request data',
+      details: error.issues
+    })
+  }
   if (error.validation) {
     return reply.status(400).send({
       error: 'Validation Error',

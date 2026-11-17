@@ -1,3 +1,4 @@
+import { niceStep } from '../../../../../shared/chartScale'
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { addDataChangedListener } from '../../../utils/refresh'
 
@@ -136,8 +137,8 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   // Use unified scale for both bars and line
   const yBar = (v: number) => baseY - Math.min(1, v / Math.max(1e-9, maxValue)) * maxH
   const yLine = (v: number) => {
-    const top = 16
-    const bottom = baseY
+
+
     // Use same scale as bars
     return baseY - (v / Math.max(1e-9, maxValue)) * maxH
   }
@@ -145,18 +146,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   const barW = Math.max(1.2, Math.min(12, (xSegment - barGap) / 2))
   const MONTH_NAMES = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
 
-  function niceStep(max: number) {
-    if (max <= 0) return 1
-    const exp = Math.floor(Math.log10(max))
-    const base = Math.pow(10, exp)
-    const m = max / base
-    let step = base
-    if (m <= 2) step = base / 5
-    else if (m <= 5) step = base / 2
-    const target = Math.max(1, Math.round(max / step))
-    if (target > 8) step *= 2
-    return step
-  }
+
   const yTicks = (() => {
     const step = niceStep(maxValue)
     const arr: number[] = []

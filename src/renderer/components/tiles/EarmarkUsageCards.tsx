@@ -1,4 +1,4 @@
-import React from 'react'
+
 import AssignmentOverview from '../finance/AssignmentOverview'
 
 export interface EarmarkUsageCardBinding {

@@ -1,6 +1,6 @@
 import ModalHeader from '../ModalHeader'
 import ColorField from '../common/ColorField'
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react';
 import { IconTrash, IconBookmark } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
 import DatePickerButton from '../common/DatePickerButton'

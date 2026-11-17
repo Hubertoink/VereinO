@@ -125,16 +125,15 @@ export function budgetUsage(input: { budgetId: number; from?: string; to?: strin
     const monthly = assignmentMonthly('budget', input.budgetId, input)
     const row = monthly.reduce((total, month) => ({ spent: total.spent + month.spent, inflow: total.inflow + month.inflow, count: total.count + month.count, lastDate: month.lastDate }), { spent: 0, inflow: 0, count: 0, lastDate: null as string | null })
 
-        const plannedRow = d.prepare(`SELECT amount_planned as planned FROM budgets WHERE id=?`).get(input.budgetId) as any
+        const plannedRow = d.prepare(`SELECT amount_planned as planned, start_date as startDate, end_date as endDate FROM budgets WHERE id=?`).get(input.budgetId) as any
         const planned = Number(plannedRow?.planned ?? 0) || 0
         const spent = Number(row.spent || 0) || 0
         const inflow = Number(row.inflow || 0) || 0
         const balance = Math.round((inflow - spent) * 100) / 100
         const remaining = Math.round((planned + inflow - spent) * 100) / 100
     // Counts inside/outside relative to budget's own date range
-    const meta = d.prepare(`SELECT start_date as startDate, end_date as endDate FROM budgets WHERE id=?`).get(input.budgetId) as any
-    const startDate = meta?.startDate || null
-    const endDate = meta?.endDate || null
+    const startDate = plannedRow?.startDate || null
+    const endDate = plannedRow?.endDate || null
     let countInside = 0
     let countOutside = 0
     const assignmentCte = `

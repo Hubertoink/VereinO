@@ -3,7 +3,8 @@ import { getDb } from '../db/database'
 
 type DB = InstanceType<typeof Database>
 
-export type PaymentAccountKind = 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'
+import type { PaymentAccountKind } from '../../../shared/financePrimitives'
+export type { PaymentAccountKind } from '../../../shared/financePrimitives'
 
 type PaymentAccountRow = {
   id: number

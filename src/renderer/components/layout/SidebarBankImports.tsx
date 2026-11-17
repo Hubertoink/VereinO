@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 import { bankImportReminder, bankReminderDays } from '../../../../shared/bankImportReminder'
 import { addDataChangedListener } from '../../utils/refresh'
 

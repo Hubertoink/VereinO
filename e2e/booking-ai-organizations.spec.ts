@@ -4,7 +4,7 @@ import { build } from 'esbuild'
 let script: string
 
 test.beforeAll(async () => {
-  const result = await build({
+  const result = await build({ jsx: 'automatic',
     stdin: {
       resolveDir: process.cwd(), loader: 'tsx', contents: `
         import React from 'react'
@@ -49,6 +49,7 @@ test.beforeEach(async ({ context }) => {
 })
 
 const learnedRow = (page: Page) => page.getByRole('row').filter({ hasText: 'text:snacks' })
+const learnedSwitch = (page: Page) => learnedRow(page).getByRole('switch', { name: 'snacks aktivieren', exact: true })
 
 async function learnTwice(page: Page) {
   await page.getByRole('button', { name: 'Buchung lernen' }).click({ clickCount: 2 })
@@ -60,22 +61,29 @@ test('keeps patterns and settings isolated after switching organizations and rel
   await learnTwice(page)
   await expect(learnedRow(page)).toContainText('Verein a')
   await expect(learnedRow(page)).toContainText('Budget a')
-  await learnedRow(page).getByRole('checkbox').uncheck()
+  await learnedSwitch(page).uncheck()
   await page.getByRole('switch', { name: 'Mustererkennung' }).uncheck()
 
   await page.getByRole('button', { name: 'Organisation wechseln' }).click()
+  await expect(page).toHaveURL('http://booking-ai.test/?org=b')
   await expect(page.getByRole('switch', { name: 'Mustererkennung' })).toBeChecked()
   await expect(learnedRow(page)).toHaveCount(0)
   await learnTwice(page)
   await expect(learnedRow(page)).toContainText('Verein b')
   await expect(learnedRow(page)).toContainText('Budget b')
-  await expect(learnedRow(page).getByRole('checkbox')).toBeChecked()
+  await expect(learnedSwitch(page)).toBeChecked()
 
   await page.getByRole('button', { name: 'Organisation wechseln' }).click()
+  await expect(page).toHaveURL('http://booking-ai.test/?org=a')
+  await page.reload()
   await expect(page.getByRole('switch', { name: 'Mustererkennung' })).not.toBeChecked()
   await expect(learnedRow(page)).toContainText('Verein a')
   await expect(learnedRow(page)).not.toContainText('Verein b')
-  await expect(learnedRow(page).getByRole('checkbox')).not.toBeChecked()
+  await expect(learnedSwitch(page)).not.toBeChecked()
+  await expect(learnedSwitch(page)).toBeDisabled()
+  await page.getByRole('switch', { name: 'Mustererkennung' }).check()
+  await expect(learnedSwitch(page)).toBeEnabled()
+  await expect(learnedSwitch(page)).not.toBeChecked()
 })
 
 test('synchronizes same-organization windows through storage events without affecting another organization', async ({ page, context }) => {
@@ -87,6 +95,8 @@ test('synchronizes same-organization windows through storage events without affe
   await learnTwice(detached)
   await expect(learnedRow(page)).toContainText('Verein a')
   await expect(learnedRow(other)).toHaveCount(0)
+  await learnedSwitch(detached).uncheck()
+  await expect(learnedSwitch(page)).not.toBeChecked()
   await page.getByRole('switch', { name: 'Mustererkennung' }).uncheck()
   await expect(detached.getByRole('switch', { name: 'Mustererkennung' })).not.toBeChecked()
   await expect(other.getByRole('switch', { name: 'Mustererkennung' })).toBeChecked()

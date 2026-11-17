@@ -6,7 +6,7 @@ let script: string
 let css: string
 test.beforeAll(async () => {
   css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/shortcuts/shortcuts.css', 'src/renderer/components/layout/sidebar.css'].map(file => fs.readFile(file, 'utf8')))).join('\n')
-  const result = await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
+  const result = await build({ jsx: 'automatic', stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
     import React, { useState, useEffect } from 'react'
     import { createRoot } from 'react-dom/client'
     import { AppSidebar } from './src/renderer/components/layout/AppSidebar'

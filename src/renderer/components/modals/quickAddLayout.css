@@ -51,6 +51,7 @@
 .quick-add-modal.booking-editor .booking-modal-header-actions .window-controls__btn--close:hover { background: #c42b36; color: #fff; }
 .quick-add-modal.booking-editor .booking-modal-header-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 .booking-editor .booking-validation-badge { border-radius: 6px; padding: 8px 10px; font-size: 11px; }
+.quick-add-modal .booking-date-input-wrap { display: grid; align-self: start; }
 .booking-editor .quick-add-dropzone { min-height: 80px; }
 @container (max-width: 950px) {
  .quick-add-modal.booking-editor > form.quick-add-form { grid-template-columns: minmax(0, 1fr); grid-template-areas: "kind" "overview" "primary" "description" "assignments" "secondary" "footer"; }

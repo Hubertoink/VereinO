@@ -1,13 +1,13 @@
 import BudgetTiles from '../../components/tiles/BudgetTiles'
 import DashboardBindings from './DashboardBindings'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 import type { RendererApi } from '../../../types/api'
 import HoverTooltip from '../../components/common/HoverTooltip'
 const money = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
 const colors = ['var(--accent)', 'color-mix(in srgb, var(--accent) 55%, var(--success))', 'var(--success)', 'var(--warning)', 'color-mix(in srgb, var(--accent) 65%, var(--text))', 'color-mix(in srgb, var(--accent) 45%, var(--danger))']
 const names: Record<string, string> = { IDEELL: 'Ideell', ZWECK: 'Zweckbetrieb', VERMOEGEN: 'Vermögen', WGB: 'Wirtschaftlich' }
 type Budget = Awaited<ReturnType<RendererApi['budgets']['list']>>['rows'][number]
-type Usage = Awaited<ReturnType<RendererApi['budgets']['usage']>>
+
 type Summary = Awaited<ReturnType<RendererApi['reports']['summary']>>
 export default function DashboardInsights({ from, to, revision, onBudgets, onBindings }: { from: string; to: string; revision: number; onBudgets: () => void; onBindings: () => void }) {
   const [data, setData] = useState<{ summary: Summary; budgets: Budget[] } | null>(null)

@@ -5,6 +5,8 @@
         "module": "ESNext",
         "moduleResolution": "Bundler",
         "strict": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
         "resolveJsonModule": true,
         "isolatedModules": true,
         "skipLibCheck": true,

@@ -1,62 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Sphere, VoucherType, PaymentMethod } from './types'
+import { useReportChartWidth } from './useReportChartWidth'
+import { niceStep } from '../../../../shared/chartScale'
+import { useMemo, useState } from 'react';
+import type { ReportMonthlyModel } from './reportMonthlyData'
 
-export default function ReportsInOutLines(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
-  const [loading, setLoading] = useState(false)
-  const [inBuckets, setInBuckets] = useState<Array<{ month: string; gross: number }>>([])
-  const [outBuckets, setOutBuckets] = useState<Array<{ month: string; gross: number }>>([])
+export default function ReportsInOutLines(props: { activateKey?: number; from?: string; to?: string; data: ReportMonthlyModel; loading: boolean }) {
+  const { data, loading } = props
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const [containerW, setContainerW] = useState<number>(0)
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const measure = () => {
-      const w = el.clientWidth
-      if (w && Math.abs(w - containerW) > 1) setContainerW(w)
-    }
-    measure()
-    const ro = new ResizeObserver(() => measure())
-    ro.observe(el)
-    const onResize = () => measure()
-    const onVis = () => { if (document.visibilityState === 'visible') { setTimeout(measure, 0); setTimeout(measure, 120) } }
-    window.addEventListener('resize', onResize)
-    document.addEventListener('visibilitychange', onVis)
-    const t0 = setTimeout(measure, 0)
-    const t1 = setTimeout(measure, 120)
-    const t2 = setTimeout(measure, 360)
-    return () => { ro.disconnect(); window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', onVis); clearTimeout(t0); clearTimeout(t1); clearTimeout(t2) }
-  }, [loading])
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const measure = () => {
-      const w = el.clientWidth
-      if (w && Math.abs(w - containerW) > 1) setContainerW(w)
-    }
-    requestAnimationFrame(() => {
-      measure()
-      setTimeout(measure, 0)
-      setTimeout(measure, 120)
-      setTimeout(measure, 360)
-    })
-  }, [props.activateKey])
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    Promise.all([
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, paymentMethod: props.paymentMethod, type: 'IN', earmarkId: props.earmarkId, budgetId: props.budgetId }),
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, paymentMethod: props.paymentMethod, type: 'OUT', earmarkId: props.earmarkId, budgetId: props.budgetId })
-    ]).then(([inRes, outRes]) => {
-      if (cancelled) return
-      setInBuckets((props.type && props.type !== 'IN' ? [] : inRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
-      setOutBuckets((props.type && props.type !== 'OUT' ? [] : outRes?.buckets || []).map((b: any) => ({ month: b.month, gross: b.gross })))
-    }).finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [props.from, props.to, props.sphere, props.type, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
-  const months = Array.from(new Set([...(inBuckets.map(b => b.month)), ...(outBuckets.map(b => b.month))])).sort()
-  const maxVal = Math.max(1, ...months.map(m => Math.max(Math.abs(inBuckets.find(b => b.month === m)?.gross || 0), Math.abs(outBuckets.find(b => b.month === m)?.gross || 0))))
+  const { containerRef, containerW } = useReportChartWidth(loading, props.activateKey)
+  const { months, incomeByMonth, expenseByMonth, maxMagnitude: maxVal } = data
   const margin = { top: 22, right: 35, bottom: 48, left: 100 }
   const innerH = 188
   const height = innerH + margin.top + margin.bottom
@@ -84,23 +36,12 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
     if (years.length === 0) return ''
     return years.length === 1 ? years[0] : `${years[0]}–${years[years.length - 1]}`
   }, [props.from, props.to, years])
-  const points = (arr: Array<{ month: string; gross: number }>) => months.map((m, i) => `${xFor(i)},${yFor(arr.find(b => b.month === m)?.gross || 0)}`).join(' ')
+  const points = (values: ReadonlyMap<string, number>) => months.map((m, i) => `${xFor(i)},${yFor(values.get(m) || 0)}`).join(' ')
   
   // Y-Achse Ticks
-  function niceStep(max: number) {
-    if (max <= 0) return 1
-    const exp = Math.floor(Math.log10(max))
-    const base = Math.pow(10, exp)
-    const m = max / base
-    let step = base
-    if (m <= 2) step = base / 5
-    else if (m <= 5) step = base / 2
-    const target = Math.max(1, Math.round(max / step))
-    if (target > 6) step *= 2
-    return step
-  }
+
   const yTicks = (() => {
-    const step = niceStep(maxVal)
+    const step = niceStep(maxVal, 6)
     const arr: number[] = []
     for (let v = 0; v <= maxVal; v += step) arr.push(Math.round(v))
     return arr
@@ -119,10 +60,10 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
         <div ref={containerRef} className="report-chart-scroll">
           {(() => {
             const idx = (typeof hoverIdx === 'number' ? hoverIdx : null)
-            if (idx == null) return null
+            if (idx == null || !months[idx]) return null
             const m = months[idx]
-            const inn = inBuckets.find(b => b.month === m)?.gross || 0
-            const out = outBuckets.find(b => b.month === m)?.gross || 0
+            const inn = incomeByMonth.get(m) || 0
+            const out = expenseByMonth.get(m) || 0
             const gx = xFor(idx)
             const tooltipX = (gx / width) * 100
             return (
@@ -141,8 +82,8 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
                 <text x={margin.left - 6} y={yFor(v) + 4} fill="var(--text-dim)" fontSize={11} fontWeight={500} textAnchor="end">{eurFmt.format(v)}</text>
               </g>
             ))}
-            <polyline fill="none" stroke="var(--dp-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points(inBuckets)} />
-            <polyline fill="none" stroke="var(--dp-amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="5 4" points={points(outBuckets)} />
+            <polyline fill="none" stroke="var(--dp-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points(incomeByMonth)} />
+            <polyline fill="none" stroke="var(--dp-amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="5 4" points={points(expenseByMonth)} />
             {months.map((m, i) => (
               <g key={m} style={{ cursor: 'pointer' }}>
                 {(() => {
@@ -162,11 +103,11 @@ export default function ReportsInOutLines(props: { activateKey?: number; refresh
                       }} />
                   )
                 })()}
-                <circle cx={xFor(i)} cy={yFor(inBuckets.find(b => b.month === m)?.gross || 0)} r={3} fill="var(--dp-accent)">
-                  <title>{`IN ${monthLabel(m, true)}: ${eurFmt.format(inBuckets.find(b => b.month === m)?.gross || 0)}`}</title>
+                <circle cx={xFor(i)} cy={yFor(incomeByMonth.get(m) || 0)} r={3} fill="var(--dp-accent)">
+                  <title>{`IN ${monthLabel(m, true)}: ${eurFmt.format(incomeByMonth.get(m) || 0)}`}</title>
                 </circle>
-                <circle cx={xFor(i)} cy={yFor(outBuckets.find(b => b.month === m)?.gross || 0)} r={3} fill="var(--dp-amber)">
-                  <title>{`OUT ${monthLabel(m, true)}: ${eurFmt.format(outBuckets.find(b => b.month === m)?.gross || 0)}`}</title>
+                <circle cx={xFor(i)} cy={yFor(expenseByMonth.get(m) || 0)} r={3} fill="var(--dp-amber)">
+                  <title>{`OUT ${monthLabel(m, true)}: ${eurFmt.format(expenseByMonth.get(m) || 0)}`}</title>
                 </circle>
                 <text x={xFor(i)} y={margin.top + innerH + 18} textAnchor="middle" fontSize="10">{monthLabel(m, years.length > 1)}</text>
               </g>

@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react'
+import { Suspense, lazy } from 'react';
 import { initializeBookingAIPatterns } from './renderer/utils/bookingAiPatterns'
 
 // Lazy-load the heavy renderer App to keep the root lightweight

@@ -1,4 +1,4 @@
-import React from 'react'
+
 import { IconTag } from '@tabler/icons-react'
 import { CATEGORY_ICONS, categoryIconKey } from '../../utils/categoryIcons'
 

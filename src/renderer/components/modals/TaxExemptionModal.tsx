@@ -1,3 +1,4 @@
+import { bufferToBase64Safe } from '../../utils/fileEncoding'
 import ModalHeader from '../ModalHeader'
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -9,15 +10,7 @@ interface TaxExemptionModalProps {
 }
 
 // Safe ArrayBuffer -> base64 converter (chunked to avoid call stack overflow)
-function bufferToBase64Safe(buf: ArrayBuffer) {
-  const bytes = new Uint8Array(buf)
-  const chunk = 0x8000
-  let binary = ''
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode.apply(null as any, bytes.subarray(i, i + chunk) as any)
-  }
-  return btoa(binary)
-}
+
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'

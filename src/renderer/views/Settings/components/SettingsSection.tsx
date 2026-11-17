@@ -1,4 +1,4 @@
-import React, { useId, type ReactNode } from 'react'
+import { useId, type ReactNode } from 'react';
 
 export function SettingsSection({
   title,

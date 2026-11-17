@@ -1,4 +1,4 @@
-import React from 'react'
+
 import type { BackupProgress } from '../../../../shared/backupProgress'
 
 export default function BackupProgressStatus({ progress }: { progress: BackupProgress | null }) {

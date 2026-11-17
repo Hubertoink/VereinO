@@ -1,3 +1,4 @@
+import { normalizeLookup } from '../../../../shared/textLookup'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TAiAgentRunOutput } from '../../../../electron/main/ipc/schemas'
 import type { ReportAnswer } from '../../../../shared/aiReporting'
@@ -31,16 +32,6 @@ type UseAiAgentWorkflowInput = {
   prepareAgentDraft: (draft: TAiAgentRunOutput['drafts'][number], userPrompt: string) => void
   onTrace: (trace: TAiAgentRunOutput['trace']) => void
   getUiContext?: () => Record<string, unknown>
-}
-
-function normalizeLookup(value: unknown) {
-  return String(value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/ß/g, 'ss')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
 }
 
 function mergeAgentDrafts(drafts: TAiAgentRunOutput['drafts']) {

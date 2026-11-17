@@ -11,14 +11,12 @@ import { IconTrash } from '../../../utils/icons'
  * TagsPane - Tag Management
  * Displays existing tags with usage counts and allows opening the global tag manager.
  */
-export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDataVersion }: TagsPaneProps) {
+export function TagsPane({ tagDefs, setTagDefs, notify, bumpDataVersion }: TagsPaneProps) {
   const [editTag, setEditTag] = React.useState<TagValue | null>(null)
   const [deleteConfirm, setDeleteConfirm] = React.useState<TagDeleteTarget | null>(null)
-  const [busy, setBusy] = React.useState(false)
 
   // Refresh tags with usage counts
   async function refreshTags() {
-    setBusy(true)
     try {
       const res = await window.api?.tags?.list?.({ includeUsage: true })
       if (res?.rows) {
@@ -26,8 +24,6 @@ export function TagsPane({ tagDefs, setTagDefs, notify, openTagsManager, bumpDat
       }
     } catch (e: any) {
       notify('error', e?.message || String(e))
-    } finally {
-      setBusy(false)
     }
   }
 

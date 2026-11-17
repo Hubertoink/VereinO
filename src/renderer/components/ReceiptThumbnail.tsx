@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react';
 import { IconFileDescription } from '@tabler/icons-react'
 import { base64ToUint8Array } from '../utils/fileEncoding'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'

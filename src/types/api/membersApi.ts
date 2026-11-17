@@ -1,3 +1,4 @@
+import type { MembersImportApi } from '../../../shared/membersImport'
 import type {
     TMemberCreateInput,
     TMemberCreateOutput,
@@ -20,28 +21,13 @@ import type {
     TPaymentsUnmarkOutput
 } from '../../../electron/main/ipc/schemas'
 
-type MemberExportField =
-    | 'memberNo'
-    | 'name'
-    | 'email'
-    | 'phone'
-    | 'address'
-    | 'status'
-    | 'boardRole'
-    | 'iban'
-    | 'bic'
-    | 'contribution_amount'
-    | 'contribution_interval'
-    | 'mandate_ref'
-    | 'mandate_date'
-    | 'join_date'
-    | 'leave_date'
-    | 'notes'
+import type { MemberExportField } from '../../../shared/memberExport'
 
-type ContributionInterval = 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
+import type { ContributionInterval } from '../../../shared/membershipPayments'
 
 export interface MembersApi {
     members: {
+        import: MembersImportApi
         list: (payload?: TMembersListInput) => Promise<TMembersListOutput>
         create: (payload: TMemberCreateInput) => Promise<TMemberCreateOutput>
         update: (payload: TMemberUpdateInput) => Promise<TMemberUpdateOutput>

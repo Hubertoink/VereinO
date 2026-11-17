@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 import { addDataChangedListener } from '../../utils/refresh'
 import { IconLock } from '@tabler/icons-react'
 import { financeUsage } from '../finance/financeModel'

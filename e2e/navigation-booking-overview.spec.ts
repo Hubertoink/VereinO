@@ -6,7 +6,7 @@ let script: string
 let css: string
 test.beforeAll(async () => {
   css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/booking/bookingTable.css', 'src/renderer/components/finance/financeOverview.css'].map(file => readFile(file, 'utf8')))).join('\n')
-  const result = await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
+  const result = await build({ jsx: 'automatic', stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
     import React, { useState } from 'react'
     import { createRoot } from 'react-dom/client'
     import { usePageHistory } from './src/renderer/hooks/usePageHistory'

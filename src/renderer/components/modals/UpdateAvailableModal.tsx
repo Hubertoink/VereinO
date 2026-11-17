@@ -1,5 +1,5 @@
 import ModalHeader from '../ModalHeader'
-import React from 'react'
+
 
 export type UpdateModalState = {
   status: 'available' | 'downloading' | 'downloaded' | 'error'

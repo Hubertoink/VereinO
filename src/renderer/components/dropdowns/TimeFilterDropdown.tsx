@@ -1,5 +1,5 @@
 import DateFilterInput from '../common/DateFilterInput'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { IconCalendar } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
 import FilterDropdown from './FilterDropdown'

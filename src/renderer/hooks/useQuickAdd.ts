@@ -575,10 +575,10 @@ export function useQuickAdd(
             // Save and Upload hotkeys only when Quick-Add is open
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { 
                 if (quickAdd) { 
-                    const compactForm = bookingEntryPresentation === 'flyout' && activeDraftKind === 'booking'
-                        ? document.querySelector<HTMLFormElement>('.compact-booking-flyout form')
+                    const bookingForm = activeDraftKind === 'booking'
+                        ? document.querySelector<HTMLFormElement>('.compact-booking-flyout form, form.quick-add-form')
                         : null
-                    if (compactForm) compactForm.requestSubmit()
+                    if (bookingForm) bookingForm.requestSubmit()
                     else onQuickSave()
                     e.preventDefault() 
                 } 

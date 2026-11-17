@@ -114,6 +114,7 @@ export default function SelectDropdown({ value, options, onChange, id, ariaLabel
         style={style}
         disabled={disabled}
         aria-label={ariaLabel}
+        aria-invalid={invalid || undefined}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}

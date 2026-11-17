@@ -1,4 +1,4 @@
-import React from 'react'
+
 import './managementKpis.css'
 
 export default function ManagementKpis({ label, loading, items, compact = false }: { label: string; loading?: boolean; compact?: boolean; items: Array<{ label: string; value: string; hint: string; tone?: 'warning' | 'success' }> }) {

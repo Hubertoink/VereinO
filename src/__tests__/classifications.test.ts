@@ -44,7 +44,16 @@ describe('resolvePrimaryClassificationValueId', () => {
         classificationDb('GENERAL') as any,
         { legacySphere: 'IDEELL' }
       )
-    ).toThrow(/Kategorie/i)
+    ).toThrow('Bitte eine Kategorie auswählen.')
+  })
+
+  it('distinguishes an unavailable category from a missing selection', () => {
+    expect(() =>
+      resolvePrimaryClassificationValueId(
+        classificationDb('GENERAL') as any,
+        { legacySphere: 'IDEELL', primaryClassificationValueId: 999 }
+      )
+    ).toThrow('Die ausgewählte kategorie ist nicht verfügbar.')
   })
 })
 

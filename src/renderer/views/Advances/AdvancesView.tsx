@@ -958,7 +958,7 @@ export default function AdvancesView() {
             }}
           />
           <div className="compact-booking-flyout-anchor advances-purchase-flyout-anchor">
-            <CompactBookingFlyout
+            <CompactBookingFlyout notify={notify}
               qa={purchaseQa}
               setQa={setPurchaseQa}
               kindOptions={[{ value: 'IN', label: 'Einnahme' }, { value: 'OUT', label: 'Ausgabe' }]}

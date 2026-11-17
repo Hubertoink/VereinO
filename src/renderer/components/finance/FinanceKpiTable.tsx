@@ -1,4 +1,4 @@
-import React from 'react'
+
 import FinanceSparkline from './FinanceSparkline'
 import type { MonthRow } from '../../views/DashboardPlus/dashboardPlusModel'
 

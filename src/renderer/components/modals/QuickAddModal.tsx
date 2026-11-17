@@ -1,5 +1,6 @@
 import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import { useBankDraftSourceHighlight } from '../../hooks/useBankDraftSourceHighlight'
+import { useBookingAiSuggestions } from '../../hooks/useBookingAiSuggestions'
 import BankDraftSourcePanel from '../booking/BankDraftSourcePanel'
 import React from 'react'
 import { IconPlus, IconCalendar, IconWallet, IconCurrencyEuro, IconUser, IconTags, IconPaperclip, IconNotes, IconLink, IconReceipt2, IconArrowDownLeft, IconArrowUpRight, IconArrowsExchange, IconUsers, IconBulb, IconLayoutGrid, IconUpload } from '@tabler/icons-react'
@@ -16,16 +17,12 @@ import { getInternalAssignmentValidationState } from './voucherMetaValidation'
 import { getContrastTextColor, resolveTagDisplayColor } from '../../utils/tagColors'
 import { distributeAmountEvenly, isAmountEvenlyDistributed } from '../../utils/budgetDistribution'
 import type { ClassificationValue, OrganizationProfile } from '../../../../shared/classification'
+import type { BudgetAssignment, EarmarkAssignment } from '../../../../shared/bookingAssignments'
 import {
-    AI_PATTERNS_CHANGED_EVENT,
-    buildAISuggestions,
-    readAISuggestionLearning,
     rememberBookingAIPattern,
     type BookingAISuggestion
 } from '../../utils/bookingAiPatterns'
 
-type BudgetAssignment = { budgetId: number; amount: number }
-type EarmarkAssignment = { earmarkId: number; amount: number }
 type ExistingAttachment = { id: number; fileName: string }
 type PaymentAccount = { id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder: number; isActive: number }
 type PrimaryClassificationState = {
@@ -56,6 +53,7 @@ interface QuickAddModalProps {
     qa: QA
     setQa: (qa: QA) => void
     onSave: () => void
+    notify?: (type: 'info', text: string) => void
     onSaveAndNew?: () => void
     onSaveAndClose?: () => void
     afterSaveDefault?: 'close' | 'new'
@@ -148,6 +146,7 @@ export default function QuickAddModal({
     qa,
     setQa,
     onSave,
+    notify,
     onSaveAndNew,
     onSaveAndClose,
     saveLabel,
@@ -185,12 +184,9 @@ export default function QuickAddModal({
     const dateInputRef = React.useRef<HTMLInputElement | null>(null)
     const tagsInputRef = React.useRef<HTMLInputElement | null>(null)
     const modalRef = React.useRef<HTMLDivElement | null>(null)
-    const aiAssistRef = React.useRef<HTMLDivElement | null>(null)
     const dragStartRef = React.useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null)
     const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 })
     const [saveMenuOpen, setSaveMenuOpen] = React.useState(false)
-    const [aiMenuOpen, setAiMenuOpen] = React.useState(false)
-    const [aiLearningVersion, setAiLearningVersion] = React.useState(0)
     const [aiDisabledParts, setAiDisabledParts] = React.useState<Record<string, AISuggestionPartKey[]>>({})
     const [primaryClassification, setPrimaryClassification] = React.useState<PrimaryClassificationState | null>(null)
 
@@ -309,11 +305,12 @@ export default function QuickAddModal({
     })
     const internalAssignmentBlocked = qa.type === 'INTERNAL' && !internalAssignmentValidation.hasValidAssignments
     const hasMissingDate = !qa.date
-    const saveBlocked = needsBookingType || hasMissingDate || hasOutOfRange || hasInvalidAmount || hasMissingAccount || hasSameTransferAccount || internalAssignmentBlocked
+    const hasMissingCategory = primaryClassification?.profile === 'GENERAL' && qa.primaryClassificationValueId == null
+    const requiredFieldHint = hasMissingDate ? 'Bitte ein Buchungsdatum auswählen.' : hasMissingCategory ? 'Bitte eine Kategorie auswählen.' : null
+    const saveBlocked = needsBookingType || hasMissingDate || hasMissingCategory || hasOutOfRange || hasInvalidAmount || hasMissingAccount || hasSameTransferAccount || internalAssignmentBlocked
+    const saveDisabled = needsBookingType || (saveBlocked && !requiredFieldHint)
     const bookingValidationMessage = footerLeft
         ? null
-        : hasMissingDate
-            ? 'Bitte ein Buchungsdatum auswählen.'
         : hasInvalidAmount
             ? 'Bitte einen Betrag größer als 0 € eingeben.'
             : hasMissingAccount
@@ -330,40 +327,12 @@ export default function QuickAddModal({
     const defaultSaveLabel = saveLabel || 'Speichern'
     const canDrag = !windowMode
     const hasAnyAttachment = files.length > 0 || existingFiles.length > 0
-    const aiLearning = React.useMemo(() => readAISuggestionLearning(), [aiLearningVersion])
-    const aiSuggestions = React.useMemo(
-        () => buildAISuggestions({
-            description: qa.description || '',
-            grossAmount: grossAmt,
-            currentTags: (qa as any).tags || [],
-            currentType: qa.type,
-            currentSphere: qa.sphere,
-            currentBudgets: budgetsList.map((item) => ({ id: item.budgetId, amount: item.amount })),
-            currentEarmarks: earmarksList.map((item) => ({ id: item.earmarkId, amount: item.amount })),
-            currentPaymentAccountId: (qa as any).paymentAccountId || null,
-            currentTransferFromAccountId: (qa as any).transferFromAccountId || null,
-            currentTransferToAccountId: (qa as any).transferToAccountId || null,
-            tagDefs,
-            paymentAccounts: activePaymentAccounts,
-            learning: aiLearning
-        }),
-        [activePaymentAccounts, aiLearning, qa.description, qa.sphere, qa.type, (qa as any).tags, (qa as any).paymentAccountId, (qa as any).transferFromAccountId, (qa as any).transferToAccountId, budgetsList, earmarksList, grossAmt, tagDefs]
-    )
-
-    React.useEffect(() => {
-        if (!aiSuggestions.length) setAiMenuOpen(false)
-    }, [aiSuggestions.length])
-
-    React.useEffect(() => {
-        if (!aiMenuOpen) return
-        const closeOnOutside = (event: PointerEvent) => {
-            const target = event.target as Node | null
-            if (target && aiAssistRef.current?.contains(target)) return
-            setAiMenuOpen(false)
-        }
-        document.addEventListener('pointerdown', closeOnOutside)
-        return () => document.removeEventListener('pointerdown', closeOnOutside)
-    }, [aiMenuOpen])
+    const { aiAssistRef, aiMenuOpen, setAiMenuOpen, aiSuggestions, refreshLearning } = useBookingAiSuggestions({
+        draft: qa,
+        grossAmount: grossAmt,
+        tagDefs,
+        paymentAccounts: activePaymentAccounts
+    })
 
     React.useEffect(() => {
         setAiDisabledParts((current) => {
@@ -372,16 +341,6 @@ export default function QuickAddModal({
             return Object.keys(next).length === Object.keys(current).length ? current : next
         })
     }, [aiSuggestions])
-
-    React.useEffect(() => {
-        const refreshLearning = () => setAiLearningVersion((value) => value + 1)
-        window.addEventListener(AI_PATTERNS_CHANGED_EVENT, refreshLearning)
-        window.addEventListener('storage', refreshLearning)
-        return () => {
-            window.removeEventListener(AI_PATTERNS_CHANGED_EVENT, refreshLearning)
-            window.removeEventListener('storage', refreshLearning)
-        }
-    }, [])
 
     const rememberCurrentBookingPattern = React.useCallback((draft: QA = qa) => {
         rememberBookingAIPattern({
@@ -396,8 +355,8 @@ export default function QuickAddModal({
             transferFromAccountId: draft.type === 'TRANSFER' ? Number((draft as any).transferFromAccountId || 0) || null : null,
             transferToAccountId: draft.type === 'TRANSFER' ? Number((draft as any).transferToAccountId || 0) || null : null,
         })
-        setAiLearningVersion((value) => value + 1)
-    }, [grossAmt, qa])
+        refreshLearning()
+    }, [grossAmt, qa, refreshLearning])
 
     const isAISuggestionPartDisabled = React.useCallback((suggestionKey: string, partKey: AISuggestionPartKey) => (
         aiDisabledParts[suggestionKey]?.includes(partKey) || false
@@ -517,22 +476,28 @@ export default function QuickAddModal({
     }, [activeSuggestion, budgetsList, defaultBankAccount, defaultCashAccount, earmarksList, grossAmt, paymentAccountsById, qa, rememberCurrentBookingPattern, setQa])
 
     const handleSave = React.useCallback(() => {
+        if (needsBookingType) return
+        if (requiredFieldHint) { notify?.('info', requiredFieldHint); return }
         if (saveBlocked) return
         rememberCurrentBookingPattern()
         onSave()
-    }, [onSave, rememberCurrentBookingPattern, saveBlocked])
+    }, [onSave, rememberCurrentBookingPattern, saveBlocked, needsBookingType, requiredFieldHint, notify])
 
     const handleSaveAndNew = React.useCallback(() => {
+        if (needsBookingType) return
+        if (requiredFieldHint) { notify?.('info', requiredFieldHint); return }
         if (saveBlocked) return
         rememberCurrentBookingPattern()
         saveAndNew()
-    }, [rememberCurrentBookingPattern, saveAndNew, saveBlocked])
+    }, [rememberCurrentBookingPattern, saveAndNew, saveBlocked, needsBookingType, requiredFieldHint, notify])
 
     const handleSaveAndClose = React.useCallback(() => {
+        if (needsBookingType) return
+        if (requiredFieldHint) { notify?.('info', requiredFieldHint); return }
         if (saveBlocked) return
         rememberCurrentBookingPattern()
         saveAndClose()
-    }, [rememberCurrentBookingPattern, saveAndClose, saveBlocked])
+    }, [rememberCurrentBookingPattern, saveAndClose, saveBlocked, needsBookingType, requiredFieldHint, notify])
 
     const selectBookingType = React.useCallback((type: QA['type']) => {
         const nextQa = { ...qa, type, bookingTypeSelected: true } as QA
@@ -768,7 +733,8 @@ export default function QuickAddModal({
                 <BankDraftSourcePanel source={qa.bankReviewSource} anchorRef={modalRef} active={bankSource.active} />
                 <form
                     className="quick-add-form"
-                    onSubmit={(e) => { e.preventDefault(); if (!saveBlocked) handleSave(); }}
+                    noValidate
+                    onSubmit={(e) => { e.preventDefault(); handleSave(); }}
                 >
                     <BookingKindSwitch
                         className="booking-kind-switch"
@@ -1008,7 +974,7 @@ export default function QuickAddModal({
                                 <div className="field booking-floating-field booking-floating-field--filled" {...bankSource.fieldProps('date')}>
                                     <label htmlFor="quick-add-date">Datum <span className="req-asterisk" aria-hidden="true">*</span></label>
                                     <span className="booking-date-input-wrap">
-                                        <input id="quick-add-date" ref={dateInputRef} className="input" type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} aria-label="Datum der Buchung" required />
+                                        <input id="quick-add-date" ref={dateInputRef} className={`input${hasMissingDate ? ' input-error' : ''}`} type="date" value={qa.date} onChange={(e) => setQa({ ...qa, date: e.target.value })} aria-label="Datum der Buchung" aria-invalid={hasMissingDate} required />
                                         <DatePickerButton inputRef={dateInputRef} ariaLabel="Kalender zur Datumsauswahl öffnen" />
                                     </span>
                                 </div>
@@ -1020,6 +986,7 @@ export default function QuickAddModal({
                                             value={String(qa.primaryClassificationValueId ?? '')}
                                             onChange={(value) => setQa({ ...qa, primaryClassificationValueId: value ? Number(value) : null })}
                                             ariaLabel="Kategorie der Buchung"
+                                            invalid={hasMissingCategory}
                                             placeholder="Kategorie wählen"
                                             options={primaryClassification.values.map((category) => ({
                                                 value: String(category.id),
@@ -1662,14 +1629,14 @@ export default function QuickAddModal({
                                     <button
                                         type="submit"
                                         className="btn primary booking-split-save__main"
-                                        disabled={saveBlocked}
+                                        disabled={saveDisabled}
                                     >
                                         {defaultSaveLabel}
                                     </button>
                                     <button
                                         type="button"
                                         className="btn primary booking-split-save__arrow"
-                                        disabled={saveBlocked}
+                                        disabled={saveDisabled}
                                         aria-label="Weitere Speicheraktionen"
                                         aria-haspopup="menu"
                                         aria-expanded={saveMenuOpen}
@@ -1679,7 +1646,7 @@ export default function QuickAddModal({
                                             <path d="M7 10l5 5 5-5H7z" />
                                         </svg>
                                     </button>
-                                    {saveMenuOpen && !saveBlocked && (
+                                    {saveMenuOpen && !saveDisabled && (
                                         <div className="booking-split-save__menu" role="menu">
                                             <button type="button" role="menuitem" onClick={() => { setSaveMenuOpen(false); handleSaveAndClose() }}>
                                                 Speichern & schließen
@@ -1694,7 +1661,7 @@ export default function QuickAddModal({
                                 <button
                                     type="submit"
                                     className="btn primary"
-                                    disabled={saveBlocked}
+                                    disabled={saveDisabled}
                                 >
                                     {defaultSaveLabel}
                                 </button>

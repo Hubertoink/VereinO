@@ -1,5 +1,5 @@
 import { SettingsPageHeader, SettingsSection } from '../components/index'
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react';
 import CashCheckModal from '@renderer/renderer/components/modals/CashCheckModal'
 import CashCheckAuditorsModal from '@renderer/renderer/components/modals/CashCheckAuditorsModal'
 import type { CashCheckPaneProps } from '../types'

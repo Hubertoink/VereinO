@@ -73,6 +73,9 @@ export function resolvePrimaryClassificationValueId(
   const profile = getProfileRow(d).profile
   const schemeKey = ORGANIZATION_PROFILE_DEFINITIONS[profile].primarySchemeKey
   const requestedId = input.primaryClassificationValueId
+  if (profile === 'GENERAL' && requestedId == null) {
+    throw new Error('Bitte eine Kategorie auswählen.')
+  }
   const row = requestedId == null
     ? d
         .prepare(`
@@ -98,9 +101,6 @@ export function resolvePrimaryClassificationValueId(
   if (Number(row.isActive) !== 1) throw new Error('Inaktive Klassifikationen können nicht verwendet werden.')
   if (profile === 'NONPROFIT' && row.stableKey !== input.legacySphere) {
     throw new Error('Sphäre und primäre Klassifikation müssen übereinstimmen.')
-  }
-  if (profile === 'GENERAL' && requestedId == null) {
-    throw new Error('Für allgemeine Organisationen ist eine Kategorie erforderlich.')
   }
   return Number(row.id)
 }

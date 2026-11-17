@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react';
 import { IconArrowUp, IconSparkles, IconMessagePlus } from '@tabler/icons-react'
 import type { ReportBookingSource, ReportScope } from '../../../../shared/aiReporting'
 import type { TAiAgentRunOutput } from '../../../../electron/main/ipc/schemas'

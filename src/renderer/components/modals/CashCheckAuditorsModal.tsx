@@ -1,6 +1,6 @@
 import MasterDataDialog, { FieldLabel } from '../common/MasterDataDialog'
 import { IconUsers } from '@tabler/icons-react'
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react';
 
 export default function CashCheckAuditorsModal(props: {
   open: boolean

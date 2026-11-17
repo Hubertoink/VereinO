@@ -1,4 +1,4 @@
-import React from 'react'
+
 import { IconClock, IconDeviceFloppy, IconFolderOpen } from '@tabler/icons-react'
 import { BackupInfo } from '../types'
 

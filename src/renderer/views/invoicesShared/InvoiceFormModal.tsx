@@ -1,5 +1,5 @@
 import CategoryIcon from '../../components/common/CategoryIcon'
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react';
 import { IconX } from '@tabler/icons-react'
 import AppIcon from '../../components/common/AppIcon'
 import TagsEditor from '../../components/TagsEditor'

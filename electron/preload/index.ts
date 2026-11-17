@@ -337,6 +337,12 @@ const rendererApi = {
     postToVoucher: (payload) => invoke('invoices.postToVoucher', payload)
   },
   members: {
+    import: {
+      preview: (payload) => invoke('members.import.preview', payload),
+      execute: (payload) => invoke('members.import.execute', payload),
+      template: () => invoke('members.import.template'),
+      testdata: () => invoke('members.import.testdata')
+    },
     list: (payload) => invoke('members.list', payload),
     create: (payload) => invoke('members.create', payload),
     update: (payload) => invoke('members.update', payload),

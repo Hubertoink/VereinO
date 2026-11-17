@@ -3,9 +3,9 @@ import CategoryIcon from '../../../components/common/CategoryIcon'
 import { createPortal } from 'react-dom'
 import { IconLock, IconPencil, IconRotateClockwise } from '@tabler/icons-react'
 import AppIcon from '../../../components/common/AppIcon'
-import { ICONS, IconBank, IconCash, IconArrow, IconPayPal, TransferDisplay, IconAttachment } from '../../../utils/icons'
+import { ICONS, IconBank, IconCash, IconPayPal, IconAttachment } from '../../../utils/icons';
 import HoverTooltip from '../../../components/common/HoverTooltip'
-import { getContrastTextColor, resolveTagDisplayColor } from '../../../utils/tagColors'
+import { getContrastTextColor } from '../../../utils/tagColors';
 import { addDataChangedListener } from '../../../utils/refresh'
 import {
     normalizeVoucherBudgetAssignments,

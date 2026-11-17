@@ -1,4 +1,5 @@
-export type Sphere = 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+import type { Sphere } from '../../../../shared/financePrimitives'
+export type { Sphere } from '../../../../shared/financePrimitives'
 
 export type CommonFilters = {
   from: string

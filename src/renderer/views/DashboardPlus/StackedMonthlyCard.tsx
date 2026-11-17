@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react';
 import HoverTooltip from '../../components/common/HoverTooltip'
 import { stackedMonths, type StackGroup, type StackVoucher } from './stackedMonthlyModel'
 import { resolveTagDisplayColor } from '../../utils/tagColors'

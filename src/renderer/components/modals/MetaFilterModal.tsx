@@ -1,5 +1,5 @@
 import ModalHeader from '../ModalHeader'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 
 export type Sphere = null | 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom'
 import { IconHelpCircle, IconLayoutColumns, IconList, IconSettings, IconBuildingBank, IconCheck, IconX } from '@tabler/icons-react'
 import type { NavKey } from '../../utils/navItems'

@@ -1,4 +1,4 @@
-import React from 'react'
+
 import { DATE_FORMAT_OPTIONS } from '../../../utils/appearanceOptions'
 import { TablePaneProps, ColKey } from '../types'
 import { DnDOrder, SettingsPageHeader, SettingsSection, SettingsRow } from '../components'

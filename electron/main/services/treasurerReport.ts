@@ -3,8 +3,8 @@
  * Creates a readable PDF overview for club members / Mitgliederversammlung
  */
 
-import { BrowserWindow } from 'electron'
-import fs from 'node:fs/promises'
+import { writeReportPdf } from './reportPdf'
+import { escapeReportHtml as esc, voucherDescriptionHtml } from './reportHtml'
 import { summarizeVouchers, listVouchersAdvanced, cashBalance } from '../repositories/vouchers'
 import { listBindings, bindingUsage } from '../repositories/bindings'
 import { listBudgets, budgetUsage } from '../repositories/budgets'
@@ -13,7 +13,7 @@ import { listCashChecks } from '../repositories/cashChecks'
 import { summarizeInvoices } from '../repositories/invoices'
 import { createExportPath, createExportStamp } from './exportPaths'
 import { getSetting } from './settings'
-import { voucherStatusKind, voucherStatusText } from './voucherStatus'
+import { voucherStatusKind } from './voucherStatus'
 
 export interface TreasurerReportOptions {
   fiscalYear: number
@@ -34,19 +34,8 @@ export interface TreasurerReportOptions {
   voucherListSort?: 'ASC' | 'DESC'
 }
 
-function esc(s: any) {
-  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as any)[c])
-}
-
 function euro(n: number) {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number(n) || 0)
-}
-
-function voucherDescriptionHtml(row: any) {
-  const status = voucherStatusText(row)
-  const kind = voucherStatusKind(row)
-  const description = String(row?.description || '').trim() || '—'
-  return `${esc(description)}${status ? `<div class="voucher-status voucher-status-${kind}">${esc(status)}</div>` : ''}`
 }
 
 function paymentAccountLabel(row: any) {
@@ -170,7 +159,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
   let invoiceData: { openCount: number; openAmount: number; overdueCount: number; overdueAmount: number } | null = null
   if (includeInvoices) {
     try {
-      const todayIso = new Date().toISOString().slice(0, 10)
+
       const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10) })()
       const sOpen = summarizeInvoices({ status: 'OPEN' } as any) as any
       const sPart = summarizeInvoices({ status: 'PARTIAL' } as any) as any
@@ -193,6 +182,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
     try {
       const bindings = listBindings()
       const todayIso = new Date().toISOString().slice(0, 10)
+
       const previousYearEnd = `${fiscalYear - 1}-12-31`
       bindingsData = bindings
         .filter((b: any) => {
@@ -245,6 +235,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
 
   // 9. Tag summary (optional)
   let tagSummaryData: { tag: string; inGross: number; outGross: number; saldo: number }[] = []
+  let tagSummaryVouchers: ReturnType<typeof listVouchersAdvanced> | undefined
   if (includeTagSummary) {
     try {
       const allVouchers = listVouchersAdvanced({ from, to, limit: 100000, sort: 'ASC' })
@@ -270,6 +261,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
           saldo: data.inGross - data.outGross
         }))
         .sort((a, b) => a.tag.localeCompare(b.tag, 'de'))
+      tagSummaryVouchers = allVouchers
     } catch {
       tagSummaryData = []
     }
@@ -280,7 +272,12 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
   if (includeVoucherList) {
     const vlFrom = voucherListFrom || from
     const vlTo = voucherListTo || to
-    const vouchers = listVouchersAdvanced({ from: vlFrom, to: vlTo, limit: 100000, sort: voucherListSort || 'ASC' })
+    const vlSort = voucherListSort || 'ASC'
+    // The tag summary already loaded this exact list for the current export.
+    // Other periods/orders still need their own query; failed loads are retried.
+    const vouchers = tagSummaryVouchers !== undefined && vlFrom === from && vlTo === to && vlSort === 'ASC'
+      ? tagSummaryVouchers
+      : listVouchersAdvanced({ from: vlFrom, to: vlTo, limit: 100000, sort: vlSort })
     voucherRows = Array.isArray(vouchers) ? vouchers.filter((row: any) => includeInternalVouchers || row.type !== 'INTERNAL') : []
   }
 
@@ -828,31 +825,12 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
 </body>
 </html>`
 
-  // Render to PDF
-  const win = new BrowserWindow({
-    show: false,
-    width: 900,
-    height: 10000,
-    webPreferences: { offscreen: true }
+  await writeReportPdf({
+    html,
+    filePath,
+    windowOptions: { height: 10000, webPreferences: { offscreen: true } },
+    printOptions: { margins: { top: 0, bottom: 0, left: 0, right: 0 } }
   })
-
-  await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html))
-
-  await new Promise<void>((resolve) => {
-    win.webContents.on('did-finish-load', () => {
-      setTimeout(resolve, 300)
-    })
-    setTimeout(resolve, 1000)
-  })
-
-  const buff = await win.webContents.printToPDF({
-    pageSize: 'A4',
-    printBackground: true,
-    margins: { top: 0, bottom: 0, left: 0, right: 0 }
-  })
-
-  await fs.writeFile(filePath, buff)
-  try { win.destroy() } catch { }
 
   return { filePath }
 }

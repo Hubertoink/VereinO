@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { FileDataFields, hasFileData, Sphere, UploadFileInput } from './primitives'
 
 // Invoices
-const InvoiceStatus = z.enum(['OPEN', 'PARTIAL', 'PAID'])
+import { InvoiceStatus } from '../../../../shared/financePrimitives'
 export const InvoiceCreateInput = z.object({
   date: z.string(),
   dueDate: z.string().nullable().optional(),

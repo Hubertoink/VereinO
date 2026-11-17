@@ -1,3 +1,4 @@
+import { createExportStamp, ensureExportsDir } from './exportPaths'
 import ExcelJS from 'exceljs'
 import { Buffer as NodeBuffer } from 'node:buffer'
 import { createVoucher } from '../repositories/vouchers'
@@ -1289,13 +1290,9 @@ export async function executeXlsx(base64: string, mapping: Record<FieldKey, stri
             errWs.addRow(rowVals)
         }
         try {
-            const fs = await import('node:fs')
             const path = await import('node:path')
-            const os = await import('node:os')
-            const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-            try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
-            const when = new Date()
-            const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}${String(when.getSeconds()).padStart(2, '0')}`
+            const baseDir = await ensureExportsDir()
+            const stamp = createExportStamp({ includeSeconds: true })
             errorFilePath = path.join(baseDir, `Import_Fehler_${stamp}.xlsx`)
             await (errWb as any).xlsx.writeFile(errorFilePath)
         } catch { /* ignore file save errors */ }
@@ -1550,15 +1547,11 @@ export async function generateImportTestData(destPath?: string): Promise<{ fileP
     addListValidation(ws, 'K5:K10000', '=Budgets')
     addListValidation(ws, 'M5:M10000', '=Earmarks')
 
-    const fs = await import('node:fs')
     const path = await import('node:path')
-    const os = await import('node:os')
     let filePath = destPath
     if (!filePath) {
-        const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-        try { fs.mkdirSync(baseDir, { recursive: true }) } catch { }
-        const when = new Date()
-        const stamp = `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
+        const baseDir = await ensureExportsDir()
+        const stamp = createExportStamp()
         filePath = path.join(baseDir, `Import_Testdaten_${stamp}.xlsx`)
     }
     await wb.xlsx.writeFile(filePath!)

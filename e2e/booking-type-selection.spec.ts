@@ -10,10 +10,12 @@ test.beforeAll(async () => {
   css += '\n' + await fs.readFile('src/renderer/components/booking/bankDraftSource.css', 'utf8') + '\n' + await fs.readFile('src/renderer/components/compactBookingFlyout.css', 'utf8')
   css += '\n' + await fs.readFile('src/renderer/components/common/party.css', 'utf8')
   css += '\n' + await fs.readFile('src/renderer/components/modalHeader.css', 'utf8')
-  const result = await build({
+  const result = await build({ jsx: 'automatic',
     stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
       import React from 'react'
       import { createRoot } from 'react-dom/client'
+      import { ToastProvider } from './src/renderer/context/ToastContext'
+      import { useToast } from './src/renderer/context/useToast'
       import { useQuickAdd } from './src/renderer/hooks/useQuickAdd'
       import { resolveBankDraftParty } from './src/renderer/utils/bankDraftParty'
       import { bankDraftSourceFromTransaction } from './src/renderer/types/bankDraftSource'
@@ -21,6 +23,7 @@ test.beforeAll(async () => {
       import QuickAddModal from './src/renderer/components/modals/QuickAddModal'
       import CompactBookingFlyout from './src/renderer/components/CompactBookingFlyout'
       function Harness() {
+        const { notify } = useToast()
         const hook = useQuickAdd('2026-09-25', async () => ({ id: 1 }), undefined, undefined, true)
         const [presentation, setPresentation] = React.useState('flyout')
         const fileInputRef = React.useRef(null)
@@ -46,7 +49,7 @@ test.beforeAll(async () => {
         window.aiDraft = (type) => hook.openQuickAdd({ qa: selectAiDraftBookingType({ type,
           date: '2026-09-25', grossAmount: 75, mode: 'GROSS', vatRate: 0, sphere: 'IDEELL', description: 'KI-Vorschlag', paymentAccountId: 1 }) })
         React.useEffect(() => { hook.openQuickAdd() }, [])
-        const props = { qa: hook.qa, setQa: hook.setQa, onSave: hook.onQuickSave, onClose: hook.parkQuickAdd,
+        const props = { notify, qa: hook.qa, setQa: hook.setQa, onSave: hook.onQuickSave, onClose: hook.parkQuickAdd,
           files: hook.files, setFiles: hook.setFiles, onDropFiles: hook.onDropFiles, openFilePicker: () => {}, fileInputRef,
           budgetsForEdit: [], earmarks: [], tagDefs: [], descSuggest: [], paymentAccounts: [
             { id: 1, name: 'Bank', kind: 'BANK', isActive: 1 }, { id: 2, name: 'Bar', kind: 'CASH', isActive: 1 }
@@ -59,7 +62,7 @@ test.beforeAll(async () => {
           : <QuickAddModal key={hook.activeDraftId} {...props} windowMode={presentation === 'detached'}
               fmtDate={d => d} eurFmt={new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })} />
       }
-      createRoot(document.getElementById('root')).render(<Harness />)
+      createRoot(document.getElementById('root')).render(<ToastProvider><Harness /></ToastProvider>)
     ` }, bundle: true, write: false, platform: 'browser', loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' }
   })
   script = result.outputFiles[0].text
@@ -76,6 +79,61 @@ test.beforeEach(async ({ page }) => {
 })
 
 for (const presentation of ['flyout', 'modal', 'detached']) {
+  test(`${presentation}: missing date and category show toasts without shifting the form`, async ({ page }, testInfo) => {
+    await page.evaluate(value => {
+      const fixtureWindow = window as any
+      fixtureWindow.api = {
+        ...fixtureWindow.api,
+        classifications: { primary: { list: async () => ({
+          profile: 'GENERAL', definition: { primaryLabel: 'Kategorie' },
+          values: [{ id: 7, name: 'Material', isActive: 1 }]
+        }) } }
+      }
+      fixtureWindow.changePresentation(value)
+      fixtureWindow.prefill(true)
+    }, presentation)
+    const category = page.getByRole('button', { name: 'Kategorie der Buchung', exact: true })
+    await expect(category).toHaveAttribute('aria-invalid', 'true')
+    await expect(category).toHaveClass(/input-error/)
+    await expect(page.locator('small[role="status"]')).toHaveCount(0)
+    const dateInput = page.locator('input[type=date]').first()
+    const save = page.locator('button[type=submit]').first()
+    const before = await category.evaluate(element => element.offsetTop)
+    await expect(save).toBeEnabled()
+    await save.click()
+    await expect(page.locator('.toast.info').last()).toHaveText('Bitte eine Kategorie auswählen.')
+    await page.screenshot({ path: testInfo.outputPath('missing-category-toast.png') })
+    await page.keyboard.press('Control+s')
+    await expect(category).toBeVisible()
+    expect(await page.evaluate(() => (window as any).currentQa.description)).toBe('Vorbelegt')
+    await category.click()
+    await page.getByRole('option', { name: 'Material', exact: true }).click()
+    await expect(category).not.toHaveAttribute('aria-invalid', 'true')
+    expect(await category.evaluate(element => element.offsetTop)).toBe(before)
+    await dateInput.fill('')
+    await expect(dateInput).toHaveAttribute('aria-invalid', 'true')
+    await expect(dateInput).toHaveClass(/input-error/)
+    await save.click()
+    await expect(page.locator('.toast.info').last()).toHaveText('Bitte ein Buchungsdatum auswählen.')
+    await page.screenshot({ path: testInfo.outputPath('missing-date-toast.png') })
+    await page.keyboard.press('Control+s')
+    await expect(dateInput).toBeVisible()
+    await dateInput.fill('2026-11-13')
+    await expect(dateInput).toHaveAttribute('aria-invalid', 'false')
+    expect(await category.evaluate(element => element.offsetTop)).toBe(before)
+    const calendar = page.getByRole('button', { name: 'Kalender zur Datumsauswahl öffnen' })
+    for (const state of ['normal', 'hover', 'focus']) {
+      if (state === 'hover') await calendar.hover()
+      if (state === 'focus') { await page.mouse.move(0, 0); await calendar.focus() }
+      const inputBounds = (await dateInput.boundingBox())!
+      const iconBounds = (await calendar.locator('svg').boundingBox())!
+      expect(Math.abs(inputBounds.y + inputBounds.height / 2 - iconBounds.y - iconBounds.height / 2)).toBeLessThanOrEqual(1)
+    }
+    await page.screenshot({ path: testInfo.outputPath('category-date-toast.png') })
+    await expect(save).toBeEnabled()
+    expect(await page.evaluate(() => (window as any).currentQa.primaryClassificationValueId)).toBe(7)
+  })
+
   test(`${presentation}: unlock blurred fields without moving the editor, then switch without losing input`, async ({ page }, testInfo) => {
     await page.evaluate(value => (window as any).changePresentation(value), presentation)
     const choices = page.getByRole('group', { name: 'Buchungsart wählen' })
@@ -184,7 +242,7 @@ for (const presentation of ['modal', 'detached']) {
     await page.getByRole('button', { name: 'Einnahme', exact: true }).click()
     const editor = page.locator('.quick-add-modal')
     const footer = editor.locator('.modal-footer-actions')
-    for (const size of [{ width: 1440, height: 1200 }, { width: 1280, height: 720 }, { width: 600, height: 800 }]) {
+    for (const size of [{ width: 1440, height: 1200 }, { width: 1280, height: 720 }, { width: 601, height: 800 }, { width: 600, height: 800 }]) {
       await page.setViewportSize(size)
       for (const expanded of [false, true]) {
         if (expanded) await editor.locator('details').filter({ hasText: 'Kommentar' }).locator('summary').click()
@@ -193,14 +251,30 @@ for (const presentation of ['modal', 'detached']) {
         expect(Math.abs(bounds.y + bounds.height - footerBounds.y - footerBounds.height)).toBeLessThanOrEqual(2)
         expect(footerBounds.y).toBeGreaterThan(bounds.y)
         const close = (await editor.getByRole('button', { name: 'Schließen', exact: true }).boundingBox())!
+        const headerElement = editor.locator('.modal-header-bar')
+        const header = (await headerElement.boundingBox())!
+        const headerPadding = await headerElement.evaluate(element => {
+          const style = getComputedStyle(element)
+          return { top: style.paddingTop, right: style.paddingRight, bottom: style.paddingBottom, left: style.paddingLeft }
+        })
         if (presentation === 'detached') {
+          // Native window controls must reach the outer frame, including at
+          // the shared header's 600px responsive breakpoint.
+          expect(headerPadding).toEqual({ top: '0px', right: '0px', bottom: '0px', left: '0px' })
           expect(Math.abs(close.x + close.width - bounds.x - bounds.width)).toBeLessThanOrEqual(2)
           expect(Math.abs(close.y - bounds.y)).toBeLessThanOrEqual(2)
+          expect(close.width).toBe(48)
+          expect(close.height).toBe(44)
         } else {
-          expect(bounds.x + bounds.width - close.x - close.width).toBeCloseTo(15, 0)
+          // Standard ModalHeader uses 20px horizontal/16px vertical padding;
+          // below 601px it uses 16px/14px. The modal adds its 1px border.
+          const horizontal = size.width <= 600 ? 16 : 20
+          const vertical = size.width <= 600 ? 14 : 16
+          expect(headerPadding).toEqual({ top: `${vertical}px`, right: `${horizontal}px`, bottom: `${vertical}px`, left: `${horizontal}px` })
+          expect(header.x + header.width - close.x - close.width).toBeCloseTo(horizontal, 0)
+          expect(bounds.x + bounds.width - close.x - close.width).toBeCloseTo(horizontal + 1, 0)
           expect(close.width).toBe(34)
           expect(close.height).toBe(32)
-          const header = (await editor.locator('.modal-header-bar').boundingBox())!
           expect(Math.abs(close.y + close.height / 2 - header.y - header.height / 2)).toBeLessThanOrEqual(2)
         }
         if (presentation === 'detached') expect(Math.abs(bounds.height - size.height)).toBeLessThanOrEqual(2)
@@ -220,25 +294,27 @@ for (const presentation of ['modal', 'detached']) {
     }
   })
 
-  test(`${presentation}: save is disabled until date and amount are complete`, async ({ page }) => {
+  test(`${presentation}: missing date shows a toast while invalid amounts keep saving disabled`, async ({ page }) => {
     await page.evaluate(value => (window as any).changePresentation(value), presentation)
     await page.getByRole('button', { name: 'Einnahme', exact: true }).click()
     const save = page.getByRole('button', { name: 'Speichern', exact: true })
     const menu = page.getByRole('button', { name: 'Weitere Speicheraktionen' })
     await expect(page.getByRole('button', { name: 'Abbrechen', exact: true })).toHaveCount(0)
     await page.getByRole('spinbutton', { name: 'Brutto-Betrag' }).fill('25')
-    await expect(save).toBeDisabled()
-    await expect(menu).toBeDisabled()
-    const disabledBackground = await save.evaluate(button => getComputedStyle(button).backgroundColor)
+    await expect(save).toBeEnabled()
+    await expect(menu).toBeEnabled()
+    await save.click()
+    await expect(page.locator('.toast.info').last()).toHaveText('Bitte ein Buchungsdatum auswählen.')
     await page.locator('#quick-add-date').fill('2026-10-08')
     await expect(save).toBeEnabled()
     await expect(menu).toBeEnabled()
-    expect(await save.evaluate(button => getComputedStyle(button).backgroundColor)).not.toBe(disabledBackground)
     await page.locator('#quick-add-amount').fill('0')
     await expect(save).toBeDisabled()
     await page.locator('#quick-add-amount').fill('25')
     await page.locator('#quick-add-date').fill('')
-    await expect(save).toBeDisabled()
+    await expect(save).toBeEnabled()
+    await page.keyboard.press('Control+s')
+    await expect(page.locator('.toast.info').last()).toHaveText('Bitte ein Buchungsdatum auswählen.')
   })
 }
 

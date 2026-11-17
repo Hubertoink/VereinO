@@ -4,17 +4,16 @@ import Database from 'better-sqlite3'
 import { getAppDataDir, getDb, withTransaction } from '../db/database'
 import { createVoucher } from './vouchers'
 import { resolvePrimaryClassificationValueId } from './classifications'
-import { setVoucherTags } from './tags'
 import { getPaymentAccountById, paymentMethodForAccountKind } from './paymentAccounts'
 import { filePayloadToBuffer } from '../services/filePayload'
 import type { FileDataPayload, UploadFilePayload } from '../../../shared/filePayload'
 
- type DB = InstanceType<typeof Database>
+type DB = InstanceType<typeof Database>
 
-export type InvoiceStatus = 'OPEN' | 'PARTIAL' | 'PAID'
+import type { InvoiceStatus } from '../../../shared/financePrimitives'
+export type { InvoiceStatus } from '../../../shared/financePrimitives'
 
-type InvoiceBudgetAssignment = { budgetId: number; amount: number }
-type InvoiceEarmarkAssignment = { earmarkId: number; amount: number }
+import type { BudgetAssignment as InvoiceBudgetAssignment, EarmarkAssignment as InvoiceEarmarkAssignment } from '../../../shared/bookingAssignments'
 
 function clamp2(n: number) { return Math.round(n * 100) / 100 }
 
@@ -333,7 +332,21 @@ export function listInvoicesPaged(filters: {
   const params: any[] = []
   const wh: string[] = []
   let joinTag = ''
-  if (filters.unpaidOnly) wh.push('i.gross_amount > COALESCE((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id=i.id),0) + 0.000001')
+  // Compute status before pagination, using the same tolerance and OPEN precedence
+  // as computeStatus. Both the page and its count use this exact filtered relation.
+  const invoiceState = `WITH payment_totals AS (
+    SELECT invoice_id, SUM(amount) AS paid_sum FROM invoice_payments GROUP BY invoice_id
+  ), invoice_state AS (
+    SELECT i.*, IFNULL(p.paid_sum, 0) AS invoice_paid_sum,
+      CASE
+        WHEN IFNULL(p.paid_sum, 0) <= 0 THEN 'OPEN'
+        WHEN IFNULL(p.paid_sum, 0) + 0.000001 < i.gross_amount THEN 'PARTIAL'
+        ELSE 'PAID'
+      END AS invoice_payment_status
+    FROM invoices i LEFT JOIN payment_totals p ON p.invoice_id = i.id
+  )`
+  if (filters.unpaidOnly) wh.push('i.gross_amount > i.invoice_paid_sum + 0.000001')
+  if (status && status !== 'ALL') { wh.push('i.invoice_payment_status = ?'); params.push(status) }
   if (filters.voucherType) { wh.push("COALESCE(i.voucher_type,'OUT') = ?"); params.push(filters.voucherType) }
   if (sphere) { wh.push('i.sphere = ?'); params.push(sphere) }
   if (budgetId) { wh.push('i.budget_id = ?'); params.push(budgetId) }
@@ -346,19 +359,20 @@ export function listInvoicesPaged(filters: {
   }
   if (tag) { joinTag = 'JOIN invoice_tags it ON it.invoice_id = i.id JOIN tags t ON t.id = it.tag_id'; wh.push('t.name = ?'); params.push(tag) }
   const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
-  const base = `FROM invoices i ${joinTag} ${whereSql}`
-  const total = (d.prepare(`SELECT COUNT(DISTINCT i.id) as c ${base}`).get(...params) as any)?.c || 0
+  const base = `FROM invoice_state i ${joinTag} ${whereSql}`
+  const total = (d.prepare(`${invoiceState} SELECT COUNT(DISTINCT i.id) as c ${base}`).get(...params) as any)?.c || 0
 
   const orderExpr = (sortBy === 'date')
     ? 'i.date'
     : (sortBy === 'amount')
       ? 'i.gross_amount'
       : (sortBy === 'status')
-        ? "CASE WHEN IFNULL((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) >= i.gross_amount THEN 2 WHEN IFNULL((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) > 0 THEN 1 ELSE 0 END"
+        ? 'CASE WHEN i.invoice_paid_sum >= i.gross_amount THEN 2 WHEN i.invoice_paid_sum > 0 THEN 1 ELSE 0 END'
         : 'COALESCE(i.due_date, i.date)'
   const orderDir = sort ?? 'ASC'
 
   const rows = d.prepare(`
+    ${invoiceState}
     SELECT i.id, i.date, i.due_date as dueDate, i.invoice_no as invoiceNo, i.party, i.party_id as partyId, i.description, i.note,
            i.gross_amount as grossAmount, i.payment_method as paymentMethod, i.sphere,
            i.primary_classification_value_id as primaryClassificationValueId, cv.name as primaryClassificationName, cv.color as primaryClassificationColor, cv.icon as primaryClassificationIcon,
@@ -366,47 +380,22 @@ export function listInvoicesPaged(filters: {
            i.voucher_type as voucherType, i.posted_voucher_id as postedVoucherId,
            (SELECT v.voucher_no FROM vouchers v WHERE v.id = i.posted_voucher_id) as postedVoucherNo,
            (SELECT COUNT(1) FROM invoice_files f WHERE f.invoice_id = i.id) as fileCount,
-           IFNULL((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) as paidSum,
+           i.invoice_paid_sum as paidSum, i.invoice_payment_status as status,
            (
              SELECT GROUP_CONCAT(t2.name, '\u0001')
              FROM invoice_tags it2 JOIN tags t2 ON t2.id = it2.tag_id
              WHERE it2.invoice_id = i.id
            ) as tagsConcat
-    ${base.replace('FROM invoices i', 'FROM invoices i LEFT JOIN classification_values cv ON cv.id=i.primary_classification_value_id')}
+    ${base.replace('FROM invoice_state i', 'FROM invoice_state i LEFT JOIN classification_values cv ON cv.id=i.primary_classification_value_id')}
     GROUP BY i.id
     ORDER BY ${orderExpr} ${orderDir}, i.id ASC
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset) as any[]
 
-  const mapped = rows.map(r => {
-    const status2 = computeStatus(Number(r.grossAmount || 0), Number(r.paidSum || 0))
-    return { ...r, status: status2 as InvoiceStatus, tags: r.tagsConcat ? String(r.tagsConcat).split('\u0001') : [] }
-  })
-
-  const filtered = (status && status !== 'ALL') ? mapped.filter(r => r.status === status) : mapped
-
-  // Recalculate total after status filter by counting all matching rows (not just the limited result)
-  let actualTotal = total
-  if (status && status !== 'ALL') {
-    // We need to count all rows with this status, not just the limited result
-    // Fetch all rows without limit to count them properly
-    const allRowsForCount = d.prepare(`
-      SELECT
-        i.id,
-        i.gross_amount as grossAmount,
-        IFNULL((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id = i.id), 0) as paidSum
-      ${base}
-      GROUP BY i.id
-    `).all(...params) as any[]
-
-    const allMapped = allRowsForCount.map(r => {
-      const status2 = computeStatus(Number(r.grossAmount || 0), Number(r.paidSum || 0))
-      return { ...r, status: status2 as InvoiceStatus }
-    })
-    actualTotal = allMapped.filter(r => r.status === status).length
+  return {
+    rows: rows.map(r => ({ ...r, tags: r.tagsConcat ? String(r.tagsConcat).split('\u0001') : [] })),
+    total
   }
-
-  return { rows: filtered, total: actualTotal }
 }
 
 export function summarizeInvoices(filters: {
@@ -534,6 +523,29 @@ export function deleteInvoiceFile(fileId: number) {
   return { id: fileId }
 }
 
+// Called inside the payment/posting transaction after the caller has checked its
+// own prerequisites. The caller also chooses the booking date and paid amount.
+function createVoucherForInvoice(d: DB, invoiceId: number, invoice: any, date: string, paidAmount: number): number {
+  const tags = (d.prepare(`SELECT t.name FROM invoice_tags it JOIN tags t ON t.id = it.tag_id WHERE it.invoice_id = ?`).all(invoiceId) as Array<{ name: string }>).map(x => x.name)
+  const budgets = d.prepare('SELECT budget_id as budgetId, amount FROM invoice_budgets WHERE invoice_id = ? ORDER BY id').all(invoiceId) as InvoiceBudgetAssignment[]
+  const earmarks = d.prepare('SELECT earmark_id as earmarkId, amount FROM invoice_earmarks WHERE invoice_id = ? ORDER BY id').all(invoiceId) as InvoiceEarmarkAssignment[]
+  const paymentAccount = invoice.payment_account_id ? getPaymentAccountById(Number(invoice.payment_account_id), d) : undefined
+  const voucherInput = buildInvoiceVoucherCreationInput({
+    invoiceId,
+    date,
+    paidAmount,
+    invoice,
+    tags,
+    budgets,
+    earmarks,
+    paymentAccount
+  })
+  const { id: voucherId } = createVoucher(voucherInput as any)
+  d.prepare('UPDATE invoices SET posted_voucher_id = ? WHERE id=?').run(voucherId, invoiceId)
+  copyInvoiceFilesToVoucher(d, invoiceId, voucherId)
+  return voucherId
+}
+
 export function addPayment(input: { invoiceId: number; date: string; amount: number }) {
   return withTransaction((d: DB) => {
     const inv = d.prepare('SELECT * FROM invoices WHERE id=?').get(input.invoiceId) as any
@@ -554,29 +566,7 @@ export function addPayment(input: { invoiceId: number; date: string; amount: num
     const status = computeStatus(gross, paid)
     let voucherId: number | null = null
     if (status === 'PAID' && inv.auto_post && !inv.posted_voucher_id) {
-      // voucher creation on final payment
-      const vDate = input.date
-      const desc = (inv.description && String(inv.description).trim())
-        ? String(inv.description).trim()
-        : `Zahlung zu Rechnung ${inv.invoice_no ?? '#' + input.invoiceId}`
-      const tags = (d.prepare(`SELECT t.name FROM invoice_tags it JOIN tags t ON t.id = it.tag_id WHERE it.invoice_id = ?`).all(input.invoiceId) as any[]).map(x => x.name)
-      const budgets = d.prepare('SELECT budget_id as budgetId, amount FROM invoice_budgets WHERE invoice_id = ? ORDER BY id').all(input.invoiceId) as InvoiceBudgetAssignment[]
-      const earmarks = d.prepare('SELECT earmark_id as earmarkId, amount FROM invoice_earmarks WHERE invoice_id = ? ORDER BY id').all(input.invoiceId) as InvoiceEarmarkAssignment[]
-      const paymentAccount = inv.payment_account_id ? getPaymentAccountById(Number(inv.payment_account_id), d) : undefined
-      const voucherInput = buildInvoiceVoucherCreationInput({
-        invoiceId: input.invoiceId,
-        date: vDate,
-        paidAmount: clamp2(paid),
-        invoice: inv,
-        tags,
-        budgets,
-        earmarks,
-        paymentAccount
-      })
-      const res = createVoucher(voucherInput as any)
-      voucherId = res.id
-      d.prepare('UPDATE invoices SET posted_voucher_id = ? WHERE id=?').run(voucherId, input.invoiceId)
-      copyInvoiceFilesToVoucher(d, input.invoiceId, voucherId)
+      voucherId = createVoucherForInvoice(d, input.invoiceId, inv, input.date, clamp2(paid))
     }
     return { id: input.invoiceId, status, paidSum: paid, voucherId }
   })
@@ -598,27 +588,7 @@ export function markPaid(invoiceId: number) {
     const total = clamp2(gross)
     let voucherId: number | null = inv.posted_voucher_id || null
     if (inv.auto_post && !inv.posted_voucher_id) {
-      const desc = (inv.description && String(inv.description).trim())
-        ? String(inv.description).trim()
-        : `Zahlung zu Rechnung ${inv.invoice_no ?? '#' + invoiceId}`
-      const tags = (d.prepare(`SELECT t.name FROM invoice_tags it JOIN tags t ON t.id = it.tag_id WHERE it.invoice_id = ?`).all(invoiceId) as any[]).map(x => x.name)
-      const budgets = d.prepare('SELECT budget_id as budgetId, amount FROM invoice_budgets WHERE invoice_id = ? ORDER BY id').all(invoiceId) as InvoiceBudgetAssignment[]
-      const earmarks = d.prepare('SELECT earmark_id as earmarkId, amount FROM invoice_earmarks WHERE invoice_id = ? ORDER BY id').all(invoiceId) as InvoiceEarmarkAssignment[]
-      const paymentAccount = inv.payment_account_id ? getPaymentAccountById(Number(inv.payment_account_id), d) : undefined
-      const voucherInput = buildInvoiceVoucherCreationInput({
-        invoiceId,
-        date: new Date().toISOString().slice(0,10),
-        paidAmount: total,
-        invoice: inv,
-        tags,
-        budgets,
-        earmarks,
-        paymentAccount
-      })
-      const res = createVoucher(voucherInput as any)
-      voucherId = res.id
-      d.prepare('UPDATE invoices SET posted_voucher_id = ? WHERE id=?').run(voucherId, invoiceId)
-      copyInvoiceFilesToVoucher(d, invoiceId, voucherId)
+      voucherId = createVoucherForInvoice(d, invoiceId, inv, new Date().toISOString().slice(0, 10), total)
     }
     return { id: invoiceId, status: 'PAID' as InvoiceStatus, voucherId }
   })
@@ -637,30 +607,7 @@ export function postInvoiceToVoucher(invoiceId: number) {
 
     if (paid < gross) throw new Error('Rechnung ist noch nicht vollständig bezahlt')
 
-    const vDate = new Date().toISOString().slice(0, 10)
-    const desc = (inv.description && String(inv.description).trim())
-      ? String(inv.description).trim()
-      : `Zahlung zu Rechnung ${inv.invoice_no ?? '#' + invoiceId}`
-
-    const tags = (d.prepare(`SELECT t.name FROM invoice_tags it JOIN tags t ON t.id = it.tag_id WHERE it.invoice_id = ?`).all(invoiceId) as any[]).map(x => x.name)
-    const budgets = d.prepare('SELECT budget_id as budgetId, amount FROM invoice_budgets WHERE invoice_id = ? ORDER BY id').all(invoiceId) as InvoiceBudgetAssignment[]
-    const earmarks = d.prepare('SELECT earmark_id as earmarkId, amount FROM invoice_earmarks WHERE invoice_id = ? ORDER BY id').all(invoiceId) as InvoiceEarmarkAssignment[]
-    const paymentAccount = inv.payment_account_id ? getPaymentAccountById(Number(inv.payment_account_id), d) : undefined
-    const voucherInput = buildInvoiceVoucherCreationInput({
-      invoiceId,
-      date: vDate,
-      paidAmount: clamp2(paid),
-      invoice: inv,
-      tags,
-      budgets,
-      earmarks,
-      paymentAccount
-    })
-    const res = createVoucher(voucherInput as any)
-
-    const voucherId = res.id
-    d.prepare('UPDATE invoices SET posted_voucher_id = ? WHERE id=?').run(voucherId, invoiceId)
-    copyInvoiceFilesToVoucher(d, invoiceId, voucherId)
+    const voucherId = createVoucherForInvoice(d, invoiceId, inv, new Date().toISOString().slice(0, 10), clamp2(paid))
 
     return { id: invoiceId, voucherId }
   })

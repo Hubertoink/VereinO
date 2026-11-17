@@ -6,7 +6,7 @@ let componentScript: string
 let componentStyles: string
 
 test.beforeAll(async () => {
-  const result = await build({
+  const result = await build({ jsx: 'automatic',
     stdin: {
       contents: `
         import React from 'react'

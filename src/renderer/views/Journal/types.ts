@@ -1,21 +1,15 @@
-export type VoucherType = 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
-export type VoucherSphere = 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-export type PaymentMethod = 'BAR' | 'BANK'
-export type PaymentAccountKind = 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'
-export type AmountMode = 'NET' | 'GROSS'
+import type { BudgetAssignment as BudgetAssignmentPayload, EarmarkAssignment as EarmarkAssignmentPayload } from '../../../../shared/bookingAssignments'
+import type { VoucherType, Sphere as VoucherSphere, PaymentMethod, PaymentAccountKind, VoucherAmountMode as AmountMode } from '../../../../shared/financePrimitives'
+export type { VoucherType, Sphere as VoucherSphere, PaymentMethod, PaymentAccountKind, VoucherAmountMode as AmountMode } from '../../../../shared/financePrimitives'
 
-export type BudgetAssignment = {
+export type BudgetAssignment = BudgetAssignmentPayload & {
     id?: number
-    budgetId: number
-    amount: number
     label?: string
     color?: string | null
 }
 
-export type EarmarkAssignment = {
+export type EarmarkAssignment = EarmarkAssignmentPayload & {
     id?: number
-    earmarkId: number
-    amount: number
     code?: string
     name?: string
     color?: string | null

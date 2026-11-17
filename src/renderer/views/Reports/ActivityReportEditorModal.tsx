@@ -1,5 +1,5 @@
 import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react';
 import { IconTrash } from '../../utils/icons'
 import HoverTooltip from '../../components/common/HoverTooltip'
 

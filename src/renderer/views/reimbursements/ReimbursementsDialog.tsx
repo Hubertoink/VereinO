@@ -2,7 +2,7 @@ import ResponsiveSearch from '../../components/common/ResponsiveSearch'
 import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
 import ManagementKpis, { InvoicePaymentProgress, InvoiceDueHint } from '../../components/finance/ManagementKpis'
 import { IconReceipt2, IconArrowsExchange, IconCalendar, IconUser, IconPencil, IconFilter, IconPlus, IconX } from '@tabler/icons-react'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react';
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
 import AppIcon from '../../components/common/AppIcon'
 import { createPortal } from 'react-dom'

@@ -1,3 +1,4 @@
+import { niceStep } from '../../../../shared/chartScale'
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { IncomeExpenseBarsProps } from './types'
 import { addDataChangedListener } from '../../utils/refresh'
@@ -85,19 +86,7 @@ export default function IncomeExpenseBars({ from, to }: IncomeExpenseBarsProps) 
   const baseY = H - 28
   const maxH = baseY - 16
   // Y-axis ticks (nice numbers)
-  function niceStep(max: number) {
-    if (max <= 0) return 1
-    const exp = Math.floor(Math.log10(max))
-    const base = Math.pow(10, exp)
-    const m = max / base
-    let step = base
-    if (m <= 2) step = base / 5
-    else if (m <= 5) step = base / 2
-    // Aim for ~5-7 ticks
-    const target = Math.max(1, Math.round(max / step))
-    if (target > 8) step *= 2
-    return step
-  }
+
   const yStep = niceStep(maxVal)
   const yTicks: number[] = []
   for (let v = 0; v <= maxVal + 1e-9; v += yStep) yTicks.push(Math.round(v))

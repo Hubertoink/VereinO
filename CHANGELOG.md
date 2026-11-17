@@ -7,6 +7,27 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-11-17
+
+### Hinzugefügt
+
+- Der Mitgliederimport ist mit der lokalen Datenbank verbunden: Dateivorschau, Feldzuordnung und Übernahme unterstützen die Pflege bestehender und neuer Mitglieder.
+- Dezente Animationen begleiten den KI-Schalter im Bankimport, den Wechsel zwischen Ansicht und Bearbeitung der Buchungsdetails sowie die erfolgreiche Speicherung. Die Systemeinstellung zur Reduzierung von Bewegung wird berücksichtigt.
+
+### Geändert
+
+- Berichte und Diagramme laden und verarbeiten gemeinsame Monatsdaten nur einmal. PDF-Exporte und KI-Kontextaufbereitung verwenden gemeinsame Abläufe.
+- Wiederholte Datenbankabfragen, Berechnungen und Typdefinitionen wurden zusammengeführt; ungenutzte Komponenten und Codepfade entfernt. Die automatischen Prüfungen wurden erweitert.
+
+### Behoben
+
+- Fehlendes Buchungsdatum und fehlende Kategorie werden direkt am Feld rot markiert. Beim Speicherversuch erscheint ein verständlicher Hinweis als Toast, ohne das Formular durch Zusatztext zu verschieben. Auch Strg+S berücksichtigt die Formularprüfung.
+- Das Kalender-Icon sitzt mittig im Datumsfeld; das Plus bei den Tags verwendet ein zentriertes Symbol.
+- Rechnungsfilter werden vor der Seiteneinteilung angewendet, sodass Treffer und Gesamtzahl zusammenpassen.
+- Der Mitgliederimport berücksichtigt bereits angelegte zukünftige Beitragseinträge bei der Beitragsfortschreibung.
+- Fehler beim lokalen Speichern von Belegeinreichungen werden sichtbar, ohne den ausgefüllten Formularzustand zu verlieren. JPEG-Anhänge behalten den passenden Dateityp.
+- Mobile Dialogkopfzeilen und die Größenanpassung von Berichtsdiagrammen wurden korrigiert.
+
 ## [5.0.1] - 2026-11-16
 
 ### Behoben

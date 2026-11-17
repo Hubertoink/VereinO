@@ -6,7 +6,7 @@ let script: string
 let css: string
 test.beforeAll(async () => {
   css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/modalHeader.css', 'src/renderer/views/BankImport/bankImportDialog.css'].map(file => fs.readFile(file, 'utf8')))).join('\n')
-  const result = await build({
+  const result = await build({ jsx: 'automatic',
     stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
       import React from 'react'
       import { createRoot } from 'react-dom/client'

@@ -5,7 +5,7 @@ import fs from 'node:fs/promises'
 let script: string, css: string
 test.beforeAll(async () => {
   css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/modalHeader.css', 'src/renderer/components/finance/membershipPayments.css'].map(file => fs.readFile(file, 'utf8')))).join('\n')
-  script = (await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
+  script = (await build({ jsx: 'automatic', stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
     import React from 'react'
     import { createRoot } from 'react-dom/client'
     import MemberContributionDialog from './src/renderer/views/Mitglieder/MemberContributionDialog'

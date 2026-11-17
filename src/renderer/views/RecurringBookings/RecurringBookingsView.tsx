@@ -3,19 +3,7 @@ import ResponsiveSearch from '../../components/common/ResponsiveSearch'
 import ModalHeader from '../../components/ModalHeader'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import {
-  IconCalendarCheck,
-  IconCalendarPlus,
-  IconCalendarX,
-  IconCircleX,
-  IconFilter,
-  IconLink,
-  IconPencil,
-  IconPlayerPause,
-  IconPlayerPlay,
-  IconReceipt2,
-  IconX
-} from '@tabler/icons-react'
+import { IconCalendarCheck, IconCalendarPlus, IconCalendarX, IconCircleX, IconFilter, IconLink, IconPencil, IconPlayerPause, IconPlayerPlay, IconReceipt2 } from '@tabler/icons-react';
 import AppIcon from '../../components/common/AppIcon'
 import TagsEditor from '../../components/TagsEditor'
 import PartySelector from '../../components/common/PartySelector'
@@ -31,8 +19,7 @@ import type { DashboardTaskTarget } from '../../../../shared/dashboardTasks'
 
 type Status = 'ACTIVE' | 'PAUSED' | 'ENDED'
 type Sphere = 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-type BudgetAssignment = { budgetId: number; amount: number }
-type EarmarkAssignment = { earmarkId: number; amount: number }
+import type { BudgetAssignment, EarmarkAssignment } from '../../../../shared/bookingAssignments'
 type PendingRecurringAction = { row: RecurringBooking; kind: 'skip' | 'pause' | 'end' }
 
 type RecurringBooking = {

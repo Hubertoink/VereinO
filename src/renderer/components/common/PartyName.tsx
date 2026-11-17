@@ -1,4 +1,4 @@
-import React from 'react'
+
 import { IconUser } from '@tabler/icons-react'
 import './party.css'
 

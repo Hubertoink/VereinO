@@ -1,25 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react';
 import { IconAlertTriangle, IconArrowDown, IconArrowUp, IconCheck, IconFileSpreadsheet, IconFileTypePdf, IconFolderOpen } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
 import BookingPopupFrame from './BookingPopupFrame'
 
-type MemberExportField = 
-  | 'memberNo' 
-  | 'name' 
-  | 'email' 
-  | 'phone' 
-  | 'address' 
-  | 'status' 
-  | 'boardRole' 
-  | 'iban' 
-  | 'bic' 
-  | 'contribution_amount' 
-  | 'contribution_interval' 
-  | 'mandate_ref' 
-  | 'mandate_date' 
-  | 'join_date' 
-  | 'leave_date' 
-  | 'notes'
+import type { MemberExportField } from '../../../../shared/memberExport'
 
 type MemberExportStatus = 'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'
 

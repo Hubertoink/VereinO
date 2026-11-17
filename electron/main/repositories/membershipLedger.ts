@@ -64,8 +64,10 @@ export function prepareMemberPlanChange(d: DB, before: any, input: any) {
   const interval = input.contribution_interval ?? before.contribution_interval
   if (!interval) return
   const plans = d.prepare('SELECT * FROM membership_plans WHERE member_id=? ORDER BY starts_on').all(before.id) as Plan[]
+  const nextPeriodStart = periodRange(nextPeriod(periodKeyFromDate(new Date(), interval), interval), interval).start
+  const defaultStart = before.join_date && before.join_date > nextPeriodStart ? before.join_date : nextPeriodStart
   const start = input.contribution_effective_date || (input.next_due_date && input.next_due_date !== before.next_due_date ? input.next_due_date
-    : periodRange(nextPeriod(periodKeyFromDate(new Date(), interval), interval), interval).start)
+    : defaultStart)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !Number.isFinite(Date.parse(start)) || new Date(start).toISOString().slice(0, 10) !== start || (before.join_date && start < before.join_date)) throw new Error('Bitte ein gültiges Datum für die Beitragsänderung ab Eintritt angeben.')
   if (plans.length && start < today()) throw new Error('Beitragsänderungen können ab heute oder für die Zukunft gelten. Bereits entstandene Beiträge bleiben erhalten.')
   for (const period of contributionPeriods(before.id, start, d)) if (period.dueDate < start) storePeriod(d, before.id, period)

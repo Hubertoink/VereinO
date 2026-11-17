@@ -1,6 +1,6 @@
 import ResponsiveSearch from '../../components/common/ResponsiveSearch'
 import ModalHeader from '../../components/ModalHeader'
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react';
 import { IconArchive, IconChevronsDown, IconChevronsUp, IconPlus } from '@tabler/icons-react'
 import AppIcon from '../../components/common/AppIcon'
 import { addDataChangedListener } from '../../utils/refresh'
@@ -60,13 +60,8 @@ export default function BudgetsView({
   const [q, setQ] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
-  const fmtDate = (d?: string | null) => d ? d.slice(8,10) + '.' + d.slice(5,7) + '.' + d.slice(0,4) : '—'
-  const formatRange = (start?: string | null, end?: string | null) => {
-    if (start && end) return `${fmtDate(start)} – ${fmtDate(end)}`
-    if (start) return `ab ${fmtDate(start)}`
-    if (end) return `bis ${fmtDate(end)}`
-    return '—'
-  }
+
+
 
   async function loadBudgets() {
     // Always load all to know archive count

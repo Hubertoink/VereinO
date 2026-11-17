@@ -1,27 +1,20 @@
+import { createAiMemberWorkflow } from './aiMemberWorkflow'
 import { currentAiDraftComment } from '../../utils/aiBookingDraft'
 import { resolveBankDraftParty } from '../../utils/bankDraftParty'
 import { takeAgentReview } from '../../utils/aiAgentHandoff'
 import { bankDraftSourceFromTransaction } from '../../types/bankDraftSource'
 import { AgentReimbursementCard } from './AgentReimbursementCard'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import './AIView.css'
 import { dispatchDataChanged } from '../../utils/refresh'
 import { AgentRuntimePanel } from './AgentRuntimePanel'
 import { AiRulesCatalog } from './AiRulesCatalog'
-import { AgentMasterDataChangeCard, type AgentMasterDataChange } from './AgentMasterDataChangeCard'
+import { AgentMasterDataChangeCard } from './AgentMasterDataChangeCard';
 import { AgentReviewQueue, type AgentReviewQueueItem } from './AgentReviewQueue'
-import {
-  AgentInvoiceActionCard,
-  type AiInvoiceActionChange,
-  type AiInvoiceActionState
-} from './AgentInvoiceActionCard'
+import { AgentInvoiceActionCard } from './AgentInvoiceActionCard';
 import { AgentVoucherReverseCard, type AiVoucherReverseState } from './AgentVoucherReverseCard'
-import { AgentVoucherRebookCard, type AiVoucherRebookState } from './AgentVoucherRebookCard'
-import {
-  AgentVoucherUpdateCard,
-  type AiVoucherUpdateChange,
-  type AiVoucherUpdateState
-} from './AgentVoucherUpdateCard'
+import { AgentVoucherRebookCard } from './AgentVoucherRebookCard';
+import { AgentVoucherUpdateCard, type AiVoucherUpdateChange } from './AgentVoucherUpdateCard';
 import { useAiAgentWorkflow } from './useAiAgentWorkflow'
 import { useAiComposer } from './useAiComposer'
 import { useAiMessages } from './useAiMessages'
@@ -63,100 +56,10 @@ import {
   writeAiChatSnapshot,
   type AiMessage
 } from './aiChat'
-import type {
-  AiBankLinkChange,
-  AiBankLinkState,
-  AiBankReviewState,
-  AiBankReviewSuggestion,
-  AiBudgetActionChange,
-  AiBudgetActionState,
-  AiChatSnapshot,
-  AiContributionLinkChange,
-  AiContributionLinkState,
-  AiContributionPaymentState,
-  AiEarmarkActionChange,
-  AiEarmarkActionState,
-  AiMemberDraft,
-  AiMemberImportState,
-  AiMemberUpdateChange,
-  AiMemberUpdateField,
-  AiMemberUpdateState,
-  AiMentionOption,
-  AiPartyActionChange,
-  AiPartyActionState,
-  AiPlannerQuestionOption,
-  AiPlannerQuestionState,
-  AiRecurringBookingOccurrence,
-  AiRecurringBookingState,
-  AiTagActionChange,
-  AiTagActionState,
-  AiVoucherTagActionChange,
-  AiVoucherTagActionState,
-  MemberRow,
-  Notify,
-  PaymentDueRow,
-  Props,
-  TagRow,
-  VoucherRow
-} from './aiViewTypes'
-import {
-  boardRoleLabel,
-  boardRoleFromText,
-  buildMemberUpdateDraft,
-  displayMemberValue,
-  findPaymentAccountHint,
-  intervalLabel,
-  memberStatusLabel,
-  parseContributionHint,
-  parseMemberContributionAmount,
-  parseMemberDraftsFromText,
-  sanitizeMemberState,
-  sanitizeMemberDrafts,
-  shouldApplyAccountHintToAll,
-  wantsApplyPendingMemberUpdates,
-  wantsContextualBookingLink,
-  wantsContributionDueRead,
-  wantsContributionPaymentAction,
-  wantsCreatePendingMembers,
-  wantsMemberCreation,
-  wantsMemberRead,
-  wantsMemberUpdate
-} from './aiMemberDomain'
-import {
-  findPlanArg,
-  findPlanChange,
-  findPlanFilter,
-  memberStateFromPlan,
-  normalizePlanKey,
-  parsePlanAmount,
-  parsePlanDate,
-  planItemValue,
-  planValueList,
-  planValueString
-} from './aiPlanDomain'
-import {
-  cleanTagCandidateName,
-  extractTagNamesFromText,
-  extractVoucherTagAppendRequest,
-  extractVoucherTagCorrection,
-  isLikelyTagName,
-  isVereinRelevantPrompt,
-  parseReportExportRequest,
-  resolveExistingTagName,
-  routeTextType,
-  shouldProcessFilesAsBookingDocuments,
-  tagColorForName,
-  tagPromptFromPlan,
-  voucherTagPromptFromPlan,
-  wantsApplyPendingTagActions,
-  wantsApplyPendingVoucherActions,
-  wantsBankImportReview,
-  wantsModifyPendingReview,
-  wantsReportExport,
-  wantsTagAction,
-  wantsTagRead,
-  wantsVoucherTagAction
-} from './aiPromptIntents'
+import type { AiBankReviewState, AiBankReviewSuggestion, AiBudgetActionChange, AiChatSnapshot, AiContributionLinkState, AiContributionPaymentState, AiMentionOption, AiPlannerQuestionOption, AiPlannerQuestionState, AiRecurringBookingState, AiTagActionChange, AiTagActionState, AiVoucherTagActionChange, AiVoucherTagActionState, MemberRow, PaymentDueRow, Props, TagRow, VoucherRow } from './aiViewTypes';
+import { boardRoleLabel, findPaymentAccountHint, intervalLabel, memberStatusLabel, parseMemberContributionAmount, parseMemberDraftsFromText, sanitizeMemberState, shouldApplyAccountHintToAll, wantsApplyPendingMemberUpdates, wantsContextualBookingLink, wantsContributionDueRead, wantsContributionPaymentAction, wantsCreatePendingMembers, wantsMemberCreation, wantsMemberRead, wantsMemberUpdate } from './aiMemberDomain';
+import { findPlanArg, findPlanChange, findPlanFilter, memberStateFromPlan, normalizePlanKey, parsePlanAmount, parsePlanDate, planItemValue, planValueString } from './aiPlanDomain';
+import { cleanTagCandidateName, extractTagNamesFromText, extractVoucherTagAppendRequest, extractVoucherTagCorrection, isLikelyTagName, isVereinRelevantPrompt, parseReportExportRequest, resolveExistingTagName, routeTextType, shouldProcessFilesAsBookingDocuments, tagColorForName, tagPromptFromPlan, voucherTagPromptFromPlan, wantsApplyPendingTagActions, wantsApplyPendingVoucherActions, wantsModifyPendingReview, wantsReportExport, wantsTagAction, wantsTagRead, wantsVoucherTagAction } from './aiPromptIntents';
 import {
   bankReviewBody,
   extractBankSuggestionsFromAiText,
@@ -173,43 +76,8 @@ import {
   paymentMethodForAccount,
   type PaymentAccountOption
 } from './aiBooking'
-import {
-  formatIsoDate,
-  isoDate,
-  normalizeLookup,
-  parseGermanDate,
-  statusLabel,
-  typeLabel,
-  warningClassName
-} from './aiText'
-import type {
-  TAiActionPlan,
-  TAiAgentAutoRulesListOutput,
-  TAiAgentMemoryListOutput,
-  TAiAgentRunOutput,
-  TAiAgentTraceEvent,
-  TAiBankImportReviewOutput,
-  TAiBookingAnalysisResult,
-  TAiBookingCandidate,
-  TAiJobsGetOutput,
-  TAiJobsListOutput,
-  TAiSettingsGetOutput,
-  TAiTextGenerateInput,
-  TTagUpsertInput,
-  TTagsListOutput,
-  TBudgetUpsertInput,
-  TBindingUpsertInput,
-  TPartyUpsertInput,
-  TMemberCreateInput,
-  TMemberUpdateInput,
-  TMembersListOutput,
-  TPaymentsListDueOutput,
-  TInvoiceCreateInput,
-  TVoucherMetaUpdateInput,
-  TVoucherCreateInput,
-  TVouchersListOutput,
-  TReportsExportInput
-} from '../../../../electron/main/ipc/schemas'
+import { formatIsoDate, normalizeLookup, typeLabel } from './aiText';
+import type { TAiActionPlan, TAiAgentRunOutput, TAiAgentTraceEvent, TAiBankImportReviewOutput, TAiBookingAnalysisResult, TAiBookingCandidate, TAiJobsGetOutput, TAiTextGenerateInput, TTagUpsertInput, TBudgetUpsertInput, TMemberCreateInput, TVoucherMetaUpdateInput, TVoucherCreateInput } from '../../../../electron/main/ipc/schemas';
 
 const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
 const usd = new Intl.NumberFormat('de-DE', {
@@ -360,6 +228,25 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     restore: restoreReviewState,
     reset: resetReviewState
   } = useAiReviewState({ initialChat, sanitizeMemberState })
+  const {
+    prepareMemberCreation,
+    applyMemberFollowup,
+    createPendingMembers,
+    loadAllMembers,
+    prepareMemberUpdate,
+    applyMemberUpdateFollowup,
+    toggleMemberUpdateChange,
+    applyPendingMemberUpdates
+  } = createAiMemberWorkflow({
+    members: window.api.members,
+    pendingMembers,
+    setPendingMembers,
+    pendingMemberUpdates,
+    setPendingMemberUpdates,
+    pushMessage,
+    notify,
+    setBusy
+  })
   const { agentMemory, agentAutoRules, loadAgentKnowledge } = useAiAgentKnowledge()
   useEffect(() => {
     onBusyChange?.(busy)
@@ -1315,137 +1202,6 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     })
   }
 
-  const prepareMemberCreation = async (userPrompt: string) => {
-    const parsed = parseMemberDraftsFromText(userPrompt)
-    if (!parsed) return false
-    setPendingMembers(parsed)
-    const missingContribution = parsed.members.some(
-      (member) => !member.contributionAmount || !member.contributionInterval
-    )
-    pushMessage({
-      role: 'assistant',
-      title: 'Mitgliederanlage vorbereitet',
-      body: `${parsed.members.length} Mitglied(er) wurden aus deiner Nachricht erkannt. Bitte prüfe die Vorschau unten${missingContribution ? ' und ergänze den Beitrag.' : '.'}`,
-      meta: missingContribution ? 'Beitrag fehlt noch' : 'Bereit zum Anlegen'
-    })
-    return true
-  }
-
-  const applyMemberFollowup = async (userPrompt: string) => {
-    if (!pendingMembers || pendingMembers.status === 'CREATED') return false
-    const contribution = parseContributionHint(userPrompt)
-    if (contribution.amount || contribution.interval) {
-      const nextState: AiMemberImportState = {
-        ...pendingMembers,
-        members: sanitizeMemberDrafts(pendingMembers.members).map((member) => ({
-          ...member,
-          contributionAmount: contribution.amount ?? member.contributionAmount,
-          contributionInterval: contribution.interval || member.contributionInterval
-        }))
-      }
-      setPendingMembers(nextState)
-      const firstMember = nextState.members[0]
-      pushMessage({
-        role: 'assistant',
-        title: 'Beitrag übernommen',
-        body: `Der Beitrag wurde für die vorbereiteten Mitglieder gesetzt: ${firstMember?.contributionAmount ? euro.format(firstMember.contributionAmount) : 'Betrag offen'}${firstMember?.contributionInterval === 'YEARLY' ? ' · jährlich' : firstMember?.contributionInterval ? ` · ${firstMember.contributionInterval}` : ''}.`
-      })
-      return true
-    }
-    if (wantsCreatePendingMembers(userPrompt)) {
-      await createPendingMembers()
-      return true
-    }
-    return false
-  }
-
-  const nextMemberNumbers = async (count: number) => {
-    const result = await window.api.members.list({ limit: 200, sortBy: 'memberNo', sort: 'DESC' })
-    const numeric = (result.rows || [])
-      .map((member) => Number(String(member.memberNo || '').trim()))
-      .filter((value) => Number.isFinite(value) && value > 0)
-    const start = numeric.length ? Math.max(...numeric) + 1 : 1
-    return Array.from({ length: count }, (_, idx) => String(start + idx).padStart(4, '0'))
-  }
-
-  const createPendingMembers = async (stateOverride?: AiMemberImportState) => {
-    const memberState = stateOverride || pendingMembers
-    if (!memberState || memberState.status === 'CREATED') return
-    const missing = memberState.members.filter(
-      (member) =>
-        !member.name ||
-        !member.joinDate ||
-        !member.contributionAmount ||
-        !member.contributionInterval
-    )
-    if (missing.length) {
-      pushMessage({
-        role: 'assistant',
-        title: 'Mitgliederanlage noch unvollständig',
-        body: `Es fehlen noch Pflichtangaben bei ${missing.map((member) => member.name).join(', ')}. Bitte ergänze Beitrag und Eintrittsdatum.`
-      })
-      return
-    }
-    setBusy(true)
-    try {
-      const numbers = await nextMemberNumbers(memberState.members.length)
-      const created = []
-      for (let idx = 0; idx < memberState.members.length; idx += 1) {
-        const member = memberState.members[idx]
-        const payload: TMemberCreateInput = {
-          memberNo: numbers[idx],
-          name: member.name,
-          status: 'ACTIVE',
-          boardRole: member.boardRole || null,
-          join_date: member.joinDate,
-          contribution_amount: member.contributionAmount ?? null,
-          contribution_interval: member.contributionInterval || null,
-          next_due_date: member.nextDueDate || null,
-          notes: member.birthDate ? `Geburtsdatum: ${formatIsoDate(member.birthDate)}` : null
-        }
-        const result = await window.api.members.create(payload)
-        created.push({ ...member, createdId: result.id, createdMemberNo: numbers[idx] })
-      }
-      setPendingMembers({ ...memberState, status: 'CREATED', members: created })
-      pushMessage({
-        role: 'assistant',
-        title: 'Mitglieder angelegt',
-        body: `${created.length} Mitglied(er) wurden angelegt:\n${created.map((member) => `- ${member.createdMemberNo} · ${member.name}`).join('\n')}`,
-        meta: 'VereinO-Daten geändert'
-      })
-      dispatchDataChanged(['members'])
-      notify('success', `${created.length} Mitglieder angelegt.`)
-    } catch (error: any) {
-      notify('error', error?.message || String(error))
-      pushMessage({
-        role: 'assistant',
-        title: 'Mitgliederanlage fehlgeschlagen',
-        body: error?.message || String(error)
-      })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const loadAllMembers = async () => {
-    const rows: MemberRow[] = []
-    let offset = 0
-    const limit = 200
-    while (true) {
-      const result = await window.api.members.list({
-        limit,
-        offset,
-        status: 'ALL',
-        sortBy: 'name',
-        sort: 'ASC'
-      })
-      rows.push(...(result.rows || []))
-      if ((result.rows || []).length < limit) break
-      offset += limit
-    }
-    return rows
-  }
-
   const loadDueRowsForMember = async (member: MemberRow) => {
     const intervals: Array<NonNullable<TMemberCreateInput['contribution_interval']>> =
       member.contribution_interval
@@ -1821,130 +1577,6 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     })
   }
 
-  const prepareMemberUpdate = async (userPrompt: string) => {
-    const members = await loadAllMembers()
-    const draft = buildMemberUpdateDraft(userPrompt, members)
-    if (!draft) {
-      pushMessage({
-        role: 'assistant',
-        title: 'Mitgliederänderung nicht eindeutig',
-        body: 'Ich konnte keine eindeutigen Mitgliedsänderungen ableiten. Nenne bitte Zielgruppe oder Namen und die gewünschten Felder, z.B. „Setze bei allen aktiven Mitgliedern den Beitrag auf 20 € monatlich“.'
-      })
-      return true
-    }
-    setPendingMemberUpdates(draft)
-    pushMessage({
-      role: 'assistant',
-      title: 'Mitgliederänderung vorbereitet',
-      body: `${draft.changes.length} Änderung(en) für ${new Set(draft.changes.map((change) => change.memberId)).size} Mitglied(er) vorbereitet. Bitte prüfe die Vorschau unten.`,
-      meta: 'Review erforderlich'
-    })
-    return true
-  }
-
-  const applyMemberUpdateFollowup = async (userPrompt: string) => {
-    if (!pendingMemberUpdates || pendingMemberUpdates.status === 'APPLIED') return false
-    if (wantsApplyPendingMemberUpdates(userPrompt)) {
-      await applyPendingMemberUpdates()
-      return true
-    }
-    const normalized = normalizeLookup(userPrompt)
-    const wantsLowercase = /(klein|kleinschreib|lowercase|lower case|minuskel)/.test(normalized)
-    const wantsUppercase = /(gross|groß|uppercase|upper case|majusk)/.test(normalized)
-    const wantsEmailTransform =
-      /(email|e mail|mail|adresse|adressen)/.test(normalized) ||
-      pendingMemberUpdates.changes.some(
-        (change) => change.field === 'email' && change.selected && !change.applied
-      )
-    if ((wantsLowercase || wantsUppercase) && wantsEmailTransform) {
-      let changed = 0
-      setPendingMemberUpdates((current) =>
-        current
-          ? {
-              ...current,
-              changes: current.changes.map((change) => {
-                if (
-                  change.applied ||
-                  change.field !== 'email' ||
-                  typeof change.newValue !== 'string'
-                )
-                  return change
-                const nextValue = wantsLowercase
-                  ? change.newValue.toLowerCase()
-                  : change.newValue.toUpperCase()
-                if (nextValue === change.newValue) return change
-                changed += 1
-                return {
-                  ...change,
-                  newValue: nextValue,
-                  newDisplay: displayMemberValue(change.field, nextValue),
-                  selected: true
-                }
-              })
-            }
-          : current
-      )
-      pushMessage({
-        role: 'assistant',
-        title: 'Mitgliederänderung angepasst',
-        body: changed
-          ? `${changed} E-Mail-Änderung(en) im offenen Review wurden ${wantsLowercase ? 'kleingeschrieben' : 'großgeschrieben'}. Bitte prüfe die Vorschau unten.`
-          : `Die E-Mail-Änderungen im offenen Review waren bereits ${wantsLowercase ? 'kleingeschrieben' : 'großgeschrieben'}.`
-      })
-      return true
-    }
-    const contribution = parseContributionHint(userPrompt)
-    if (!contribution.amount && !contribution.interval) return false
-    setPendingMemberUpdates((current) =>
-      current
-        ? {
-            ...current,
-            changes: current.changes.map((change) => {
-              if (change.applied) return change
-              if (change.field === 'contribution_amount' && contribution.amount != null) {
-                return {
-                  ...change,
-                  newValue: contribution.amount,
-                  newDisplay: displayMemberValue(change.field, contribution.amount),
-                  selected: true
-                }
-              }
-              if (change.field === 'contribution_interval' && contribution.interval) {
-                return {
-                  ...change,
-                  newValue: contribution.interval,
-                  newDisplay: displayMemberValue(change.field, contribution.interval),
-                  selected: true
-                }
-              }
-              return change
-            })
-          }
-        : current
-    )
-    pushMessage({
-      role: 'assistant',
-      title: 'Mitgliederänderung angepasst',
-      body: 'Ich habe den Beitrag/Intervall im offenen Änderungsvorschlag aktualisiert. Bitte prüfe die Vorschau unten.'
-    })
-    return true
-  }
-
-  const toggleMemberUpdateChange = (id: string) => {
-    setPendingMemberUpdates((current) =>
-      current
-        ? {
-            ...current,
-            changes: current.changes.map((change) =>
-              change.id === id && !change.applied
-                ? { ...change, selected: !change.selected }
-                : change
-            )
-          }
-        : current
-    )
-  }
-
   const applyPendingRecurringBooking = async () => {
     if (!pendingRecurringBooking || pendingRecurringBooking.status === 'APPLIED') return
     const openOccurrences = pendingRecurringBooking.occurrences.filter(
@@ -1994,55 +1626,6 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
       if (failures.size)
         notify('error', `${failures.size} Dauerbuchung(en) konnten nicht erstellt werden.`)
       else notify('success', `${booked.size} Dauerbuchung(en) erstellt.`)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const applyPendingMemberUpdates = async () => {
-    if (!pendingMemberUpdates || pendingMemberUpdates.status === 'APPLIED') return
-    const selected = pendingMemberUpdates.changes.filter(
-      (change) => change.selected && !change.applied
-    )
-    if (!selected.length) {
-      notify('info', 'Keine Mitgliederänderungen ausgewählt.')
-      return
-    }
-    setBusy(true)
-    try {
-      const grouped = new Map<number, TMemberUpdateInput>()
-      for (const change of selected) {
-        const payload = grouped.get(change.memberId) || { id: change.memberId }
-        ;(payload as any)[change.field] = change.newValue ?? null
-        grouped.set(change.memberId, payload)
-      }
-      for (const payload of grouped.values()) {
-        await window.api.members.update(payload)
-      }
-      const appliedIds = new Set(selected.map((change) => change.id))
-      const nextState: AiMemberUpdateState = {
-        ...pendingMemberUpdates,
-        status: 'APPLIED',
-        changes: pendingMemberUpdates.changes.map((change) =>
-          appliedIds.has(change.id) ? { ...change, applied: true } : change
-        )
-      }
-      setPendingMemberUpdates(nextState)
-      pushMessage({
-        role: 'assistant',
-        title: 'Mitglieder geändert',
-        body: `${selected.length} Änderung(en) bei ${grouped.size} Mitglied(er)n übernommen.`,
-        meta: 'VereinO-Daten geändert'
-      })
-      dispatchDataChanged(['members'])
-      notify('success', `${selected.length} Mitgliederänderungen übernommen.`)
-    } catch (error: any) {
-      notify('error', error?.message || String(error))
-      pushMessage({
-        role: 'assistant',
-        title: 'Mitgliederänderung fehlgeschlagen',
-        body: error?.message || String(error)
-      })
     } finally {
       setBusy(false)
     }

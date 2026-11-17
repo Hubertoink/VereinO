@@ -130,17 +130,6 @@ export interface SystemApi {
             migrateTo: (payload: { root: string; organizationId: string }) => Promise<{ ok: true } & StorageLocation>
         }
         onInitFailed?: (callback: (info: { message: string }) => void) => () => void
-        onPreUpdateBackup?: (callback: (info: {
-            fromVersion: string
-            toVersion: string
-            filePath: string
-            dir: string
-        }) => void) => () => void
-        onPreUpdateBackupFailed?: (callback: (info: {
-            fromVersion: string
-            toVersion: string
-            error: string
-        }) => void) => () => void
     }
     organizations: {
         list: () => Promise<{

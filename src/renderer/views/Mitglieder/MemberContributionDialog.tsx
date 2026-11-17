@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 import BookingPopupFrame from '../../components/modals/BookingPopupFrame'
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
 import '../../components/finance/membershipPayments.css'

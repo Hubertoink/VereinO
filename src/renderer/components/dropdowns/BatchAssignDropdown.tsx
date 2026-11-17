@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react';
 import { IconTags, IconX } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
 import FilterDropdown from './FilterDropdown'

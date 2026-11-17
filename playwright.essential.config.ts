@@ -6,10 +6,16 @@ export default defineConfig({
   ...config,
   testMatch: [
     'booking-defaults.spec.ts',
+    'booking-ai-organizations.spec.ts',
+    'booking-type-selection.spec.ts',
+    'modal-header.spec.ts',
     'party-selector.spec.ts',
     'bookings-plus-filters.spec.ts',
     'journal-edit-tabs.spec.ts',
-    'leader-shortcuts.spec.ts'
+    'leader-shortcuts.spec.ts',
+    'report-chart-width.spec.ts',
+    'report-monthly-loading.spec.ts',
+    'reports-analytics.spec.ts'
   ],
   use: {
     ...config.use,

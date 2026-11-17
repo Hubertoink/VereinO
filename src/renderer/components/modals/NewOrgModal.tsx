@@ -1,6 +1,6 @@
 import MasterDataDialog, { FieldLabel } from '../common/MasterDataDialog'
 import { IconBuildingCommunity } from '@tabler/icons-react'
-import React, { useState } from 'react'
+import { useState } from 'react';
 import type { OrganizationProfile } from '../../../../shared/classification'
 
 interface NewOrgModalProps {

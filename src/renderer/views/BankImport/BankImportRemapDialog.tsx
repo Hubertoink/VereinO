@@ -1,5 +1,5 @@
 import ModalHeader from '../../components/ModalHeader'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom'
 
 import type { TBankImportRemapPreviewOutput } from '../../../../electron/main/ipc/schemas'

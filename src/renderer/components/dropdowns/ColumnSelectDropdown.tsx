@@ -1,4 +1,4 @@
-import React from 'react'
+
 import { IconLayoutGrid } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
 import FilterDropdown from './FilterDropdown'

@@ -219,11 +219,8 @@ function handleFormSubmit(e) {
         attachment: currentImage
     }
     
-    // Add to list
-    submissions.push(submission)
-    
-    // Save to storage
-    saveToStorage()
+    // Publish the new state only after it has been persisted successfully.
+    if (!saveToStorage([...submissions, submission])) return
     
     // Update UI
     updateBadges()
@@ -274,10 +271,10 @@ function handleImageSelect(e) {
     reader.onload = (event) => {
         if (isImage) {
             // Compress image
-            compressImage(event.target.result, file.type, (compressedData) => {
+            compressImage(event.target.result, (compressedData) => {
                 currentImage = {
-                    name: file.name,
-                    mimeType: file.type || 'image/jpeg',
+                    name: `${file.name.replace(/\.[^.]+$/, '') || 'beleg'}.jpg`,
+                    mimeType: 'image/jpeg',
                     dataBase64: compressedData.split(',')[1] // Remove data URL prefix
                 }
                 
@@ -307,7 +304,7 @@ function handleImageSelect(e) {
     reader.readAsDataURL(file)
 }
 
-function compressImage(dataUrl, mimeType, callback) {
+function compressImage(dataUrl, callback) {
     const img = new Image()
     img.onload = () => {
         const canvas = document.createElement('canvas')
@@ -412,8 +409,7 @@ function handleDeleteSubmission(id) {
         message: 'Diese Buchung wird aus der Liste entfernt.',
         confirmText: 'Löschen',
         onConfirm: () => {
-            submissions = submissions.filter(s => s.id !== id)
-            saveToStorage()
+            if (!saveToStorage(submissions.filter(s => s.id !== id))) return
             updateBadges()
             renderSubmissionsList()
             showToast('Buchung gelöscht', 'success')
@@ -428,8 +424,7 @@ function handleClearAll() {
         message: 'Alle Buchungen werden unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.',
         confirmText: 'Alle löschen',
         onConfirm: () => {
-            submissions = []
-            saveToStorage()
+            if (!saveToStorage([])) return
             updateBadges()
             renderSubmissionsList()
             showToast('Alle Buchungen gelöscht', 'success')
@@ -500,11 +495,15 @@ function handleDownload() {
 }
 
 // ===== Storage =====
-function saveToStorage() {
+function saveToStorage(nextSubmissions) {
     try {
-        localStorage.setItem('vereino-submissions', JSON.stringify(submissions))
+        localStorage.setItem('vereino-submissions', JSON.stringify(nextSubmissions))
+        submissions = nextSubmissions
+        return true
     } catch (e) {
         console.error('Failed to save to localStorage', e)
+        showToast('Änderung konnte nicht gespeichert werden. Bitte erneut versuchen oder vorhandene Buchungen exportieren.', 'error')
+        return false
     }
 }
 

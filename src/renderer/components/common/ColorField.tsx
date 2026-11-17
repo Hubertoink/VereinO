@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react'
+import { useId, useState } from 'react';
 import { IconPalette, IconX } from '@tabler/icons-react'
 import MasterDataDialog from './MasterDataDialog'
 import RandomColorButton from './RandomColorButton'

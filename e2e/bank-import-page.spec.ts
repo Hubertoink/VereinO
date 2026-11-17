@@ -19,7 +19,7 @@ test.beforeAll(async () => {
     'src/renderer/views/BankImport/bankImportPage.css',
     'src/renderer/views/BankImport/bankImportRemap.css'
   ].map(file => fs.readFile(file, 'utf8')))).join('\n')
-  const result = await build({
+  const result = await build({ jsx: 'automatic',
     stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
       import React from 'react'
       import { createRoot } from 'react-dom/client'

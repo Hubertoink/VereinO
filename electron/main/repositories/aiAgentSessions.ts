@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { getDb } from '../db/database'
 import { ensureAiTables } from '../db/migrations'
 
-type DB = ReturnType<typeof getDb>
+
 
 export type AiAgentSessionRow = {
   id: string

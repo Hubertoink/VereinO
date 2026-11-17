@@ -1,9 +1,9 @@
 import EarmarkUsageCards from '../../components/tiles/EarmarkUsageCards'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 import type { RendererApi } from '../../../types/api'
-const money = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
+
 type Binding = Awaited<ReturnType<RendererApi['bindings']['list']>>['rows'][number]
-type Usage = Awaited<ReturnType<RendererApi['bindings']['usage']>>
+
 export default function DashboardBindings({ from, to, revision }: { from: string; to: string; revision: number }) {
   const [rows, setRows] = useState<Binding[] | null>(null)
   const [error, setError] = useState(false)

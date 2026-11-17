@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 import { addDataChangedListener } from '../../utils/refresh'
 
 type Account = { id: number; name: string; balance: number; isActive: number; color?: string | null }

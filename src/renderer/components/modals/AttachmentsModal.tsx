@@ -1,6 +1,6 @@
 import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import ReceiptZoomControl from '../ReceiptZoomControl'
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom'
 import { IconExternalLink, IconDownload, IconPlus, IconChevronLeft, IconChevronRight, IconTrash, IconFile, IconPhoto as IconImage, IconReceipt2, IconCalendar, IconWallet, IconCategory, IconTag, IconArrowDown, IconArrowUp, IconArrowsExchange, IconPaperclip } from '@tabler/icons-react'
 import { useToast } from '../../context/useToast'

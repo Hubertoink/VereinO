@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react';
 import { IconTag } from '@tabler/icons-react'
 import MasterDataDialog, { FieldLabel } from '../common/MasterDataDialog'
 import ColorField from '../common/ColorField'

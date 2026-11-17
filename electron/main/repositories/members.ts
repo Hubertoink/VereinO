@@ -128,7 +128,7 @@ export function listMembers(params: MembersListParams): { rows: MemberRow[]; tot
     const summary = filtered.reduce((acc, member) => {
       if (member.status === 'ACTIVE') acc.active++
       const overdue = Math.max(0, statuses.get(member.id)?.overdue || 0)
-      const amount = Math.max(0, member.contribution_amount || 0)
+
       if (overdue > 0) { acc.dueMembers++; acc.dueAmount += Math.round((statuses.get(member.id)?.dueAmount || 0) * 100) }
       return acc
     }, { active: 0, dueMembers: 0, dueAmount: 0 })

@@ -68,8 +68,9 @@ button.modal-close-button svg { width: 16px; height: 16px; pointer-events: none;
 .modal-header-bar .booking-modal-header-actions { align-self: center; align-items: center; gap: 8px; }
 .modal-header-bar .booking-modal-header-actions .booking-modal-icon-btn { width: 34px; height: 32px; border-radius: 6px; }
 
-/* Detached windows keep native controls at the outer frame edge. */
-.modal-header-bar.modal-header-bar.detached-booking-titlebar { padding: 0; align-items: stretch; }
+/* Detached windows keep native controls at the outer frame edge, including
+   below the shared header's responsive breakpoint. */
+.modal-header-bar.modal-header-bar.modal-header-bar.detached-booking-titlebar { padding: 0; align-items: stretch; }
 .modal-header-bar.detached-booking-titlebar .booking-editor-title { padding: 12px 14px; }
 .modal-header-bar.detached-booking-titlebar .booking-modal-header-actions { align-self: flex-start; gap: 0; }
 

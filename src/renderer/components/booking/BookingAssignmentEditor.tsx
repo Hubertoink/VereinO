@@ -1,4 +1,4 @@
-import React from 'react'
+
 import { IconPlus, IconX } from '@tabler/icons-react'
 import BookingDetailPopover from './BookingDetailPopover'
 

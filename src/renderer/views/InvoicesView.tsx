@@ -1,6 +1,7 @@
+import { getContrastTextColor as contrastText } from '../utils/tagColors'
 import ResponsiveSearch from '../components/common/ResponsiveSearch'
 import ManagementKpis, { InvoicePaymentProgress, InvoiceDueHint } from '../components/finance/ManagementKpis'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom'
 import { IconBuildingBank, IconCash, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconFileImport, IconPaperclip, IconPlus, IconX } from '@tabler/icons-react'
 import { useToast } from '../context/useToast'
@@ -32,17 +33,7 @@ import type {
   InvoiceTagDef
 } from './invoicesShared/types'
 
-function contrastText(bg?: string | null) {
-  if (!bg) return '#000'
-  const m = /^#?([0-9a-fA-F]{6})$/.exec((bg || '').trim())
-  if (!m) return '#000'
-  const hex = m[1]
-  const r = parseInt(hex.slice(0, 2), 16)
-  const g = parseInt(hex.slice(2, 4), 16)
-  const b = parseInt(hex.slice(4, 6), 16)
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.6 ? '#000' : '#fff'
-}
+
 
 type PageShortcutAction = {
   id: string

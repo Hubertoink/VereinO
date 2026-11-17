@@ -423,6 +423,22 @@
 .bp-assignment { grid-auto-rows: minmax(24px, auto); }
 .bp-assignment-edit-row { min-height: 24px; }
 
+/* Only the fields and actions that change between reading and editing fade in. */
+.bp-inspector .bp-inspector-scroll > :is(.bp-detail-tag-row, .bp-assignment, .bp-assignment-edit-row, .bp-note, .bp-note-input),
+.bp-inspector .bp-detail-actions {
+  animation: bp-detail-mode-in 180ms ease-out;
+}
+
+@keyframes bp-detail-mode-in {
+  from { opacity: .35; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-inspector .bp-inspector-scroll > :is(.bp-detail-tag-row, .bp-assignment, .bp-assignment-edit-row, .bp-note, .bp-note-input),
+  .bp-inspector .bp-detail-actions { animation: none; }
+}
+
 @media (max-width: 1100px) {
  .bp-toolbar { flex-wrap: wrap; gap: 10px; }
  .bp-toolbar .bp-invoice-tools { margin-left: auto; }

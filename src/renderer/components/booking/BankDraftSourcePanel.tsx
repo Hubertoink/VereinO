@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { BankSourceField as Field } from '../../hooks/useBankDraftSourceHighlight'
 import { createPortal } from 'react-dom'
 import type { BankDraftSource } from '../../types/bankDraftSource'

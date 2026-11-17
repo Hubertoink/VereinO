@@ -8,6 +8,7 @@ import ReportsMonthlyChart from '../../components/reports/ReportsMonthlyChart'
 import ReportsSphereDonut from '../../components/reports/ReportsSphereDonut'
 import ReportsPaymentMethodBars from '../../components/reports/ReportsPaymentMethodBars'
 import ReportsInOutLines from '../../components/reports/ReportsInOutLines'
+import { useReportMonthlyData } from '../../components/reports/useReportMonthlyData'
 import { FilterDropdown, MetaFilterDropdown, TimeFilterDropdown } from '../../components/dropdowns'
 import ExportOptionsModal from '../../components/modals/ExportOptionsModal'
 import ActivityReportEditorModal from './ActivityReportEditorModal'
@@ -66,6 +67,16 @@ export default function ReportsView(props: {
     refreshKey,
     activateKey
   } = props
+
+  const monthly = useReportMonthlyData({
+    from: from || undefined,
+    to: to || undefined,
+    sphere: filterSphere || undefined,
+    type: filterType || undefined,
+    paymentMethod: filterPM || undefined,
+    earmarkId: filterEarmark || undefined,
+    budgetId: filterBudgetId || undefined
+  }, refreshKey)
 
   const hasActiveFilters = filterSphere || filterType || filterPM || filterEarmark != null || filterBudgetId != null || from || to
 
@@ -300,11 +311,13 @@ export default function ReportsView(props: {
         <ReportsSphereDonut refreshKey={refreshKey} from={from || undefined} to={to || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
         <ReportsPaymentMethodBars refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
       </div>
-      <div className="reports-chart-stack">
-        <ReportsMonthlyChart activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
-        <ReportsInOutLines type={filterType || undefined} activateKey={activateKey} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
-      </div>
-      <ReportsAnalytics refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
+      {!monthly.error && (
+        <div className="reports-chart-stack">
+          <ReportsMonthlyChart activateKey={activateKey} from={from || undefined} to={to || undefined} data={monthly.model} loading={monthly.loading} />
+          <ReportsInOutLines activateKey={activateKey} from={from || undefined} to={to || undefined} data={monthly.model} loading={monthly.loading} />
+        </div>
+      )}
+      <ReportsAnalytics from={from || undefined} to={to || undefined} data={monthly.model} loading={monthly.loading} error={monthly.error} onRetry={monthly.reload} />
     </div>
   )
 }

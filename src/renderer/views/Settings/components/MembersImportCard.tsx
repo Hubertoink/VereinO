@@ -1,20 +1,12 @@
 import { useState, useRef, useMemo, memo, useCallback } from 'react'
 import ModalHeader from '../../../components/ModalHeader'
 import { createPortal } from 'react-dom'
-import { dispatchDataChanged } from '../../../utils/refresh'
+import { bufferToBase64Safe } from '../../../utils/fileEncoding'
+import type { MembersImportExecuteResult as MembersImportResult } from '../../../../../shared/membersImport'
 import { IconAlertTriangle, IconCalendar, IconCircleCheck, IconCreditCard, IconDeviceMobile, IconHome, IconNotes, IconPencil, IconPlayerSkipForward, IconUser } from '@tabler/icons-react'
 
 interface MembersImportCardProps {
   notify?: (type: 'success' | 'error' | 'info', text: string, ms?: number, action?: { label: string; onClick: () => void }) => void
-}
-
-type MembersImportResult = {
-  imported: number
-  updated: number
-  skipped: number
-  errors: Array<{ row: number; message: string }>
-  rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>
-  errorFilePath?: string
 }
 
 type SampleRow = Record<string, any> & { _rowIndex?: number; _isHintRow?: boolean }
@@ -268,16 +260,6 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
   const fileRef = useRef<HTMLInputElement | null>(null)
   const [error, setError] = useState<string>('')
 
-  function bufferToBase64(buf: ArrayBuffer) {
-    const bytes = new Uint8Array(buf)
-    const chunk = 0x8000
-    let binary = ''
-    for (let i = 0; i < bytes.length; i += chunk) {
-      binary += String.fromCharCode.apply(null as any, bytes.subarray(i, i + chunk) as any)
-    }
-    return btoa(binary)
-  }
-
   async function processFile(f: File) {
     setError('')
     setResult(null)
@@ -285,11 +267,11 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
     setFileName(f.name)
     try {
       const buf = await f.arrayBuffer()
-      const b64 = bufferToBase64(buf)
+      const b64 = bufferToBase64Safe(buf)
       setBase64(b64)
       setBusy(true)
       try {
-        const prev = await (window as any).api?.members?.import?.preview?.({ fileBase64: b64 })
+        const prev = await window.api.members.import.preview({ fileBase64: b64 })
         if (prev) {
           setHeaders(prev.headers)
           setSample(prev.sample as SampleRow[])
@@ -334,7 +316,7 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
         }
       }
       
-      const res = await (window as any).api?.members?.import?.execute?.({ 
+      const res = await window.api.members.import.execute({
         fileBase64: base64, 
         mapping,
         updateExisting,
@@ -342,8 +324,6 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
       })
       if (res) {
         setResult(res)
-        // let app know data changed
-        dispatchDataChanged(['members'])
         if ((res.errors?.length || 0) > 0) {
           setShowErrorsModal(true)
           if (res.errorFilePath) {
@@ -387,24 +367,6 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
     { key: 'mandate_date', label: 'Mandatsdatum' },
     { key: 'notes', label: 'Notizen' }
   ]
-
-  // Helper: get required columns based on current mapping
-  const getRequiredColumns = useMemo(() => {
-    const required: string[] = []
-    // memberNo is always required
-    if (mapping.memberNo) required.push(mapping.memberNo)
-    // join_date is always required
-    if (mapping.join_date) required.push(mapping.join_date)
-    // either name OR (firstName AND lastName)
-    const hasName = !!mapping.name
-    const hasFirstLast = !!mapping.firstName && !!mapping.lastName
-    if (hasName && mapping.name) required.push(mapping.name)
-    if (!hasName && hasFirstLast) {
-      if (mapping.firstName) required.push(mapping.firstName)
-      if (mapping.lastName) required.push(mapping.lastName)
-    }
-    return required
-  }, [mapping])
 
   // Validate a row and return missing required fields (by header name)
   const validateRow = useCallback((row: SampleRow, rowIdx: number): string[] => {
@@ -527,7 +489,7 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
             className="btn"
             onClick={async () => {
               try {
-                const res = await (window as any).api?.members?.import?.template?.()
+                const res = await window.api.members.import.template()
                 if (res?.filePath) {
                   setError('')
                   setResult(null)
@@ -550,7 +512,7 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
             className="btn"
             onClick={async () => {
               try {
-                const res = await (window as any).api?.members?.import?.testdata?.()
+                const res = await window.api.members.import.testdata()
                 if (res?.filePath) {
                   setError('')
                   setResult(null)

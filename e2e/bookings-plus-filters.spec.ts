@@ -30,7 +30,7 @@ test('compact rows and removable filter chips retain the detail inspector', asyn
 })
 
 test.beforeAll(async () => {
-  const result = await build({
+  const result = await build({ jsx: 'automatic',
     stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
       import React, { useState } from 'react'
       import { createRoot } from 'react-dom/client'

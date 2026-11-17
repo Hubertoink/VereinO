@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { IconSearch, IconX } from '@tabler/icons-react'
 import AppIcon from './AppIcon'
 import FilterDropdown from '../dropdowns/FilterDropdown'

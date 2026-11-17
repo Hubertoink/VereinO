@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 import { VoucherType, PaymentMethod } from './types'
 
 type DistributionRow = { key: string; gross: number; color?: string | null }

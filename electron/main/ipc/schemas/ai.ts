@@ -171,6 +171,40 @@ export const AiBankImportAction = z.enum([
   'MARK_CHECKED',
   'NEEDS_MANUAL_REVIEW'
 ])
+
+type BankImportActionFields = {
+  action: z.infer<typeof AiBankImportAction>
+  voucherId?: number | null
+  bookingCandidate?: unknown
+  recurringBookingId?: number | null
+  occurrenceId?: number | null
+  scheduledDate?: string | null
+}
+
+function validateBankImportAction(value: BankImportActionFields, ctx: z.RefinementCtx) {
+  if (value.action === 'LINK_EXISTING' && !value.voucherId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'LINK_EXISTING requires voucherId',
+      path: ['voucherId']
+    })
+  }
+  if (value.action === 'CREATE_BOOKING' && !value.bookingCandidate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'CREATE_BOOKING requires bookingCandidate',
+      path: ['bookingCandidate']
+    })
+  }
+  if (value.action === 'APPLY_RECURRING' && (!value.recurringBookingId || (!value.occurrenceId && !value.scheduledDate))) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'APPLY_RECURRING requires recurringBookingId and occurrenceId or scheduledDate',
+      path: ['recurringBookingId']
+    })
+  }
+}
+
 export const AiBankImportReviewSuggestion = z
   .object({
     membership: z.object({ memberId: z.number().int().positive(), startPeriod: z.string().nullable().optional() }).nullable().optional(),
@@ -194,29 +228,7 @@ export const AiBankImportReviewSuggestion = z
     evidence: z.array(z.string()).default([]),
     transaction: z.record(z.any()).optional()
   })
-  .superRefine((value, ctx) => {
-    if (value.action === 'LINK_EXISTING' && !value.voucherId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'LINK_EXISTING requires voucherId',
-        path: ['voucherId']
-      })
-    }
-    if (value.action === 'CREATE_BOOKING' && !value.bookingCandidate) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'CREATE_BOOKING requires bookingCandidate',
-        path: ['bookingCandidate']
-      })
-    }
-    if (value.action === 'APPLY_RECURRING' && (!value.recurringBookingId || (!value.occurrenceId && !value.scheduledDate))) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'APPLY_RECURRING requires recurringBookingId and occurrenceId or scheduledDate',
-        path: ['recurringBookingId']
-      })
-    }
-  })
+  .superRefine(validateBankImportAction)
 
 export const AiBankImportReviewResult = z.object({
   suggestions: z.array(AiBankImportReviewSuggestion).default([]),
@@ -242,29 +254,7 @@ export const AiBankImportReviewSuggestionStructured = z
     warnings: z.array(z.string()),
     evidence: z.array(z.string())
   })
-  .superRefine((value, ctx) => {
-    if (value.action === 'LINK_EXISTING' && !value.voucherId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'LINK_EXISTING requires voucherId',
-        path: ['voucherId']
-      })
-    }
-    if (value.action === 'CREATE_BOOKING' && !value.bookingCandidate) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'CREATE_BOOKING requires bookingCandidate',
-        path: ['bookingCandidate']
-      })
-    }
-    if (value.action === 'APPLY_RECURRING' && (!value.recurringBookingId || (!value.occurrenceId && !value.scheduledDate))) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'APPLY_RECURRING requires recurringBookingId and occurrenceId or scheduledDate',
-        path: ['recurringBookingId']
-      })
-    }
-  })
+  .superRefine(validateBankImportAction)
 
 export const AiBankImportReviewResultStructured = z.object({
   suggestions: z.array(AiBankImportReviewSuggestionStructured),

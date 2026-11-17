@@ -1,4 +1,4 @@
-import React from 'react'
+
 import './financeOverview.css'
 
 export default function FinanceSparkline({ values, label }: { values: number[]; label: string }) {

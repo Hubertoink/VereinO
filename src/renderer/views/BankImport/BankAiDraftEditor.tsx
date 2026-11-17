@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react';
 import type { BankBookingCandidate } from '../../../../shared/bankAiBatch'
 import type { ClassificationValue } from '../../../../shared/classification'
 import BookingOptionalArea from '../../components/booking/BookingOptionalArea'

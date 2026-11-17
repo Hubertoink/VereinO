@@ -1,3 +1,5 @@
+import { createExportStamp, ensureExportsDir } from './exportPaths'
+import { normalizeLookup } from '../../../shared/textLookup'
 import { currentAiBookingComment } from './aiBookingPolicy'
 import { createAiMasterData, getAiMasterDataPermissions, resolveAiMasterData } from './aiMasterData'
 import { createReimbursementTools } from './aiReimbursementTools'
@@ -6,7 +8,6 @@ import { z } from 'zod'
 import { BrowserWindow } from 'electron'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import os from 'node:os'
 import ExcelJS from 'exceljs'
 import { listBankTransactions, findBankTransactionMatches, getBankTransaction } from '../repositories/bankTransactions'
 import { listBindings } from '../repositories/bindings'
@@ -78,16 +79,6 @@ function parseArgs<T>(schema: z.ZodType<T>, args: unknown) {
 
 const nullableString = { type: ['string', 'null'] }
 const nullableNumber = { type: ['number', 'null'] }
-
-function normalizeLookup(value: unknown) {
-  return String(value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/ß/g, 'ss')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-}
 
 function displayMemberValue(field: string, value: unknown) {
   if (value == null || value === '') return '-'
@@ -305,17 +296,6 @@ const reportFieldLabels: Record<string, string> = {
   tags: 'Tags'
 }
 
-async function ensureReportExportDir() {
-  const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
-  await fs.mkdir(baseDir, { recursive: true })
-  return baseDir
-}
-
-function reportStamp() {
-  const when = new Date()
-  return `${when.getFullYear()}-${String(when.getMonth() + 1).padStart(2, '0')}-${String(when.getDate()).padStart(2, '0')}_${String(when.getHours()).padStart(2, '0')}${String(when.getMinutes()).padStart(2, '0')}`
-}
-
 function escapeHtml(value: unknown) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[char])
 }
@@ -404,8 +384,8 @@ function renderAgentContentHtml(markdown: string) {
 }
 
 async function exportAgentContentPdf(args: AgentContentPdfExportInput) {
-  const dir = await ensureReportExportDir()
-  const filePath = path.join(dir, `${safeFilePart(args.fileName || args.title, 'VereinO-Agent-PDF')}_${reportStamp()}.pdf`)
+  const dir = await ensureExportsDir()
+  const filePath = path.join(dir, `${safeFilePart(args.fileName || args.title, 'VereinO-Agent-PDF')}_${createExportStamp()}.pdf`)
   const title = args.title || 'VereinO Agent PDF'
   const html = `<!doctype html>
 <html lang="de"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
@@ -584,8 +564,8 @@ ${includeVoucherList ? `<section class="card" style="margin-top:12px"><h2>Buchun
 async function exportAgentReport(args: AgentReportExportInput) {
   const rows = reportRows(args)
   const fields = args.fields?.length ? args.fields : ['date', 'voucherNo', 'type', 'sphere', 'description', 'status', 'paymentMethod', 'netAmount', 'vatAmount', 'grossAmount', 'tags']
-  const dir = await ensureReportExportDir()
-  const fileBase = `${args.type === 'JOURNAL' ? 'Journal' : 'Controlling'}_${reportStamp()}`
+  const dir = await ensureExportsDir()
+  const fileBase = `${args.type === 'JOURNAL' ? 'Journal' : 'Controlling'}_${createExportStamp()}`
   const filePath = path.join(dir, `${fileBase}.${args.format.toLowerCase()}`)
   const outNegative = args.amountMode === 'OUT_NEGATIVE'
 

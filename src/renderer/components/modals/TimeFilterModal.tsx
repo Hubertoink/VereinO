@@ -1,6 +1,6 @@
 import ModalHeader from '../ModalHeader'
 import DateFilterInput from '../common/DateFilterInput'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 
 export default function TimeFilterModal({ open, onClose, yearsAvail, from, to, onApply }: {
   open: boolean

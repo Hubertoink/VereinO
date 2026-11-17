@@ -4,8 +4,8 @@ import MemberContributionDialog from './MemberContributionDialog'
 import type { DashboardTaskTarget } from '../../../../shared/dashboardTasks'
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { IconCalendarCheck, IconCalendarDue, IconCheck, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconFileExport, IconFilter, IconMail, IconPencil, IconPlus, IconTrash, IconX } from '@tabler/icons-react'
-import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
+import { IconCalendarCheck, IconCalendarDue, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconFileExport, IconFilter, IconMail, IconPencil, IconPlus, IconTrash, IconX } from '@tabler/icons-react';
+import ModalHeader from '../../components/ModalHeader';
 
 import ColumnSelectDropdown from '../../components/dropdowns/ColumnSelectDropdown'
 import FilterDropdown from '../../components/dropdowns/FilterDropdown'
@@ -49,7 +49,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
     const [rows, setRows] = useState<Array<{ id: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status: string; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null; iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null; mandate_ref?: string | null; mandate_date?: string | null; join_date?: string | null; leave_date?: string | null; notes?: string | null; next_due_date?: string | null }>>([])
     const [total, setTotal] = useState(0)
     const [memberSummary, setMemberSummary] = useState<{ active: number; dueMembers: number; dueAmount: number } | null>(null)
-    const [limit, setLimit] = useState(50)
+    const [limit] = useState(50)
     const [offset, setOffset] = useState(0)
     useEffect(() => {
         if (initialTask?.kind !== 'members') return
@@ -1039,15 +1039,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
     )
 }
 
-interface VoucherSuggestion {
-    id: number
-    voucherNo: string
-    date: string
-    description?: string | null
-    counterparty?: string | null
-    gross: number
-    score?: number
-}
+
 
 function MemberFilterDropdown({
     status,
@@ -1297,23 +1289,4 @@ function sanitizePeriodKey(s: string, interval: 'MONTHLY'|'QUARTERLY'|'YEARLY'):
     }
     const y = /^\d{4}$/.exec(t)?.[0]
     return y || t
-}
-
-function periodRangeLocal(periodKey: string): { start: string; end: string } {
-    const [yStr, rest] = periodKey.split('-'); const y = Number(yStr)
-    if (/^Q\d$/.test(rest||'')) {
-        const q = Number((rest||'Q1').replace('Q',''))
-        const start = new Date(Date.UTC(y, (q-1)*3, 1))
-        const end = new Date(Date.UTC(y, q*3, 0))
-        return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) }
-    }
-    if (rest) {
-        const m = Number(rest)
-        const start = new Date(Date.UTC(y, m-1, 1))
-        const end = new Date(Date.UTC(y, m, 0))
-        return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) }
-    }
-    const start = new Date(Date.UTC(y, 0, 1))
-    const end = new Date(Date.UTC(y, 12, 0))
-    return { start: start.toISOString().slice(0,10), end: end.toISOString().slice(0,10) }
 }

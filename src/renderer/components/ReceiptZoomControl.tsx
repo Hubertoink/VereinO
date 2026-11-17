@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react';
 import { IconMinus, IconPlus } from '@tabler/icons-react'
 import CompactPopover from './CompactPopover'
 

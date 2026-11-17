@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react';
 import { SideNav, type SideNavProps } from './SideNav'
 import './sidebar.css'
 import { createPortal } from 'react-dom'

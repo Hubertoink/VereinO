@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 import { IconArrowRight, IconFileDescription, IconSparkles } from '@tabler/icons-react'
 import type { BankBookingCandidate, BankTransaction } from '../../../../shared/bankAiBatch'
 

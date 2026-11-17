@@ -1,6 +1,6 @@
 import ModalHeader from '../ModalHeader'
 import { IconTags } from '@tabler/icons-react'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom'
 import TagModal, { TagValue } from './TagModal'
 import TagDeleteModal, { TagDeleteTarget } from './TagDeleteModal'

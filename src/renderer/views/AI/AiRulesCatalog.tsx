@@ -1,5 +1,5 @@
 import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
-import React, { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react';
 
 
 import type { TAiKnowledgeRulesListOutput } from '../../../../electron/main/ipc/schemas'

@@ -12,23 +12,8 @@ import { getSetting } from './settings'
 // We use ExcelJS for XLSX export - already a dependency
 import ExcelJS from 'exceljs'
 
-export type MemberExportField =
-  | 'memberNo'
-  | 'name'
-  | 'email'
-  | 'phone'
-  | 'address'
-  | 'status'
-  | 'boardRole'
-  | 'iban'
-  | 'bic'
-  | 'contribution_amount'
-  | 'contribution_interval'
-  | 'mandate_ref'
-  | 'mandate_date'
-  | 'join_date'
-  | 'leave_date'
-  | 'notes'
+import type { MemberExportField } from '../../../shared/memberExport'
+export type { MemberExportField } from '../../../shared/memberExport'
 
 export interface MembersExportOptions {
   format: 'XLSX' | 'PDF'

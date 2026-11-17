@@ -1,6 +1,6 @@
 import { getSetting } from './settings'
 import { getActiveOrganization } from '../db/database'
-import { listBindings } from '../repositories/bindings'
+import { listBindings, type Binding } from '../repositories/bindings'
 import { listBudgets } from '../repositories/budgets'
 import { listInvoicesPaged, summarizeInvoices } from '../repositories/invoices'
 import { listMembers } from '../repositories/members'
@@ -10,7 +10,7 @@ import { listParties } from '../repositories/parties'
 import { listRecurringBookings, recurringBookingsSummary } from '../repositories/recurringBookings'
 import { listTags } from '../repositories/tags'
 import { listAiKnowledgeRules } from '../repositories/aiAgentKnowledge'
-import { getOrganizationProfile, getOrganizationProfileDefinition, listPrimaryClassificationValues } from '../repositories/classifications'
+import { getOrganizationProfileDefinition, listPrimaryClassificationValues } from '../repositories/classifications'
 import {
   cashBalance,
   listVoucherYears,
@@ -20,7 +20,14 @@ import {
 } from '../repositories/vouchers'
 import type { AiContext } from './ai'
 
-function budgetLabelForAi(budget: any) {
+type BudgetForAiSource = Omit<NonNullable<AiContext['budgets']>[number], 'label'> & {
+  label?: string | null
+  name?: string | null
+}
+
+type TagForAiSource = Omit<NonNullable<AiContext['tags']>[number], 'usage'> & { usage?: unknown }
+
+function budgetLabelForAi(budget: BudgetForAiSource) {
   if (budget.label) return budget.label
   if (budget.name) return budget.name
   if (budget.categoryName) return `${budget.year} - ${budget.categoryName}`
@@ -39,7 +46,7 @@ function dateRangeForYear(year: number, today: string) {
   }
 }
 
-function compactReportSummary(filters: any = {}) {
+function compactReportSummary(filters: Parameters<typeof summarizeVouchers>[0] = {}) {
   const summary = summarizeVouchers(filters)
   const primaryClassificationLabel = summary.primaryClassificationLabel || 'Sphäre'
   return {
@@ -106,14 +113,51 @@ function compactPartyForAi(party: any) {
   }
 }
 
+function compactPaymentAccountForAi(account: ReturnType<typeof listPaymentAccounts>[number]): NonNullable<AiContext['paymentAccounts']>[number] {
+  return {
+    id: account.id,
+    name: account.name,
+    kind: account.kind,
+    ibanLast4: account.iban ? String(account.iban).replace(/\s+/g, '').slice(-4) : null,
+    color: account.color,
+    sortOrder: account.sortOrder,
+    isActive: account.isActive
+  }
+}
+
+function compactBudgetForAi(budget: BudgetForAiSource): NonNullable<AiContext['budgets']>[number] {
+  return {
+    id: budget.id,
+    label: budgetLabelForAi(budget),
+    year: budget.year,
+    sphere: budget.sphere,
+    categoryName: budget.categoryName,
+    projectName: budget.projectName,
+    amountPlanned: budget.amountPlanned,
+    isArchived: budget.isArchived
+  }
+}
+
+function compactEarmarkForAi(earmark: Pick<Binding, 'id' | 'code' | 'name' | 'isActive'>): NonNullable<AiContext['earmarks']>[number] {
+  return { id: earmark.id, code: earmark.code, name: earmark.name, isActive: earmark.isActive }
+}
+
+function compactTagForAi(tag: TagForAiSource): NonNullable<AiContext['tags']>[number] {
+  return { id: tag.id, name: tag.name, color: tag.color, usage: Number(tag.usage || 0) }
+}
+
+function compactPrimaryClassificationForAi(value: ReturnType<typeof listPrimaryClassificationValues>[number]): NonNullable<AiContext['primaryClassifications']>[number] {
+  return { id: value.id, name: value.name, stableKey: value.stableKey, color: value.color, icon: value.icon, isActive: value.isActive }
+}
+
 export function buildAiInvoiceContext(): AiContext {
-  const profile = getOrganizationProfile()
   const definition = getOrganizationProfileDefinition()
-  const primaryClassifications = listPrimaryClassificationValues().map((value) => ({ id: value.id, name: value.name, stableKey: value.stableKey, color: value.color, icon: value.icon, isActive: value.isActive }))
-  const paymentAccounts = listPaymentAccounts({ activeOnly: true } as any) || []
-  const budgets = listBudgets({ includeArchived: true } as any) || []
-  const earmarks = listBindings({ activeOnly: true } as any) || []
-  const tags = listTags({ includeUsage: true } as any) || []
+  const profile = definition.profile
+  const primaryClassifications = listPrimaryClassificationValues().map(compactPrimaryClassificationForAi)
+  const paymentAccounts = listPaymentAccounts({ activeOnly: true }) || []
+  const budgets = listBudgets({ includeArchived: true }) || []
+  const earmarks = listBindings({ activeOnly: true }) || []
+  const tags = listTags({ includeUsage: true }) || []
   const parties = listParties({ activeOnly: true, limit: 500 }) || []
   const aiRules = listAiKnowledgeRules({ enabledOnly: true, scope: 'INVOICES' })
 
@@ -122,41 +166,14 @@ export function buildAiInvoiceContext(): AiContext {
     aiRules,
     primaryClassifications,
     generatedAt: new Date().toISOString().slice(0, 10),
-    paymentAccounts: paymentAccounts.map((account: any) => ({
-      id: account.id,
-      name: account.name,
-      kind: account.kind,
-      ibanLast4: account.iban ? String(account.iban).replace(/\s+/g, '').slice(-4) : null,
-      color: account.color,
-      sortOrder: account.sortOrder,
-      isActive: account.isActive
-    })),
+    paymentAccounts: paymentAccounts.map(compactPaymentAccountForAi),
     budgets: budgets
-      .filter((budget: any) => budget.isArchived !== 1)
-      .map((budget: any) => ({
-        id: budget.id,
-        label: budgetLabelForAi(budget),
-        year: budget.year,
-        sphere: budget.sphere,
-        categoryName: budget.categoryName,
-        projectName: budget.projectName,
-        amountPlanned: budget.amountPlanned,
-        isArchived: budget.isArchived
-      })),
+      .filter((budget: BudgetForAiSource) => budget.isArchived !== 1)
+      .map(compactBudgetForAi),
     earmarks: earmarks
-      .filter((earmark: any) => earmark.isActive !== 0)
-      .map((earmark: any) => ({
-        id: earmark.id,
-        code: earmark.code,
-        name: earmark.name,
-        isActive: earmark.isActive
-      })),
-    tags: tags.slice(0, 120).map((tag: any) => ({
-      id: tag.id,
-      name: tag.name,
-      color: tag.color,
-      usage: Number(tag.usage || 0)
-    })),
+      .filter((earmark: Binding) => earmark.isActive !== 0)
+      .map(compactEarmarkForAi),
+    tags: tags.slice(0, 120).map(compactTagForAi),
     parties: parties.map(compactPartyForAi)
   }
 }
@@ -164,9 +181,9 @@ export function buildAiInvoiceContext(): AiContext {
 export function buildAiContext(): AiContext {
   const today = new Date().toISOString().slice(0, 10)
   const currentYear = Number(today.slice(0, 4))
-  const profile = getOrganizationProfile()
   const definition = getOrganizationProfileDefinition()
-  const primaryClassifications = listPrimaryClassificationValues().map((value) => ({ id: value.id, name: value.name, stableKey: value.stableKey, color: value.color, icon: value.icon, isActive: value.isActive }))
+  const profile = definition.profile
+  const primaryClassifications = listPrimaryClassificationValues().map(compactPrimaryClassificationForAi)
   const organization = (() => {
     try {
       const active = getActiveOrganization() as any
@@ -180,10 +197,10 @@ export function buildAiContext(): AiContext {
       return undefined
     }
   })()
-  const paymentAccounts = listPaymentAccounts({ activeOnly: true } as any) || []
-  const budgets = listBudgets({ includeArchived: true } as any) || []
-  const earmarks = listBindings({} as any) || []
-  const tags = listTags({ includeUsage: true } as any) || []
+  const paymentAccounts = listPaymentAccounts({ activeOnly: true }) || []
+  const budgets = listBudgets({ includeArchived: true }) || []
+  const earmarks = listBindings({}) || []
+  const tags = listTags({ includeUsage: true }) || []
   const parties = listParties({ activeOnly: true, limit: 500 }) || []
   const aiRules = listAiKnowledgeRules({ enabledOnly: true })
   const members = listMembers({ status: 'ALL', limit: 2000, sortBy: 'name', sort: 'ASC' } as any)
@@ -199,6 +216,7 @@ export function buildAiContext(): AiContext {
   const currentRange = dateRangeForYear(currentYear, today)
   const currentYearIncome = summarizeVouchers({ ...currentRange, type: 'IN' } as any).totals
   const currentYearExpenses = summarizeVouchers({ ...currentRange, type: 'OUT' } as any).totals
+  const currentYearSummary = compactReportSummary(currentRange)
   const latestVouchers = listVouchersAdvanced({ limit: 500, sort: 'DESC' } as any).map(
     compactVoucherForAi
   )
@@ -259,37 +277,10 @@ export function buildAiContext(): AiContext {
     aiRules,
     primaryClassifications,
     generatedAt: today,
-    paymentAccounts: paymentAccounts.map((account: any) => ({
-      id: account.id,
-      name: account.name,
-      kind: account.kind,
-      ibanLast4: account.iban ? String(account.iban).replace(/\s+/g, '').slice(-4) : null,
-      color: account.color,
-      sortOrder: account.sortOrder,
-      isActive: account.isActive
-    })),
-    budgets: budgets.map((budget: any) => ({
-      id: budget.id,
-      label: budgetLabelForAi(budget),
-      year: budget.year,
-      sphere: budget.sphere,
-      categoryName: budget.categoryName,
-      projectName: budget.projectName,
-      amountPlanned: budget.amountPlanned,
-      isArchived: budget.isArchived
-    })),
-    earmarks: earmarks.map((earmark: any) => ({
-      id: earmark.id,
-      code: earmark.code,
-      name: earmark.name,
-      isActive: earmark.isActive
-    })),
-    tags: tags.map((tag: any) => ({
-      id: tag.id,
-      name: tag.name,
-      color: tag.color,
-      usage: Number(tag.usage || 0)
-    })),
+    paymentAccounts: paymentAccounts.map(compactPaymentAccountForAi),
+    budgets: budgets.map(compactBudgetForAi),
+    earmarks: earmarks.map(compactEarmarkForAi),
+    tags: tags.map(compactTagForAi),
     parties: parties.map(compactPartyForAi),
     members: {
       total: members.total,
@@ -318,7 +309,7 @@ export function buildAiContext(): AiContext {
       currentDate: today,
       currentYear,
       allTime: compactReportSummary({ includeInternalVouchers: true }),
-      currentYearToDate: compactReportSummary(currentRange),
+      currentYearToDate: currentYearSummary,
       currentYearIncomeGross: roundMoney(currentYearIncome?.gross),
       currentYearExpenseGross: roundMoney(currentYearExpenses?.gross),
       cashBalance: cashBalance({ to: today } as any),
@@ -327,12 +318,12 @@ export function buildAiContext(): AiContext {
       monthlyCurrentYearExpenses: monthlyVouchers({ ...currentRange, type: 'OUT' } as any),
       yearly: years.map((year) => {
         const range = dateRangeForYear(year, today)
-        const income = summarizeVouchers({ ...range, type: 'IN' } as any).totals
-        const expenses = summarizeVouchers({ ...range, type: 'OUT' } as any).totals
+        const income = year === currentYear ? currentYearIncome : summarizeVouchers({ ...range, type: 'IN' } as any).totals
+        const expenses = year === currentYear ? currentYearExpenses : summarizeVouchers({ ...range, type: 'OUT' } as any).totals
         return {
           year,
           range,
-          summary: compactReportSummary(range),
+          summary: year === currentYear ? currentYearSummary : compactReportSummary(range),
           incomeGross: roundMoney(income?.gross),
           expenseGross: roundMoney(expenses?.gross)
         }

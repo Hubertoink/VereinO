@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { mkdir } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 
@@ -7,8 +8,18 @@ type ExportStampOptions = {
   baseDate?: Date
 }
 
+function exportsDir(): string {
+  return path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
+}
+
+export async function ensureExportsDir(): Promise<string> {
+  const dir = exportsDir()
+  await mkdir(dir, { recursive: true })
+  return dir
+}
+
 export function getExportsDir(): string {
-  const baseDir = path.join(os.homedir(), 'Documents', 'VereinPlannerExports')
+  const baseDir = exportsDir()
   try {
     fs.mkdirSync(baseDir, { recursive: true })
   } catch {

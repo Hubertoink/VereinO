@@ -2,30 +2,16 @@ import ExcelJS from 'exceljs'
 import { Buffer as NodeBuffer } from 'node:buffer'
 import { dialog, app } from 'electron'
 import path from 'path'
-import fs from 'fs'
-import { createMember, listMembers } from '../repositories/members'
-import { getDb, withTransaction } from '../db/database'
+import { createMember, updateMember } from '../repositories/members'
+import { getDb } from '../db/database'
 import { writeAudit } from './audit'
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type MembersImportPreview = {
-  headers: string[]
-  sample: any[]
-  suggestedMapping: Record<string, string | null>
-  headerRowIndex: number
-}
-
-export type MembersImportExecuteResult = {
-  imported: number
-  skipped: number
-  updated: number
-  errors: Array<{ row: number; message: string }>
-  rowStatuses?: Array<{ row: number; ok: boolean; message?: string }>
-  errorFilePath?: string
-}
+import type { MembersImportPreview, MembersImportExecuteResult } from '../../../shared/membersImport'
+export type { MembersImportPreview, MembersImportExecuteResult } from '../../../shared/membersImport'
 
 const MEMBER_FIELD_KEYS = [
   'memberNo', 'name', 'email', 'phone', 'address', 'status',
@@ -436,28 +422,16 @@ export async function executeMembersImport(
       
       if (existing) {
         if (updateExisting) {
-          // Update existing member
-          const fields: string[] = []
-          const args: any[] = []
-          
-          fields.push('name = ?'); args.push(name)
-          if (address) { fields.push('address = ?'); args.push(address) }
-          if (email) { fields.push('email = ?'); args.push(email) }
-          if (phone) { fields.push('phone = ?'); args.push(phone) }
-          fields.push('status = ?'); args.push(status)
-          if (iban) { fields.push('iban = ?'); args.push(iban) }
-          if (bic) { fields.push('bic = ?'); args.push(bic) }
-          if (contribution_amount !== null) { fields.push('contribution_amount = ?'); args.push(contribution_amount) }
-          if (contribution_interval) { fields.push('contribution_interval = ?'); args.push(contribution_interval) }
-          if (mandate_ref) { fields.push('mandate_ref = ?'); args.push(mandate_ref) }
-          if (mandate_date) { fields.push('mandate_date = ?'); args.push(mandate_date) }
-          if (join_date) { fields.push('join_date = ?'); args.push(join_date) }
-          if (leave_date) { fields.push('leave_date = ?'); args.push(leave_date) }
-          if (notes) { fields.push('notes = ?'); args.push(notes) }
-          fields.push('updated_at = ?'); args.push(new Date().toISOString())
-          
-          args.push(existing.id)
-          db.prepare(`UPDATE members SET ${fields.join(', ')} WHERE id = ?`).run(...args)
+          // Use the same contribution-plan reconciliation as manual member edits.
+          updateMember({
+            id: existing.id, name, status, join_date,
+            address: address || undefined, email: email || undefined, phone: phone || undefined,
+            iban: iban || undefined, bic: bic || undefined,
+            contribution_amount: contribution_amount ?? undefined,
+            contribution_interval: contribution_interval || undefined,
+            mandate_ref: mandate_ref || undefined, mandate_date: mandate_date || undefined,
+            leave_date: leave_date || undefined, notes: notes || undefined
+          })
           
           updated++
           rowStatuses.push({ row: r, ok: true, message: `Mitglied ${memberNo} aktualisiert` })

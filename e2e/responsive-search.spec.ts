@@ -6,7 +6,7 @@ let script: string
 let css: string
 test.beforeAll(async () => {
   css = await fs.readFile('src/renderer/styles.css', 'utf8')
-  script = (await build({
+  script = (await build({ jsx: 'automatic',
     stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
       import React, { useRef, useState } from 'react'
       import { createRoot } from 'react-dom/client'

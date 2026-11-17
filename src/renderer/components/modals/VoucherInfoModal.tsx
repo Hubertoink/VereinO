@@ -7,7 +7,7 @@ import { addDataChangedListener } from '../../utils/refresh'
 import './voucherInfoActions.css'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconArrowDown, IconArrowUp, IconArrowsExchange, IconCalendar, IconClipboardText, IconDotsVertical, IconFilePlus, IconInfoCircle, IconMessage, IconPaperclip, IconReceipt2, IconRotateClockwise, IconTableExport, IconTag, IconX } from '@tabler/icons-react'
+import { IconArrowDown, IconArrowUp, IconArrowsExchange, IconCalendar, IconClipboardText, IconDotsVertical, IconFilePlus, IconInfoCircle, IconMessage, IconPaperclip, IconPlus, IconReceipt2, IconRotateClockwise, IconTableExport, IconTag, IconX } from '@tabler/icons-react'
 import SelectDropdown from '../common/SelectDropdown'
 import TagsEditor from '../TagsEditor'
 import BookingDetailPopover from '../booking/BookingDetailPopover'
@@ -18,9 +18,7 @@ import { IconBank, IconCash } from '../../utils/icons'
 import { getContrastTextColor, resolveTagDisplayColor } from '../../utils/tagColors'
 import { getInternalAssignmentValidationState, isMetaAmountValid } from './voucherMetaValidation'
 
-// Types for multiple budget/earmark assignments
-type BudgetAssignment = { id?: number; budgetId: number; amount: number; label?: string; color?: string | null }
-type EarmarkAssignment = { id?: number; earmarkId: number; amount: number; code?: string; name?: string; color?: string | null }
+import type { BudgetAssignment, EarmarkAssignment } from '../../views/Journal/types'
 
 type VoucherInfo = {
   id: number
@@ -98,6 +96,12 @@ const IconSave = ({ size = 26 }: { size?: number }) => (
     <path d="M5 3h12l2 2v16H5V3Z" />
     <path d="M8 3v6h8V3" />
     <path d="M8 21v-7h8v7" />
+  </svg>
+)
+
+const IconSaved = ({ size = 22 }: { size?: number }) => (
+  <svg className="voucher-info-saved-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="m5 12 4 4L19 6" pathLength="1" />
   </svg>
 )
 
@@ -204,6 +208,13 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
   const tagsDisplay = voucher.tags && voucher.tags.length > 0 ? voucher.tags.join(', ') : '-'
   const [editingMeta, setEditingMeta] = useState(initialEditing)
   const [savingMeta, setSavingMeta] = useState(false)
+  const [savedVoucherId, setSavedVoucherId] = useState<number | null>(null)
+  const showSaved = savedVoucherId === voucher.id && !editingMeta
+  useEffect(() => {
+    if (savedVoucherId === null) return
+    const timeout = window.setTimeout(() => setSavedVoucherId(null), 1600)
+    return () => window.clearTimeout(timeout)
+  }, [savedVoucherId])
   const [metaNote, setMetaNote] = useState(voucher.note || '')
   const [metaBudgets, setMetaBudgets] = useState<Array<{ budgetId: number; amount: number }>>([])
   const [metaEarmarks, setMetaEarmarks] = useState<Array<{ earmarkId: number; amount: number }>>([])
@@ -228,6 +239,7 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
     setMetaTags(voucher.tags || [])
     setMetaError('')
     setEditingMeta(initialEditing)
+    setSavedVoucherId(null)
   }, [voucher.id, initialEditing])
 
   const availableBudgets = useMemo(() => (budgets || []).filter((budget) => !budget?.isArchived), [budgets])
@@ -273,7 +285,8 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
   }
 
   const saveMeta = async () => {
-    if (!onSaveMeta) return
+    if (!onSaveMeta || savingMeta) return
+    setSavedVoucherId(null)
     const validationMessage = validateMeta()
     if (validationMessage) {
       setMetaError(validationMessage)
@@ -296,6 +309,7 @@ export default function VoucherInfoModal({ voucher, onClose, eurFmt, fmtDate, no
         tags: metaTags,
       })
       setEditingMeta(false)
+      setSavedVoucherId(voucher.id)
       setMetaError('')
       notify('success', 'Buchungsdetails aktualisiert', 2000)
     } catch (e: any) {
@@ -363,7 +377,7 @@ Status: ${statusLabel}`
       <div className="bp-detail-tag-row"><span><IconTag size={15} />Tags</span><div className="bp-row-tags">{metaTags.length ? metaTags.map(name => {
         const color = resolveTagDisplayColor(name, tagDefs)
         return <span key={name} className="bp-tag" style={{ background: color || undefined, color: color ? getContrastTextColor(color) : undefined }}>{name}</span>
-      }) : <span className="bp-dim">Keine Tags</span>}<BookingDetailPopover label="Tags bearbeiten" trigger="+" disabled={savingMeta}><TagsEditor value={metaTags} onChange={setMetaTags} tagDefs={tagDefs} disabled={savingMeta} /></BookingDetailPopover></div></div>
+      }) : <span className="bp-dim">Keine Tags</span>}<BookingDetailPopover label="Tags bearbeiten" trigger={<IconPlus size={16} aria-hidden="true" />} disabled={savingMeta}><TagsEditor value={metaTags} onChange={setMetaTags} tagDefs={tagDefs} disabled={savingMeta} /></BookingDetailPopover></div></div>
       <h3>Zuordnungen</h3>
       <BookingAssignmentEditor label="Budget" value={metaBudgets.map(item => ({ id: item.budgetId, amount: item.amount }))} options={[...availableBudgets.map(item => ({ id: item.id, label: item.label })), ...budgetAssignments.filter(item => !availableBudgets.some(option => option.id === item.budgetId)).map(item => ({ id: item.budgetId, label: item.label || `#${item.budgetId}`, unavailable: true }))]} onChange={value => setMetaBudgets(value.map(item => ({ budgetId: item.id, amount: item.amount })))} gross={grossLimit} internal={voucher.type === 'INTERNAL'} disabled={savingMeta} money={eurFmt} />
       <BookingAssignmentEditor label="Zweckbindung" value={metaEarmarks.map(item => ({ id: item.earmarkId, amount: item.amount }))} options={[...availableEarmarks.map(item => ({ id: item.id, label: `${item.code} · ${item.name}` })), ...earmarkAssignments.filter(item => !availableEarmarks.some(option => option.id === item.earmarkId)).map(item => ({ id: item.earmarkId, label: item.code || `#${item.earmarkId}`, unavailable: true }))]} onChange={value => setMetaEarmarks(value.map(item => ({ earmarkId: item.id, amount: item.amount })))} gross={grossLimit} internal={voucher.type === 'INTERNAL'} disabled={savingMeta} money={eurFmt} />
@@ -447,21 +461,22 @@ Status: ${statusLabel}`
             <p className="voucher-info-subtitle">{embedded ? 'Budget, Zweckbindung, Tags und Kommentar bearbeiten' : 'Alle Informationen zu dieser Buchung'}</p>
           </div>
           <div className={windowMode ? 'booking-modal-header-actions' : undefined} style={windowMode ? ({ WebkitAppRegion: 'no-drag', pointerEvents: 'auto' } as React.CSSProperties) : { display: 'flex', alignItems: 'center', gap: 8 }}>
-            {editingMeta ? (
+            {editingMeta || showSaved ? (
               <button
                 className="btn ghost booking-modal-icon-btn voucher-info-save-btn"
                 onClick={saveMeta}
-                disabled={!canSaveMeta || budgetExceedsGross || earmarkExceedsGross}
-                title={savingMeta ? 'Speichert ...' : 'Details speichern'}
-                aria-label={savingMeta ? 'Speichert ...' : 'Details speichern'}
+                disabled={showSaved || !canSaveMeta || budgetExceedsGross || earmarkExceedsGross}
+                title={showSaved ? 'Gespeichert' : savingMeta ? 'Speichert ...' : 'Details speichern'}
+                aria-label={showSaved ? 'Gespeichert' : savingMeta ? 'Speichert ...' : 'Details speichern'}
               >
-                <IconSave size={22} />
+                {showSaved ? <IconSaved /> : <IconSave size={22} />}
               </button>
             ) : null}
             {canEditMeta ? (
               <button
                 className={`btn ghost booking-modal-icon-btn voucher-info-edit-btn${editingMeta ? ' voucher-info-edit-btn--active' : ''}`}
                 onClick={() => {
+                  setSavedVoucherId(null)
                   if (editingMeta) resetMetaDraft()
                   setEditingMeta((v) => !v)
                 }}
@@ -809,7 +824,7 @@ Status: ${statusLabel}`
             </button>
           ) : null}
           {embedded && <button className="btn" disabled={savingMeta} onClick={onClose}>Abbrechen</button>}
-          {canEditMeta ? <button className="btn primary voucher-info-footer__button" disabled={editingMeta && (!canSaveMeta || budgetExceedsGross || earmarkExceedsGross)} onClick={() => { if (editingMeta) { void saveMeta() } else { setEditingMeta(true) } }}>{!embedded && (editingMeta ? <IconSave size={18} /> : <IconEdit size={18} />)}<span>{editingMeta ? savingMeta ? 'Speichert ...' : 'Speichern' : 'Bearbeiten'}</span></button> : null}
+          {canEditMeta ? <button className="btn primary voucher-info-footer__button" disabled={editingMeta && (!canSaveMeta || budgetExceedsGross || earmarkExceedsGross)} onClick={() => { if (editingMeta) { void saveMeta() } else { setSavedVoucherId(null); setEditingMeta(true) } }}>{showSaved ? <IconSaved size={18} /> : editingMeta ? <IconSave size={18} /> : <IconEdit size={18} />}<span aria-live="polite">{showSaved ? 'Gespeichert' : editingMeta ? savingMeta ? 'Speichert ...' : 'Speichern' : 'Bearbeiten'}</span></button> : null}
         </div>
 
         <div className="helper" style={{ marginTop: 8, marginBottom: windowMode ? 10 : 16, flexShrink: 0, fontSize: 11, textAlign: 'center' }}>

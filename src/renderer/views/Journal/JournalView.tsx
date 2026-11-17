@@ -21,16 +21,7 @@ import {
     normalizeVoucherBudgetAssignments,
     normalizeVoucherEarmarkAssignments
 } from '../../utils/voucherAssignmentFallbacks'
-import {
-    DEFAULT_ORDER as SHARED_DEFAULT_ORDER,
-    LABEL_FOR_COL,
-    type BookingEditTab as SharedBookingEditTab,
-    type BudgetAssignment,
-    type ColKey as SharedColKey,
-    type EarmarkAssignment,
-    type EditVoucherRow as SharedEditVoucherRow,
-    type VoucherRow
-} from './types'
+import { LABEL_FOR_COL, type BookingEditTab as SharedBookingEditTab, type BudgetAssignment, type ColKey as SharedColKey, type EarmarkAssignment, type EditVoucherRow as SharedEditVoucherRow, type VoucherRow } from './types';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { dispatchDataChanged } from '../../utils/refresh'
 import { encodeFileForUpload } from '../../utils/fileEncoding'
@@ -43,7 +34,7 @@ type BookingEditTab = SharedBookingEditTab
 
 type ColKey = SharedColKey
 
-const DEFAULT_ORDER: ColKey[] = SHARED_DEFAULT_ORDER
+
 
 type PageShortcutAction = {
     id: string
@@ -140,8 +131,6 @@ export default function JournalView({
     eurFmt,
     friendlyError,
     journalLimit: journalLimitProp,
-    setJournalLimit: setJournalLimitProp,
-    dateFmt,
     // Column visibility & order from App
     cols,
     setCols,
@@ -271,11 +260,8 @@ export default function JournalView({
 
     // Column preferences now come from props (shared with Settings)
 
-    const hasCustomCols = useMemo(() => Object.values(cols).some((v) => v === false), [cols])
-    const hasCustomOrder = useMemo(() => {
-        if (order.length !== DEFAULT_ORDER.length) return true
-        return order.some((k, idx) => k !== DEFAULT_ORDER[idx])
-    }, [order])
+
+
 
     // Drag-and-drop state for column reorder
     const [draggedCol, setDraggedCol] = useState<ColKey | null>(null)
@@ -1614,10 +1600,7 @@ export default function JournalView({
                                                         isInternal: editRow.type === 'INTERNAL',
                                                         grossAmount: grossAmt,
                                                     })
-                                                    const hasBalancedInternalBudgets = budgetsList.length > 0
-                                                        && budgetsList.some((b: BudgetAssignment) => b.budgetId && Number(b.amount) < 0)
-                                                        && budgetsList.some((b: BudgetAssignment) => b.budgetId && Number(b.amount) > 0)
-                                                        && Math.abs(totalBudgetAmount) <= 0.001
+
                                                     return (
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                                             {budgetsList.length > 0 ? (
@@ -1732,10 +1715,7 @@ export default function JournalView({
                                                         isInternal: editRow.type === 'INTERNAL',
                                                         grossAmount: grossAmt,
                                                     })
-                                                    const hasBalancedInternalEarmarks = earmarksList.length > 0
-                                                        && earmarksList.some((e: EarmarkAssignment) => e.earmarkId && Number(e.amount) < 0)
-                                                        && earmarksList.some((e: EarmarkAssignment) => e.earmarkId && Number(e.amount) > 0)
-                                                        && Math.abs(totalEarmarkAmount) <= 0.001
+
                                                     return (
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                                             {earmarksList.length > 0 ? (

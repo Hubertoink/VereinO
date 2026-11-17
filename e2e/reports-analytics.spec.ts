@@ -10,6 +10,7 @@ test.beforeAll(async () => {
     import React, { useState } from 'react'
     import { createRoot } from 'react-dom/client'
     import ReportsAnalytics from './src/renderer/components/reports/ReportsAnalytics'
+    import { useReportMonthlyData } from './src/renderer/components/reports/useReportMonthlyData'
     import ExportOptionsModal from './src/renderer/components/modals/ExportOptionsModal'
     import FilterDropdown from './src/renderer/components/dropdowns/FilterDropdown'
     window.calls = []
@@ -21,10 +22,11 @@ test.beforeAll(async () => {
       const [sortDir, setSortDir] = useState('DESC')
       const [orgName, setOrgName] = useState('Förderverein Jugendhaus')
       const [type, setType] = useState(undefined)
-      return <main style={{ padding: 24 }}><button onClick={() => setType('OUT')}>Nur Ausgaben</button><FilterDropdown trigger="Exportieren" title="Exportoptionen" panelClassName="report-export-panel" width="min(920px, calc(100vw - 28px))"><ExportOptionsModal open flyout onClose={() => {}} fields={fields} setFields={setFields} orgName={orgName} setOrgName={setOrgName} amountMode={amountMode} setAmountMode={setAmountMode} sortDir={sortDir} setSortDir={setSortDir} exportType={exportType} setExportType={setExportType} fiscalYear={2026} setFiscalYear={() => {}} dateFrom="2026-01-01" dateTo="2026-03-31" previewFilters={{ type, budgetId: 7 }} onExport={async fmt => { window.exported = fmt }} /></FilterDropdown><ReportsAnalytics type={type} budgetId={7} from="2026-01-01" to="2026-03-31" /></main>
+      const monthly = useReportMonthlyData({ type, budgetId: 7, from: '2026-01-01', to: '2026-03-31' })
+      return <main style={{ padding: 24 }}><button onClick={() => setType('OUT')}>Nur Ausgaben</button><FilterDropdown trigger="Exportieren" title="Exportoptionen" panelClassName="report-export-panel" width="min(920px, calc(100vw - 28px))"><ExportOptionsModal open flyout onClose={() => {}} fields={fields} setFields={setFields} orgName={orgName} setOrgName={setOrgName} amountMode={amountMode} setAmountMode={setAmountMode} sortDir={sortDir} setSortDir={setSortDir} exportType={exportType} setExportType={setExportType} fiscalYear={2026} setFiscalYear={() => {}} dateFrom="2026-01-01" dateTo="2026-03-31" previewFilters={{ type, budgetId: 7 }} onExport={async fmt => { window.exported = fmt }} /></FilterDropdown><ReportsAnalytics data={monthly.model} loading={monthly.loading} error={monthly.error} onRetry={monthly.reload} from="2026-01-01" to="2026-03-31" /></main>
     }
     createRoot(document.getElementById('root')).render(<App />)
-  ` }, bundle: true, write: false, platform: 'browser', loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' } })).outputFiles[0].text
+  ` }, bundle: true, write: false, platform: 'browser', jsx: 'automatic', loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' } })).outputFiles[0].text
 })
 
 test.beforeEach(async ({ page }) => {
@@ -48,20 +50,23 @@ test('monthly comparison respects type and assignment filters; refunds and empty
   await page.screenshot({ path: info.outputPath('reports-dark.png'), fullPage: true })
 })
 
-test('export starts compact without vertical overflow and retains options through collapse', async ({ page }, info) => {
+test('export starts with expanded sections and retains options through collapse', async ({ page }, info) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.getByRole('button', { name: 'Exportoptionen' }).click()
   const panel = page.locator('.report-export-panel')
-  await expect(panel.locator('.export-section[open]')).toHaveCount(0)
-  expect(await panel.locator('.filter-dropdown__content').evaluate(el => el.scrollHeight <= el.clientHeight + 1)).toBe(true)
-  await panel.locator('summary').filter({ hasText: 'Darstellung' }).click()
+  // ExportSection explicitly defaults to <details open>; users may collapse it.
+  await expect(panel.locator('.export-section[open]')).toHaveCount(4)
   await panel.getByRole('button', { name: 'Beide positiv' }).click()
   await panel.locator('summary').filter({ hasText: 'Darstellung' }).click()
+  await expect(panel.getByRole('button', { name: 'Beide positiv' })).not.toBeVisible()
+  await expect(panel.locator('summary').filter({ hasText: 'Darstellung' })).toContainText('Beide positiv')
+  await panel.locator('summary').filter({ hasText: 'Darstellung' }).click()
+  await expect(panel.getByRole('button', { name: 'Beide positiv' })).toBeVisible()
   await expect(panel.locator('summary').filter({ hasText: 'Darstellung' })).toContainText('Beide positiv')
   await panel.getByRole('button', { name: 'PDF', exact: true }).click()
   expect(await page.evaluate(() => (window as any).exported)).toBe('PDF')
   expect(await page.evaluate(() => (window as any).previewFilters.budgetId)).toBe(7)
-  await page.screenshot({ path: info.outputPath('export-compact.png') })
+  await page.screenshot({ path: info.outputPath('export-options.png') })
   await page.setViewportSize({ width: 390, height: 700 })
   await panel.locator('summary').filter({ hasText: 'Vorschau' }).click()
   await panel.getByRole('button', { name: 'PDF', exact: true }).scrollIntoViewIfNeeded()

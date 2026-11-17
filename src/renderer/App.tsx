@@ -1333,7 +1333,7 @@ function DetachedQuickAddWindow() {
     const editMutationBlockReason = voucherMutationBlockReason(editQa)
     return (
       <>
-        <QuickAddModal
+        <QuickAddModal notify={notify}
           qa={editQa}
           setQa={setEditQa}
           onSave={saveDetachedEdit}
@@ -1460,7 +1460,7 @@ function DetachedQuickAddWindow() {
   }
 
   return (
-    <QuickAddModal
+    <QuickAddModal notify={notify}
       qa={qa}
       setQa={setQa}
       onSave={onQuickSave}
@@ -1506,8 +1506,6 @@ function AppInner() {
     setColorTheme,
     navIconColorMode,
     setNavIconColorMode,
-    dateFormat,
-    setDateFormat,
     journalRowStyle,
     setJournalRowStyle,
     journalRowDensity,
@@ -1583,7 +1581,6 @@ function AppInner() {
   const [refreshKey, setRefreshKey] = useState(0)
   const bumpDataVersion = useCallback(() => setRefreshKey((k) => k + 1), [])
   const [fabNearJournalEnd, setFabNearJournalEnd] = useState(false)
-  const [lastId, setLastId] = useState<number | null>(null) // Track last created voucher id
   const [flashId, setFlashId] = useState<number | null>(null) // Row highlight for newly created voucher
 
   useEffect(() => {
@@ -1598,7 +1595,6 @@ function AppInner() {
     const off = window.api?.quickAdd?.onSaved?.((payload: any) => {
       const id = typeof payload?.id === 'number' ? payload.id : null
       if (id != null && !payload?.deleted) {
-        setLastId(id)
         setFlashId(id)
         window.setTimeout(() => setFlashId((cur) => (cur === id ? null : cur)), 3000)
       }
@@ -1816,53 +1812,6 @@ function AppInner() {
     updatePromptRef.current = updatePrompt
   }, [updatePrompt])
 
-  // Pre-update backup toast (sent from main process)
-  useEffect(() => {
-    const offOk = (window as any).api?.db?.onPreUpdateBackup?.(
-      (info: { fromVersion: string; toVersion: string; filePath: string; dir: string }) => {
-        notify(
-          'success',
-          `Update erkannt (${info.fromVersion} → ${info.toVersion}). Sicherheits-Backup erstellt.`,
-          9000,
-          {
-            label: 'Ordner öffnen',
-            onClick: () => {
-              try {
-                ;(window as any).api?.backup?.openFolder?.()
-              } catch {}
-            }
-          }
-        )
-      }
-    )
-
-    const offFail = (window as any).api?.db?.onPreUpdateBackupFailed?.(
-      (info: { fromVersion: string; toVersion: string; error: string }) => {
-        notify(
-          'warn',
-          `Update erkannt (${info.fromVersion} → ${info.toVersion}), aber Sicherheits-Backup fehlgeschlagen: ${info.error}`,
-          12000,
-          {
-            label: 'Backup-Ordner',
-            onClick: () => {
-              try {
-                ;(window as any).api?.backup?.openFolder?.()
-              } catch {}
-            }
-          }
-        )
-      }
-    )
-
-    return () => {
-      try {
-        offOk?.()
-      } catch {}
-      try {
-        offFail?.()
-      } catch {}
-    }
-  }, [notify])
   const showStartupUpdateNotice = useCallback(
     (state: UpdateModalState) => {
       if (startupUpdateNoticeShown.current) return
@@ -1929,14 +1878,6 @@ function AppInner() {
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
 
-  // Reports view is unified now; legacy reportsTab retained only for back-compat with localStorage but unused
-  const [reportsTab, setReportsTab] = useState<string>(() => {
-    try {
-      return 'overview'
-    } catch {
-      return 'overview'
-    }
-  })
 
   // Period lock (year-end) status for UI controls (e.g., lock edit)
   const [periodLock, setPeriodLock] = useState<{ closedUntil: string | null } | null>(null)
@@ -2024,10 +1965,6 @@ function AppInner() {
       localStorage.setItem('activePage', activePage)
     } catch {}
   }, [activePage])
-  // No-op: unified reports page; keep effect to avoid removing too many deps
-  useEffect(() => {
-    /* unified reports */
-  }, [reportsTab])
   // Open Export Options when requested from nested components
   useEffect(() => {
     function onOpenExport() {
@@ -2182,7 +2119,6 @@ function AppInner() {
       try {
         const res = await window.api?.vouchers.create?.(p)
         if (res) {
-          setLastId(res.id)
           setFlashId(res.id)
           window.setTimeout(() => setFlashId((cur) => (cur === res.id ? null : cur)), 3000)
           notify('success', `Beleg erstellt: #${res.voucherNo} (Brutto ${res.grossAmount})`)
@@ -2284,7 +2220,7 @@ function AppInner() {
       // KI-Entwürfe können geöffnet werden, ohne dass die Person zuvor das
       // Journal besucht hat. Die Auswahlfelder brauchen dann die Stammdaten
       // bereits vor dem ersten Rendern des Buchungsdialogs.
-      void Promise.allSettled([loadBindings(), loadBudgets(), loadEarmarks()]).then(async () => {
+      void Promise.allSettled([loadBudgets(), loadEarmarks()]).then(async () => {
         const bankParty = detail.qa.bankReviewSource
           ? await resolveBankDraftParty({
             counterparty: detail.qa.bankReviewSource.counterparty || detail.qa.counterparty,
@@ -2671,90 +2607,6 @@ function AppInner() {
     }))
   ], [activePageShortcuts, openQuickAdd, visibleNavigationItems])
 
-  async function createSampleVoucher() {
-    try {
-      notify('info', 'Erzeuge Beleg ?')
-      const res = await window.api?.vouchers.create?.({
-        date: today,
-        type: 'IN',
-        sphere: 'IDEELL',
-        description: 'Dev Sample Voucher',
-        netAmount: 100,
-        vatRate: 19
-      })
-      if (res) {
-        setLastId(res.id)
-        setFlashId(res.id)
-        window.setTimeout(() => setFlashId((cur) => (cur === res.id ? null : cur)), 3000)
-        notify('success', `Beleg erstellt: #${res.voucherNo} (Brutto ${res.grossAmount})`)
-        // JournalView handles reload via refreshKey dependency; bump version to trigger it
-        bumpDataVersion()
-      }
-    } catch (e: any) {
-      notify('error', 'Fehler: ' + (e?.message || String(e)))
-    }
-  }
-
-  async function reverseLastVoucher() {
-    if (!lastId) {
-      notify('info', 'Kein zuletzt erstellter Beleg zum Stornieren.')
-      return
-    }
-    try {
-      notify('info', 'Storniere Beleg ?')
-      const res = await window.api?.vouchers.reverse?.({
-        originalId: lastId,
-        reason: 'Dev Reverse'
-      })
-      if (res) {
-        notify('success', `Storno erstellt: #${res.voucherNo}`)
-        // JournalView handles reload via refreshKey dependency; bump version to trigger it
-        bumpDataVersion()
-      }
-    } catch (e: any) {
-      notify('error', 'Fehler: ' + (e?.message || String(e)))
-    }
-  }
-
-  const [rows, setRows] = useState<
-    Array<{
-      id: number
-      voucherNo: string
-      date: string
-      type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
-      sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-      description?: string | null
-      paymentMethod?: 'BAR' | 'BANK' | null
-      transferFrom?: 'BAR' | 'BANK' | null
-      transferTo?: 'BAR' | 'BANK' | null
-      netAmount: number
-      vatRate: number
-      vatAmount: number
-      grossAmount: number
-      hasFiles?: boolean
-      earmarkId?: number | null
-      earmarkCode?: string | null
-      budgetId?: number | null
-      budgetLabel?: string | null
-      fileCount?: number
-      tags?: string[]
-    }>
-  >([])
-  const [totalRows, setTotalRows] = useState<number>(0)
-  const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>(() => {
-    try {
-      return (localStorage.getItem('journal.sort') as any) || 'DESC'
-    } catch {
-      return 'DESC'
-    }
-  })
-  const [sortBy, setSortBy] = useState<'date' | 'gross' | 'net'>(() => {
-    try {
-      return (localStorage.getItem('journal.sortBy') as any) || 'date'
-    } catch {
-      return 'date'
-    }
-  })
   // PaymentsAssignModal extracted to components/modals/PaymentsAssignModal.tsx
   // Buchungen (Journal) filter states
   const [from, setFrom] = useState<string>('')
@@ -2908,78 +2760,6 @@ function AppInner() {
       /* ignore */
     }
   }
-  // Map of budget id -> friendly label for filter chips
-  const [budgetNames, setBudgetNames] = useState<Map<number, string>>(new Map())
-  const chips = useMemo(() => {
-    const list: Array<{ key: string; label: string; clear: () => void }> = []
-    if (from || to)
-      list.push({
-        key: 'range',
-        label: `${from || '…'} – ${to || '…'}`,
-        clear: () => {
-          setFrom('')
-          setTo('')
-        }
-      })
-    if (filterSphere)
-      list.push({
-        key: 'sphere',
-        label: `Sphäre: ${filterSphere}`,
-        clear: () => setFilterSphere(null)
-      })
-    if (filterPrimaryClassificationValueId != null)
-      list.push({ key: 'primary-classification', label: `Kategorie: #${filterPrimaryClassificationValueId}`, clear: () => setFilterPrimaryClassificationValueId(null) })
-    if (filterType)
-      list.push({ key: 'type', label: `Art: ${filterType}`, clear: () => setFilterType(null) })
-    if (filterPaymentAccountId != null) {
-      const account = paymentAccounts.find((item) => item.id === filterPaymentAccountId)
-      list.push({
-        key: 'payment-account',
-        label: `Zahlweg: ${account?.name || `#${filterPaymentAccountId}`}`,
-        clear: () => setFilterPaymentAccountId(null)
-      })
-    } else if (filterPM)
-      list.push({ key: 'pm', label: `Zahlweg: ${filterPM}`, clear: () => setFilterPM(null) })
-    if (filterEarmark != null) {
-      const em = earmarks.find((e) => e.id === filterEarmark)
-      list.push({
-        key: 'earmark',
-        label: `Zweckbindung: ${em ? em.code : '#' + filterEarmark}`,
-        clear: () => setFilterEarmark(null)
-      })
-    }
-    if (filterBudgetId != null) {
-      const label = budgetNames.get(filterBudgetId) || `#${filterBudgetId}`
-      list.push({ key: 'budget', label: `Budget: ${label}`, clear: () => setFilterBudgetId(null) })
-    }
-    if (filterTag)
-      list.push({ key: 'tag', label: `Tag: ${filterTag}`, clear: () => setFilterTag(null) })
-    if (q)
-      list.push({
-        key: 'q',
-        label: `Suche: ${q}`.slice(0, 40) + (q.length > 40 ? '…' : ''),
-        clear: () => setQ('')
-      })
-    return list
-  }, [
-    from,
-    to,
-    filterSphere,
-    filterPrimaryClassificationValueId,
-    filterType,
-    filterPM,
-    filterPaymentAccountId,
-    filterEarmark,
-    filterBudgetId,
-    filterTag,
-    earmarks,
-    budgetNames,
-    q,
-    paymentAccounts
-  ])
-  // Legacy alias: older render sections still refer to activeChips; keep in sync
-  const activeChips = chips
-
   // Global Tags state (for filters, table colorization, and tag manager)
   const [tagDefs, setTagDefs] = useState<
     Array<{ id: number; name: string; color?: string | null; usage?: number }>
@@ -3161,147 +2941,10 @@ function AppInner() {
     } catch {}
   }, [order])
 
-  // Load recent vouchers (journal/buchungen data loader)
-  const loadRecent = useCallback(async () => {
-    try {
-      const offset = (page - 1) * journalLimit
-      const res = await window.api?.vouchers?.list?.({
-        limit: journalLimit,
-        offset,
-        sort: sortDir,
-        sortBy,
-        paymentMethod: filterPM || undefined,
-        paymentAccountId: filterPaymentAccountId || undefined,
-        sphere: filterSphere || undefined,
-        primaryClassificationValueId: filterPrimaryClassificationValueId || undefined,
-        type: filterType || undefined,
-        from: from || undefined,
-        to: to || undefined,
-        earmarkId: filterEarmark || undefined,
-        budgetId: filterBudgetId || undefined,
-        q: q.trim() || undefined,
-        tag: filterTag || undefined
-      })
-      if (res) {
-        setRows(res.rows || [])
-        setTotalRows(res.total || 0)
-      }
-    } catch (e: any) {
-      notify('error', 'Fehler beim Laden: ' + (e?.message || String(e)))
-    }
-  }, [
-    journalLimit,
-    page,
-    sortDir,
-    sortBy,
-    filterPM,
-    filterPaymentAccountId,
-    filterSphere,
-    filterPrimaryClassificationValueId,
-    filterType,
-    from,
-    to,
-    filterEarmark,
-    filterBudgetId,
-    q,
-    filterTag
-  ])
-
-  // Load vouchers whenever filters or page change
-  useEffect(() => {
-    // Removed old global loadRecent; JournalView listens to refreshKey now
-  }, [activePage, loadRecent])
-
-  // States for edit + batch modals (previously removed inadvertently)
-  type VoucherRow = {
-    id: number
-    voucherNo: string
-    date: string
-    type: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
-    sphere: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    description?: string | null
-    paymentMethod?: 'BAR' | 'BANK' | null
-    transferFrom?: 'BAR' | 'BANK' | null
-    transferTo?: 'BAR' | 'BANK' | null
-    netAmount: number
-    vatRate: number
-    vatAmount: number
-    grossAmount: number
-    hasFiles?: boolean
-    earmarkId?: number | null
-    earmarkCode?: string | null
-    budgetId?: number | null
-    budgetLabel?: string | null
-    fileCount?: number
-    tags?: string[]
-  }
-  const [showBatchEarmark, setShowBatchEarmark] = useState<boolean>(false)
-  const [editRow, setEditRow] = useState<
-    | (VoucherRow & {
-        mode?: 'NET' | 'GROSS'
-        transferFrom?: 'BAR' | 'BANK' | null
-        transferTo?: 'BAR' | 'BANK' | null
-      })
-    | null
-  >(null)
-  const [deleteRow, setDeleteRow] = useState<null | {
-    id: number
-    voucherNo?: string | null
-    description?: string | null
-    fromEdit?: boolean
-  }>(null)
-  const editFileInputRef = useRef<HTMLInputElement | null>(null)
-  const [editRowFilesLoading, setEditRowFilesLoading] = useState<boolean>(false)
-  const [editRowFiles, setEditRowFiles] = useState<Array<{ id: number; fileName: string }>>([])
-  const [confirmDeleteAttachment, setConfirmDeleteAttachment] = useState<null | {
-    id: number
-    fileName: string
-  }>(null)
-  // Refresh attachments when opening an edit modal (so neue Anhänge erscheinen beim erneuten öffnen)
-  useEffect(() => {
-    if (editRow?.id) {
-      setEditRowFilesLoading(true)
-      ;(async () => {
-        try {
-          const res = await window.api?.attachments.list?.({ voucherId: editRow.id })
-          // API may return either files[] or rows[] depending on implementation; support both
-          const list = (res as any)?.files || (res as any)?.rows || []
-          setEditRowFiles(list)
-        } catch {
-          setEditRowFiles([])
-        } finally {
-          setEditRowFilesLoading(false)
-        }
-      })()
-    } else {
-      setEditRowFiles([])
-    }
-  }, [editRow?.id])
-
   const eurFmt = useMemo(
     () => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }),
     []
   )
-
-  // Zweckbindungen (Bindings) state (kept for Buchungen page dropdowns/filters)
-  const [bindings, setBindings] = useState<
-    Array<{
-      id: number
-      code: string
-      name: string
-      description?: string | null
-      startDate?: string | null
-      endDate?: string | null
-      isActive: number
-      color?: string | null
-      budget?: number | null
-      enforceTimeRange?: number
-    }>
-  >([])
-  async function loadBindings() {
-    const res = await window.api?.bindings.list?.({})
-    if (res) setBindings(res.rows)
-  }
 
   // Budgets state (kept for Buchungen page dropdowns/filters)
   const [budgets, setBudgets] = useState<
@@ -3346,32 +2989,13 @@ function AppInner() {
       color: (b as any).color ?? null
     }))
   }, [budgets, earmarks])
+  const budgetNames = useMemo(() => new Map(budgetsForEdit.map(b => [b.id, b.label])), [budgetsForEdit])
   async function loadBudgets() {
     // Include archived budgets so filters/edit views can still resolve labels/colors.
     const res = await window.api?.budgets.list?.({ includeArchived: true } as any)
     if (res) {
       setBudgets(res.rows)
-      try {
-        const map = new Map<number, string>()
-        const byIdEarmark = new Map(earmarks.map((e) => [e.id, e]))
-        for (const b of res.rows) {
-          let label = ''
-          if (b.name && String(b.name).trim()) label = String(b.name).trim()
-          else if (b.categoryName && String(b.categoryName).trim())
-            label = `${b.year} - ${b.categoryName}`
-          else if (b.projectName && String(b.projectName).trim())
-            label = `${b.year} - ${b.projectName}`
-          else if (b.earmarkId) {
-            const em: any = byIdEarmark.get(b.earmarkId)
-            if (em) label = `${b.year} - ${em.code}`
-          }
-          if (!label) label = String(b.year)
-          map.set(b.id, label)
-        }
-        setBudgetNames(map)
-      } catch {
-        /* ignore label map errors */
-      }
+
     }
   }
 
@@ -3379,7 +3003,6 @@ function AppInner() {
     // Ein Buchungsentwurf kann direkt aus der KI geöffnet werden. Dann sind
     // dieselben Stammdaten wie im Journal erforderlich, auch ohne Seitenwechsel.
     if (isClassicBookings || isPlusBookings || quickAdd) {
-      loadBindings()
       loadBudgets()
       loadEarmarks()
     }
@@ -3899,7 +3522,7 @@ function AppInner() {
         <>
           <div className="compact-booking-flyout-dismiss compact-booking-flyout-dismiss--dimmed" aria-hidden="true" />
           <div className="compact-booking-flyout-anchor">
-            <CompactBookingFlyout
+            <CompactBookingFlyout notify={notify}
               key={`edit-${plusEditQa.id}`}
               title="Buchung bearbeiten"
               saveLabel={plusEditSaving ? 'Speichert …' : 'Änderungen speichern'}
@@ -3929,7 +3552,7 @@ function AppInner() {
         </>
       )}
       {plusEditQa && (bookingEntryPresentation === 'modal' || plusEditExpanded) && (
-        <QuickAddModal
+        <QuickAddModal notify={notify}
           key={`edit-${plusEditQa.id}`}
           title="Buchung bearbeiten"
           saveLabel={plusEditSaving ? 'Speichert …' : 'Änderungen speichern'}
@@ -3972,7 +3595,7 @@ function AppInner() {
       )}
       {quickAdd && activeDraftKind === 'booking' && effectiveBookingEntryPresentation === 'flyout' && !forceFullBookingDialog && (
         <div className={`compact-booking-flyout-anchor${shortcutBookingFlyout ? ' compact-booking-flyout-anchor--shortcut' : ''}${isClassicBookings ? ' compact-booking-flyout-anchor--journal' : ''}${fabNearJournalEnd ? ' compact-booking-flyout-anchor--journal-end' : ''}`}>
-          <CompactBookingFlyout
+          <CompactBookingFlyout notify={notify}
             key={activeDraftId ?? 'compact-quick-add'}
             qa={qa}
             setQa={setQa}
@@ -4002,7 +3625,7 @@ function AppInner() {
         </div>
       )}
       {quickAdd && activeDraftKind === 'booking' && (effectiveBookingEntryPresentation !== 'flyout' || forceFullBookingDialog) && (
-        <QuickAddModal
+        <QuickAddModal notify={notify}
           key={activeDraftId ?? 'quick-add'}
           qa={qa}
           setQa={setQa}

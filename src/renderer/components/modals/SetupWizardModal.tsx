@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom'
 import { IconArrowLeft, IconArrowRight, IconCheck, IconBuildingCommunity, IconLayoutDashboard, IconShieldCheck, IconRocket, IconFolder, IconTags, IconInfoCircle } from '@tabler/icons-react'
 import ModalHeader from '../ModalHeader'

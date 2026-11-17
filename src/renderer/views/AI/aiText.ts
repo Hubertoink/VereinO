@@ -4,15 +4,7 @@
  * Diese Funktionen dürfen weder React- noch IPC-Zustand kennen. Dadurch können
  * Erkennung, Formatierung und Routing separat getestet werden.
  */
-export function normalizeLookup(value: unknown) {
-  return String(value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/ß/g, 'ss')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-}
+export { normalizeLookup } from '../../../../shared/textLookup'
 
 export function parseGermanDate(value: string) {
   const match = String(value || '').match(/\b(\d{1,2})\.(\d{1,2})\.(20\d{2}|19\d{2})\b/)
@@ -58,4 +50,27 @@ export function warningClassName(warning: string) {
     String(warning || '')
   )
   return duplicate ? 'ai-warning ai-warning--duplicate' : 'ai-warning'
+}
+
+export function wantsBookingFromFiles(prompt: string, attachedFiles: File[]) {
+  const normalized = prompt.toLowerCase()
+  const hasSpreadsheet = attachedFiles.some((file) => /\.(xlsx|xls|csv|tsv)$/i.test(file.name))
+  if (
+    /(buchung|buchungen|buchungsvorschlag|buchungsvorschläge|buche|buchen|verbuch|anlegen|lege.*buch|erstelle.*buch|rechnung|beleg|quittung|zahlung|ausgabe|ausgaben|einnahme|einnahmen|kassenzettel)/i.test(
+      normalized
+    )
+  )
+    return true
+  if (
+    hasSpreadsheet &&
+    /(import|stammdaten|tag|tags|kategorie|kategorien|mitglied|mitglieder|tabelle|spalten|zuordnung)/i.test(
+      normalized
+    )
+  )
+    return false
+  return !hasSpreadsheet
+}
+
+export function wantsBankImportReview(prompt: string) {
+  return /(bankimport|bankbeleg|kontoauszug|offene bank|bank import|banktransaktion)/i.test(prompt)
 }

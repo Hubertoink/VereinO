@@ -1,4 +1,4 @@
-import React from 'react'
+
 
 // Zentrale Icon-Definitionen für die gesamte App
 // Verhindert Encoding-Probleme und macht Icons wartbar

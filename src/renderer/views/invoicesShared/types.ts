@@ -1,17 +1,11 @@
-export type InvoiceStatus = 'OPEN' | 'PARTIAL' | 'PAID'
+import type { InvoiceStatus } from '../../../../shared/financePrimitives'
+export type { InvoiceStatus } from '../../../../shared/financePrimitives'
 export type InvoicePaymentMethod = '' | 'BAR' | 'BANK'
 export type InvoiceSphere = 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
 export type InvoiceVoucherType = 'IN' | 'OUT'
 
-export type InvoiceBudgetAssignment = {
-  budgetId: number
-  amount: number
-}
-
-export type InvoiceEarmarkAssignment = {
-  earmarkId: number
-  amount: number
-}
+import type { BudgetAssignment as InvoiceBudgetAssignment, EarmarkAssignment as InvoiceEarmarkAssignment } from '../../../../shared/bookingAssignments'
+export type { BudgetAssignment as InvoiceBudgetAssignment, EarmarkAssignment as InvoiceEarmarkAssignment } from '../../../../shared/bookingAssignments'
 
 export type InvoiceTagDef = {
   id: number

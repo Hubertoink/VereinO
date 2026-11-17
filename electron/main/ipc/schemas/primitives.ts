@@ -1,10 +1,6 @@
 import { z } from 'zod'
 
-export const VoucherType = z.enum(['IN', 'OUT', 'TRANSFER', 'INTERNAL'])
-export const Sphere = z.enum(['IDEELL', 'ZWECK', 'VERMOEGEN', 'WGB'])
-export const PaymentMethod = z.enum(['BAR', 'BANK'])
-export const PaymentAccountKind = z.enum(['CASH', 'BANK', 'PAYPAL', 'CARD', 'OTHER'])
-export const VoucherAmountMode = z.enum(['NET', 'GROSS'])
+export { VoucherType, Sphere, PaymentMethod, PaymentAccountKind, VoucherAmountMode } from '../../../../shared/financePrimitives'
 
 export const VoucherBudgetAssignment = z.object({
   budgetId: z.number(),

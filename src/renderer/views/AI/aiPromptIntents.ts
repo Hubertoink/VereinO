@@ -1,6 +1,6 @@
 import type { TAiActionPlan, TAiTextGenerateInput, TReportsExportInput } from '../../../../electron/main/ipc/schemas'
 import type { TagRow } from './aiViewTypes'
-import { isoDate, normalizeLookup } from './aiText'
+import { isoDate, normalizeLookup, wantsBookingFromFiles } from './aiText'
 import { findPlanChange, findPlanFilter, planItemValue, planValueList, planValueString } from './aiPlanDomain'
 
 const TAG_ACTION_COLORS = [
@@ -60,9 +60,7 @@ export function isVereinRelevantPrompt(prompt: string) {
   )
 }
 
-export function wantsBankImportReview(prompt: string) {
-  return /(bankimport|bankbeleg|kontoauszug|offene bank|bank import|banktransaktion)/i.test(prompt)
-}
+export { wantsBankImportReview } from './aiText'
 
 export function wantsReportExport(prompt: string) {
   const normalized = normalizeLookup(prompt)
@@ -328,24 +326,7 @@ export function parseReportExportRequest(prompt: string): { payload: TReportsExp
   }
 }
 
-export function wantsBookingFromFiles(prompt: string, attachedFiles: File[]) {
-  const normalized = prompt.toLowerCase()
-  const hasSpreadsheet = attachedFiles.some((file) => /\.(xlsx|xls|csv|tsv)$/i.test(file.name))
-  if (
-    /(buchung|buchungen|buchungsvorschlag|buchungsvorschläge|buche|buchen|verbuch|anlegen|lege.*buch|erstelle.*buch|rechnung|beleg|quittung|zahlung|ausgabe|ausgaben|einnahme|einnahmen|kassenzettel)/i.test(
-      normalized
-    )
-  )
-    return true
-  if (
-    hasSpreadsheet &&
-    /(import|stammdaten|tag|tags|kategorie|kategorien|mitglied|mitglieder|tabelle|spalten|zuordnung)/i.test(
-      normalized
-    )
-  )
-    return false
-  return !hasSpreadsheet
-}
+export { wantsBookingFromFiles } from './aiText'
 
 export function shouldProcessFilesAsBookingDocuments(prompt: string, attachedFiles: File[]) {
   return wantsBookingFromFiles(prompt, attachedFiles)
