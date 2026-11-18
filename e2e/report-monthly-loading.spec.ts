@@ -11,7 +11,8 @@ test.beforeAll(async () => {
       import ReportsView from './src/renderer/views/Reports/ReportsView'
       window.calls = []
       window.pending = []
-      window.api = { reports: { monthly: filters => {
+      const paymentAccounts = []
+      window.api = { reports: { cashBalance: async () => ({ BAR: 0, BANK: 0, accounts: [] }), monthly: filters => {
         window.calls.push(filters)
         return new Promise((resolve, reject) => window.pending.push({ resolve, reject }))
       } } }
@@ -27,7 +28,7 @@ test.beforeAll(async () => {
         return visible && <ReportsView from="2026-01-01" to="2026-03-31" setFrom={noop} setTo={noop}
           yearsAvail={[2026]} filterSphere={null} setFilterSphere={noop} filterType={type} setFilterType={setType}
           filterPM={null} setFilterPM={noop} filterEarmark={null} setFilterEarmark={noop}
-          filterBudgetId={budget} setFilterBudgetId={setBudget} budgets={[]} earmarks={[]}
+          filterBudgetId={budget} setFilterBudgetId={setBudget} budgets={[]} earmarks={[]} paymentAccounts={paymentAccounts}
           showExportOptions={false} setShowExportOptions={noop} exportOptions={{}}
           showActivityReportEditor={false} setShowActivityReportEditor={noop} activityReportOptions={{}}
           refreshKey={0} activateKey={0} />
