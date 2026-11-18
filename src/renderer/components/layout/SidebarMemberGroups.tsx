@@ -26,7 +26,7 @@ export function SidebarMemberGroups({ onSelect }: { onSelect: (id: number) => vo
     <p className="sidebar-section-caption">Gruppen</p>
     {groups.map(group => <button type="button" key={group.id} className="sidebar-recent-assignment" onClick={() => onSelect(group.id)}>
       <span className="sidebar-assignment-heading">
-        <span className="sidebar-assignment-name"><span aria-hidden="true" style={{ color: resolveTagDisplayColor(group.name) }}>● </span>{group.name}</span>
+        <span className="sidebar-assignment-name"><span aria-hidden="true" style={{ color: resolveTagDisplayColor(group.name) ?? undefined }}>● </span>{group.name}</span>
         <span className="sidebar-assignment-balance">{group.memberCount}</span>
       </span>
     </button>)}
