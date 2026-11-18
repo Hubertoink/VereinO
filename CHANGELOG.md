@@ -7,6 +7,12 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.3.1] - 2026-11-18
+
+### Hinzugefügt
+
+- Ein Rechtsklick auf eine Mitgliedergruppe öffnet in der Mitgliederansicht und in der Seitenleiste ein kompaktes Menü zum Umbenennen oder Löschen. Das Löschen erfordert eine Bestätigung und erhält alle Mitglieder.
+
 ## [5.3.0] - 2026-11-18
 
 ### Hinzugefügt

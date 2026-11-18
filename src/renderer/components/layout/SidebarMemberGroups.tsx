@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { MemberGroup } from '../../../../shared/memberGroups'
 import { addDataChangedListener } from '../../utils/refresh'
+import MemberGroupButton from '../../views/Mitglieder/MemberGroupButton'
 import { resolveTagDisplayColor } from '../../utils/tagColors'
 
 export function SidebarMemberGroups({ onSelect }: { onSelect: (id: number) => void }) {
@@ -24,11 +25,11 @@ export function SidebarMemberGroups({ onSelect }: { onSelect: (id: number) => vo
   if (!groups.length) return null
   return <div className="sidebar-recent-assignments" role="group" aria-label="Mitgliedergruppen">
     <p className="sidebar-section-caption">Gruppen</p>
-    {groups.map(group => <button type="button" key={group.id} className="sidebar-recent-assignment" onClick={() => onSelect(group.id)}>
+    {groups.map(group => <MemberGroupButton group={group} key={group.id} className="sidebar-recent-assignment" onClick={() => onSelect(group.id)}>
       <span className="sidebar-assignment-heading">
         <span className="sidebar-assignment-name"><span aria-hidden="true" style={{ color: resolveTagDisplayColor(group.name) ?? undefined }}>● </span>{group.name}</span>
         <span className="sidebar-assignment-balance">{group.memberCount}</span>
       </span>
-    </button>)}
+    </MemberGroupButton>)}
   </div>
 }

@@ -18,3 +18,9 @@
 .receipt-zoom__footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
 .receipt-zoom__footer output { font-variant-numeric: tabular-nums; }
 .receipt-zoom__footer .btn { font-size: var(--type-control); padding: 5px 8px; }
+.member-group-menu .compact-popover__heading strong { min-width: 0; overflow-wrap: anywhere; }
+.member-group-menu form { display: grid; gap: 8px; }
+.member-group-menu form p { margin: 0; }
+.member-group-menu__actions { display: flex; justify-content: flex-end; gap: 6px; }
+.member-group-menu__options { display: grid; gap: 4px; }
+.member-group-menu__options .btn { justify-content: flex-start; }

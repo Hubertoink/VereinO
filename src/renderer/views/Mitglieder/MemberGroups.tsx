@@ -4,6 +4,7 @@ import type { GroupChange, MemberFilters, MemberGroup } from '../../../../shared
 import MasterDataDialog, { FieldLabel } from '../../components/common/MasterDataDialog'
 import CompactPopover from '../../components/CompactPopover'
 import { getContrastTextColor, resolveTagDisplayColor } from '../../utils/tagColors'
+import MemberGroupButton from './MemberGroupButton'
 import './memberGroups.css'
 
 export function MemberGroupBar({ groups, active, error, selectedCount, children, onFilter, onCreate, onRetry }: {
@@ -42,9 +43,9 @@ export function MemberGroupBar({ groups, active, error, selectedCount, children,
       {visible.map(group => {
         const color = resolveTagDisplayColor(group.name)
         const count = group.memberCount === 1 ? '1 Mitglied' : `${group.memberCount} Mitglieder`
-        return <button type="button" key={group.id} className="member-groups__badge" title={count} aria-description={count}
+        return <MemberGroupButton group={group} key={group.id} className="member-groups__badge" title={count} aria-description={count}
           aria-pressed={group.id === active} style={{ '--group-color': color, '--group-text': getContrastTextColor(color) } as CSSProperties}
-          onClick={() => onFilter(group.id === active ? undefined : group.id)}>{group.name}</button>
+          onClick={() => onFilter(group.id === active ? undefined : group.id)}>{group.name}</MemberGroupButton>
       })}
       {open && (error ? <span className="helper">Gruppen konnten nicht geladen werden. <button className="btn" onClick={onRetry}>Erneut laden</button></span>
         : !visible.length && <span className="helper">{groups.length ? 'Keine passende Gruppe gefunden.' : 'Noch keine Gruppen angelegt.'}</span>)}
@@ -92,7 +93,7 @@ function MemberSelectionActions({ count, children }: { count: number; children: 
 
 export function MemberGroupDialog({ mode, groups, memberIds, onClose, onSaved }: {
   mode: 'create' | 'assign'; groups: MemberGroup[]; memberIds: number[]; onClose: () => void
-  onSaved: (change: GroupChange, changed: number) => void
+  onSaved: (change: Extract<GroupChange, { memberIds: number[] }>, changed: number) => void
 }) {
   const [target, setTarget] = useState(mode === 'create' || !groups.length ? 'new' : '')
   const [name, setName] = useState('')

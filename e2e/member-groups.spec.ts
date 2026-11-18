@@ -27,7 +27,7 @@ test('member groups, selection across pages, recipients and history use the same
       }
       return ids
     })
-    await page.getByRole('button', { name: 'Mitglieder', exact: true }).click()
+    await page.locator('[data-shortcut-nav="Mitglieder"]').click()
     const select = (name: string) => page.getByRole('checkbox', { name, exact: true })
     const invite = page.getByRole('button', { name: 'Einladen (E-Mail)', exact: true })
     const bcc = page.getByLabel('Empfänger (BCC)', { exact: true })
@@ -153,6 +153,23 @@ test('member groups, selection across pages, recipients and history use the same
     await page.getByLabel('Gruppenname').fill('Jugend')
     await page.getByRole('button', { name: 'Gruppe erstellen' }).click()
     await expect(groupBar.getByRole('button', { name: 'Jugend', exact: true })).toHaveAttribute('title', '0 Mitglieder')
+    await group.click({ button: 'right' })
+    const editor = page.getByRole('dialog', { name: 'Helferteam', exact: true })
+    await editor.getByRole('button', { name: 'Umbenennen' }).click()
+    await editor.getByLabel('Gruppenname').fill('Verteiler')
+    await editor.getByRole('button', { name: 'Speichern' }).click()
+    await expect(editor.getByRole('alert')).toContainText('existiert bereits')
+    await editor.getByLabel('Gruppenname').fill('Team West')
+    await editor.getByRole('button', { name: 'Speichern' }).click()
+    const renamed = groupBar.getByRole('button', { name: 'Team West', exact: true })
+    await expect(renamed).toHaveAttribute('title', '2 Mitglieder')
+    await renamed.click()
+    const sidebarGroup = page.getByRole('navigation', { name: 'Seitenleiste' }).getByRole('button', { name: /Team West/ })
+    await sidebarGroup.click({ button: 'right' })
+    await page.getByRole('dialog', { name: 'Team West', exact: true }).getByRole('button', { name: 'Gruppe löschen' }).click()
+    await page.getByRole('button', { name: 'Endgültig löschen' }).click()
+    await expect(renamed).toHaveCount(0)
+    await expect(sidebarGroup).toHaveCount(0)
     const acrossOrganizations = await page.evaluate(async () => {
       const original = (await window.api.organizations.active()).organization!
       const other = await window.api.organizations.create({ name: 'Projektbudget', profile: 'GENERAL' })
@@ -167,7 +184,7 @@ test('member groups, selection across pages, recipients and history use the same
     expect(acrossOrganizations.empty).toEqual([])
     expect(acrossOrganizations.general).toMatchObject([{ name: 'Helferteam', memberCount: 1 }])
     expect(acrossOrganizations.original).toMatchObject([
-      { name: 'Helferteam', memberCount: 2 }, { name: 'Jugend', memberCount: 0 }, { name: 'Verteiler', memberCount: 52 }
+      { name: 'Jugend', memberCount: 0 }, { name: 'Verteiler', memberCount: 52 }
     ])
   } finally {
     await app.close()

@@ -61,7 +61,11 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
     useEffect(() => {
         let live = true
         window.api.members.groups.list().then(result => {
-            if (live) { setGroups(result); setGroupError(false) }
+            if (live) {
+                setGroups(result)
+                setGroupError(false)
+                setGroupId(current => typeof current === 'number' && !result.some(group => group.id === current) ? undefined : current)
+            }
         }).catch(() => { if (live) setGroupError(true) })
         return () => { live = false }
     }, [groupRevision])

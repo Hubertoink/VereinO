@@ -16,6 +16,8 @@ export const MemberAudienceSchema = z.union([
   z.object({ filters: MemberFiltersSchema }).strict()
 ])
 export const GroupChangeSchema = z.union([
+  z.object({ action: z.literal('rename'), groupId: Id, name: MemberGroupName }).strict(),
+  z.object({ action: z.literal('delete'), groupId: Id }).strict(),
   z.object({ action: z.literal('create'), name: MemberGroupName, memberIds: z.array(Id) }).strict(),
   z.object({ action: z.enum(['add', 'remove']), groupId: Id, memberIds: MemberIds }).strict()
 ])
