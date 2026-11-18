@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MemberFiltersSchema } from '../../../shared/memberGroups'
 import { ImportMasterRowSchema } from '../../../shared/importMasterData'
 
 // Public IPC-schema facade. Domain modules are re-exported here so existing
@@ -1442,20 +1443,12 @@ export type TTagDeleteOutput = z.infer<typeof TagDeleteOutput>
 
 // Members CRUD
 const MemberStatus = z.enum(['ACTIVE', 'NEW', 'PAUSED', 'LEFT'])
-export const MembersListInput = z
-  .object({
+export const MembersListInput = MemberFiltersSchema.extend({
     includeSummary: z.boolean().optional(),
-    q: z.string().optional(),
-    status: z.enum(['ACTIVE', 'NEW', 'PAUSED', 'LEFT', 'ALL']).optional(),
     limit: z.number().min(1).max(200).default(50).optional(),
     offset: z.number().min(0).default(0).optional(),
     sortBy: z.enum(['memberNo', 'name', 'email', 'status']).optional(),
-    sort: z.enum(['ASC', 'DESC']).optional(),
-    contributionFilter: z.enum(['ALL', 'DUE', 'NOT_DUE', 'NO_PLAN']).optional(),
-    intervalFilter: z.enum(['ALL', 'MONTHLY', 'QUARTERLY', 'YEARLY']).optional(),
-    boardFilter: z
-      .enum(['ALL', 'ANY', 'NONE', 'V1', 'V2', 'KASSIER', 'KASSENPR1', 'KASSENPR2', 'SCHRIFT'])
-      .optional()
+    sort: z.enum(['ASC', 'DESC']).optional()
   })
   .optional()
 const BoardRole = z.enum(['V1', 'V2', 'KASSIER', 'KASSENPR1', 'KASSENPR2', 'SCHRIFT'])

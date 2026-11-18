@@ -6,8 +6,10 @@ import { IconChevronDown, IconChevronRight, IconLayoutSidebarLeftCollapse, IconL
 import { SidebarAccounts } from './SidebarAccounts'
 import { SidebarRecentAssignments, type SidebarAssignmentKind } from './SidebarRecentAssignments'
 import { SidebarBankImports } from './SidebarBankImports'
+import { SidebarMemberGroups } from './SidebarMemberGroups'
 import { SidebarMembershipFees } from './SidebarMembershipFees'
 import type { NavigationMenuProps } from './useNavigationMenu'
+import { useUpdateNotice } from '../../context/UpdateNoticeContext'
 
 const sectionsStorageKey = 'ui.sidebarSectionsCollapsed'
 function readCollapsedSections(): Partial<Record<NavKey, boolean>> {
@@ -53,13 +55,16 @@ export interface SideNavProps extends NavigationMenuProps {
   onSelectAccount?: (id: number) => void
   onSelectAssignment?: (kind: SidebarAssignmentKind, id: number) => void
   onSelectBankAccount?: (id: number) => void
+  onSelectMemberGroup?: (id: number) => void
   onSelectMembershipFees?: () => void
   appVersion?: string
   onOpenChangelog?: () => void
 }
 
-export function SideNav({ footerActions, activePage, onNavigate, navIconColorMode, collapsed, onToggleCollapse, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, dueRecurringBookingsCount = 0, showBadges = true, items = navItems, aiBusy = false, selectedAccountId, onSelectAccount, onSelectAssignment, onSelectBankAccount, onSelectMembershipFees, appVersion, onOpenChangelog }: SideNavProps) {
+export function SideNav({ footerActions, activePage, onNavigate, navIconColorMode, collapsed, onToggleCollapse, openBankImportsCount = 0, openInvoicesCount = 0, dueMembershipFeesCount = 0, dueRecurringBookingsCount = 0, showBadges = true, items = navItems, aiBusy = false, selectedAccountId, onSelectAccount, onSelectAssignment, onSelectBankAccount, onSelectMembershipFees, onSelectMemberGroup, appVersion, onOpenChangelog }: SideNavProps) {
   const [closedSections, setClosedSections] = useState(readCollapsedSections)
+  const { version: updateVersion } = useUpdateNotice()
+  const versionDescription = `Version ${appVersion}${updateVersion ? ` · Update ${updateVersion} verfügbar` : ''} · Changelog anzeigen`
   const sectionId = useId()
   useEffect(() => {
     try { localStorage.setItem(sectionsStorageKey, JSON.stringify(closedSections)) } catch { /* Optional layout preference. */ }
@@ -88,6 +93,7 @@ export function SideNav({ footerActions, activePage, onNavigate, navIconColorMod
         {item.key === 'Buchungen' && onSelectAccount && <SidebarAccounts selectedId={activePage === 'Buchungen' ? selectedAccountId : null} onSelect={onSelectAccount} />}
         {item.key === 'Bankimport' && onSelectBankAccount && <SidebarBankImports onSelect={onSelectBankAccount} />}
         {item.key === 'Mitglieder' && onSelectMembershipFees && <SidebarMembershipFees onSelect={onSelectMembershipFees} />}
+        {item.key === 'Mitglieder' && onSelectMemberGroup && <SidebarMemberGroups onSelect={onSelectMemberGroup} />}
         {onSelectAssignment && (item.key === 'Budgets' || item.key === 'Zweckbindungen') && <SidebarRecentAssignments kind={item.key === 'Budgets' ? 'budget' : 'earmark'} onSelect={onSelectAssignment} />}
       </SidebarSection>}
     </React.Fragment>
@@ -106,7 +112,7 @@ export function SideNav({ footerActions, activePage, onNavigate, navIconColorMod
       <div className="sidebar-nav-footer">
         {footerActions}
         {items.filter(item => item.group === 'system').map(renderItem)}
-        {appVersion && onOpenChangelog && <button type="button" className="sidebar-version" onClick={onOpenChangelog} title={`Version ${appVersion} · Changelog anzeigen`} aria-label={`Version ${appVersion}, Changelog anzeigen`}>{collapsed ? `v${appVersion}` : `VereinO · v${appVersion}`}</button>}
+        {appVersion && onOpenChangelog && <button type="button" className={`sidebar-version${updateVersion ? ' sidebar-version--update' : ''}`} onClick={onOpenChangelog} title={versionDescription} aria-label={versionDescription.replaceAll(' · ', ', ')}>{collapsed ? `v${appVersion}` : `VereinO · v${appVersion}`}</button>}
       </div>
     </nav>
   )

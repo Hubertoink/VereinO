@@ -1,3 +1,5 @@
+import type { MemberHistoryEntry } from '../../../shared/memberHistory'
+import type { GroupChange, MemberGroup, MemberContact, MemberAudience } from '../../../shared/memberGroups'
 import type { MembersImportApi } from '../../../shared/membersImport'
 import type {
     TMemberCreateInput,
@@ -27,6 +29,12 @@ import type { ContributionInterval } from '../../../shared/membershipPayments'
 
 export interface MembersApi {
     members: {
+        groups: {
+            list: () => Promise<MemberGroup[]>
+            change: (payload: GroupChange) => Promise<{ groupId: number; changed: number }>
+        }
+        audience: (payload: MemberAudience) => Promise<MemberContact[]>
+        history: (payload: { memberId: number; beforeId?: number; limit?: number }) => Promise<{ rows: MemberHistoryEntry[]; hasMore: boolean }>
         import: MembersImportApi
         list: (payload?: TMembersListInput) => Promise<TMembersListOutput>
         create: (payload: TMemberCreateInput) => Promise<TMemberCreateOutput>

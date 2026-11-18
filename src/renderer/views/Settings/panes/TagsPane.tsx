@@ -76,8 +76,8 @@ export function TagsPane({ tagDefs, setTagDefs, notify, bumpDataVersion }: TagsP
 
                 {/* Name and usage */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{t.name}</div>
-                  <div className="helper" style={{ fontSize: 11 }}>
+                  <div style={{ fontWeight: 600, fontSize: 'var(--type-small-text)', marginBottom: 2 }}>{t.name}</div>
+                  <div className="helper">
                     {(t.usage ?? 0) === 0 ? 'Nicht verwendet' : `${t.usage} Buchung${(t.usage ?? 0) !== 1 ? 'en' : ''}`}
                   </div>
                 </div>

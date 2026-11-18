@@ -20,7 +20,7 @@
   container: settings / inline-size;
   padding: var(--settings-content-padding, 24px);
   min-width: 0;
-  font-size: 14px;
+  font-size: var(--type-small-text);
   line-height: 1.5;
 }
 .settings-content.settings-unified .settings-page {
@@ -45,7 +45,7 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 16px 24px;
-  padding: 0 0 24px;
+  padding: 0 0 calc(24px * var(--ui-space-scale, 1)) 0;
   margin: 0;
   border-bottom: 1px solid var(--border);
 }
@@ -58,25 +58,25 @@
   align-items: center;
   gap: 10px;
   margin: 0;
-  font-size: 20px;
+  font-size: var(--type-section-title);
   line-height: 1.3;
   font-weight: 650;
 }
 .settings-content.settings-unified .settings-page-header p {
   margin: 8px 0 0;
   color: var(--text-dim);
-  font-size: 14px;
+  font-size: var(--type-small-text);
 }
 .settings-content.settings-unified .settings-page-meta {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--type-small-text);
   color: var(--text-dim);
 }
 .settings-content.settings-unified .settings-page-count {
   padding: 2px 8px;
   border: 1px solid var(--border);
   border-radius: 20px;
-  font-size: 12px;
+  font-size: var(--type-caption);
   font-weight: 500;
   color: var(--text-dim);
 }
@@ -96,7 +96,7 @@
   ) {
   display: grid;
   gap: 16px;
-  padding: 0 0 24px;
+  padding: 0 0 calc(24px * var(--ui-space-scale, 1)) 0;
   margin: 0;
   background: transparent;
   border: 0;
@@ -122,14 +122,14 @@
     .settings-workflow-section h3
   ) {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--type-subheading);
   line-height: 1.4;
   font-weight: 600;
 }
 .settings-content.settings-unified :is(.settings-section-heading p, .settings-layout-panel p) {
   margin: 4px 0 0;
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: var(--type-small-text);
 }
 .settings-content.settings-unified
   :is(
@@ -137,7 +137,7 @@
     .settings-layout-label-row > span,
     .settings-toggle-card__copy > span:not(.settings-toggle-card__title-row)
   ) {
-  font-size: 13px;
+  font-size: var(--type-small-text);
   color: var(--text-dim);
   font-weight: 400;
   line-height: 1.5;
@@ -146,7 +146,7 @@
   margin: -10px 0 0;
 }
 .settings-content.settings-unified .helper {
-  font-size: 13px;
+  font-size: var(--type-caption);
   line-height: 1.5;
 }
 .settings-content.settings-unified .settings-row {
@@ -154,7 +154,7 @@
   grid-template-columns: minmax(200px, 1fr) minmax(240px, 1fr);
   align-items: center;
   gap: 16px 32px;
-  padding: 16px 0;
+  padding: calc(16px * var(--ui-space-scale, 1)) 0 calc(16px * var(--ui-space-scale, 1)) 0;
   border-bottom: 1px solid var(--border);
   min-width: 0;
 }
@@ -167,7 +167,7 @@
 }
 .settings-content.settings-unified .settings-row-copy > :is(strong, label) {
   display: block;
-  font-size: 14px;
+  font-size: var(--type-small-text);
   font-weight: 600;
 }
 .settings-content.settings-unified .settings-row-copy .helper {
@@ -200,7 +200,7 @@
 .settings-content.settings-unified .btn-option {
   min-height: 34px;
   padding: 6px 12px;
-  font-size: 13px;
+  font-size: var(--type-control);
 }
 .settings-content.settings-unified .settings-layout-stack {
   gap: 24px;
@@ -243,7 +243,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 0;
+  padding: calc(16px * var(--ui-space-scale, 1)) 0 calc(16px * var(--ui-space-scale, 1)) 0;
   gap: 32px;
   border: 0;
   border-bottom: 1px solid var(--border);
@@ -261,7 +261,7 @@
     .settings-toggle-card__copy strong,
     .settings-toggle-card__label
   ) {
-  font-size: 14px;
+  font-size: var(--type-small-text);
   font-weight: 600;
   line-height: 1.5;
 }
@@ -312,7 +312,7 @@
   margin: 0;
 }
 .settings-content.settings-unified .theme-card__name {
-  font-size: 13px;
+  font-size: var(--type-small-text);
   max-width: none;
   text-align: left;
   white-space: normal;
@@ -397,7 +397,7 @@
   border: 1px solid color-mix(in srgb, var(--text) 20%, transparent);
 }
 .settings-content.settings-unified .settings-record-row .helper {
-  font-size: 13px !important;
+  font-size: var(--type-caption) !important;
 }
 .settings-content.settings-unified .payment-account-card__details {
   flex: 1;
@@ -437,7 +437,7 @@
   gap: 8px;
 }
 .settings-content.settings-unified .backup-mode-select {
-  font-size: 14px;
+  font-size: var(--type-control);
   min-height: 36px;
 }
 .settings-content.settings-unified .backup-auto-details {
@@ -513,7 +513,7 @@
   border-collapse: collapse;
 }
 .settings-content.settings-unified .settings-table-preview tbody td {
-  padding: 12px 8px !important;
+  padding: calc(12px * var(--ui-space-scale, 1)) 8px calc(12px * var(--ui-space-scale, 1)) 8px !important;
 }
 .settings-content.settings-unified .settings-table-preview[data-density='compact'] tbody td {
   padding: 5px 8px !important;
@@ -588,4 +588,32 @@
   .settings-container {
     --settings-outer-padding: 12px;
   }
+}
+
+/* Live preview uses the same density tokens as the rest of the application. */
+.settings-density-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.settings-density-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 16px;
+  padding: calc(16px * var(--ui-space-scale, 1)) 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: var(--type-table-text);
+}
+.settings-density-preview > span {
+  grid-column: 1;
+  color: var(--text-dim);
+  font-size: var(--type-caption);
+}
+.settings-density-preview > b {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  font-variant-numeric: tabular-nums;
 }

@@ -1273,8 +1273,8 @@ export default function JournalView({
                                 <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', display: 'grid', placeItems: 'center' }}>
                                     <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420, width: '90vw', padding: '22px 24px', borderRadius: 14, border: '2px solid var(--accent)' }}>
                                         <div style={{ marginBottom: 6, display: 'grid', placeItems: 'center', color: 'var(--warning)' }}><AppIcon icon={IconAlertTriangle} size="action" /></div>
-                                        <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700, textAlign: 'center' }}>Ungespeicherte Änderungen</h3>
-                                        <p style={{ margin: '0 0 16px', fontSize: 13, opacity: 0.85, lineHeight: 1.45, textAlign: 'center' }}>
+                                        <h3 style={{ margin: '0 0 8px', fontSize: 'var(--type-dialog-title)', fontWeight: 700, textAlign: 'center' }}>Ungespeicherte Änderungen</h3>
+                                        <p style={{ margin: '0 0 16px', fontSize: 'var(--type-small-text)', opacity: 0.85, lineHeight: 1.45, textAlign: 'center' }}>
                                             Diese Buchung wurde verändert. Möchtest du die Änderungen wirklich verwerfen?
                                         </p>
                                         <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
@@ -1578,7 +1578,7 @@ export default function JournalView({
                                                     <button
                                                         type="button"
                                                         className="btn ghost"
-                                                        style={{ padding: '2px 6px', fontSize: '0.85rem' }}
+                                                        style={{ padding: '2px 6px' }}
                                                         onClick={() => {
                                                             const currentBudgets = (editRow as any).budgets || []
                                                             const amount = editRow.type === 'INTERNAL' && currentBudgets.length === 0 ? -((editRow as any).grossAmount || 0) : ((editRow as any).grossAmount || 0)
@@ -1693,7 +1693,7 @@ export default function JournalView({
                                                     <button
                                                         type="button"
                                                         className="btn ghost"
-                                                        style={{ padding: '2px 6px', fontSize: '0.85rem' }}
+                                                        style={{ padding: '2px 6px' }}
                                                         onClick={() => {
                                                             const currentEarmarks = (editRow as any).earmarksAssigned || []
                                                             const amount = editRow.type === 'INTERNAL' && currentEarmarks.length === 0 ? -((editRow as any).grossAmount || 0) : ((editRow as any).grossAmount || 0)

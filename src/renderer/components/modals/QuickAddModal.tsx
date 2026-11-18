@@ -713,9 +713,9 @@ export default function QuickAddModal({
                 {confirmingClose && (
                     <div className="modal-overlay" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', display: 'grid', placeItems: 'center' }}>
                         <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400, width: '90vw', padding: '24px 28px', borderRadius: 14, border: '2px solid var(--accent)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)', textAlign: 'center' }}>
-                            <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
-                            <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700 }}>Ungespeicherte Änderungen</h3>
-                            <p style={{ margin: '0 0 20px', fontSize: 13, opacity: 0.8, lineHeight: 1.5 }}>
+                            <div style={{ fontSize: "calc(28px * var(--ui-symbol-scale, 1))", marginBottom: 8 }}>⚠️</div>
+                            <h3 style={{ margin: '0 0 8px', fontSize: 'var(--type-dialog-title)', fontWeight: 700 }}>Ungespeicherte Änderungen</h3>
+                            <p style={{ margin: '0 0 20px', fontSize: 'var(--type-small-text)', opacity: 0.8, lineHeight: 1.5 }}>
                                 Du hast Änderungen an dieser Buchung vorgenommen.<br/>Möchtest du diese wirklich verwerfen?
                             </p>
                             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
@@ -1275,7 +1275,7 @@ export default function QuickAddModal({
                                             <button
                                                 type="button"
                                                 className="btn ghost"
-                                                style={{ padding: '2px 6px', fontSize: '0.85rem' }}
+                                                style={{ padding: '2px 6px' }}
                                                 onClick={addBudgetAssignment}
                                                 title="Weiteres Budget hinzufügen"
                                             >
@@ -1395,7 +1395,7 @@ export default function QuickAddModal({
                                             <button
                                                 type="button"
                                                 className="btn ghost"
-                                                style={{ padding: '2px 6px', fontSize: '0.85rem' }}
+                                                style={{ padding: '2px 6px' }}
                                                 onClick={addEarmarkAssignment}
                                                 title="Weitere Zweckbindung hinzufügen"
                                             >

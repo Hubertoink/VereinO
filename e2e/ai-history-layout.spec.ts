@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 
 let script: string, css: string
 test.beforeAll(async () => {
-  css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/views/AI/AIView.css'].map(file => fs.readFile(file, 'utf8')))).join('\n')
+  css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/modalHeader.css', 'src/renderer/views/AI/AIView.css'].map(file => fs.readFile(file, 'utf8')))).join('\n')
   script = (await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
     import React from 'react'
     import { createRoot } from 'react-dom/client'
@@ -18,7 +18,7 @@ test.beforeAll(async () => {
       <AiHistoryDrawer jobs={jobs} openBookingJobs={[]} completedBookingJobs={booked} busy={false}
         onClose={() => {}} onOpenJob={() => {}} onMarkDone={() => {}} onDelete={() => {}} />
     </div>)
-  ` }, bundle: true, jsx: 'automatic', write: false, platform: 'browser', define: { 'process.env.NODE_ENV': '"production"' } })).outputFiles[0].text
+  ` }, bundle: true, jsx: 'automatic', write: false, platform: 'browser', loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' } })).outputFiles[0].text
 })
 
 for (const viewport of [{ width: 1280, height: 550 }, { width: 640, height: 480 }]) {

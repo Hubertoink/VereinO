@@ -51,7 +51,7 @@ export default function CompactPopover({ label, anchor, onClose, children, class
     onKeyDown={event => {
       event.stopPropagation()
       if (event.key !== 'Tab') return
-      const fields = Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)') || [])
+      const fields = Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled)') || [])
       const first = fields[0], last = fields[fields.length - 1]
       if (event.shiftKey && (document.activeElement === first || document.activeElement === panel.current)) { event.preventDefault(); last?.focus() }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }

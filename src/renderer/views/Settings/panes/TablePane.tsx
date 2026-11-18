@@ -272,7 +272,7 @@ export function TablePane({
               data-density={journalRowDensity}
               data-row-style={journalRowStyle}
               cellPadding={6}
-              style={{ width: '100%', fontSize: 13 }}
+              style={{ width: '100%', fontSize: 'var(--type-small-text)' }}
             >
               <thead>
                 <tr>

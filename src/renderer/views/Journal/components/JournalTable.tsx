@@ -900,7 +900,7 @@ export default function JournalTable({
                                                 color: bg ? fg : undefined,
                                                 cursor: 'pointer',
                                                 border: bg ? `1px solid ${bg}` : undefined,
-                                                fontSize: 10,
+                                                fontSize: 'var(--type-badge)',
                                                 padding: '2px 4px',
                                                 maxWidth: 70,
                                                 overflow: 'hidden',
@@ -916,7 +916,7 @@ export default function JournalTable({
                                 )
                             })}
                             {assignments.length > 3 && (
-                                <span className="badge" style={{ fontSize: 10, padding: '2px 4px' }} title={`+${assignments.length - 3} weitere`}>
+                                <span className="badge" style={{ fontSize: 'var(--type-badge)', padding: '2px 4px' }} title={`+${assignments.length - 3} weitere`}>
                                     +{assignments.length - 3}
                                 </span>
                             )}
@@ -1011,7 +1011,7 @@ export default function JournalTable({
                                                 color: bg ? fg : undefined,
                                                 cursor: 'pointer',
                                                 border: bg ? `1px solid ${bg}` : undefined,
-                                                fontSize: 10,
+                                                fontSize: 'var(--type-badge)',
                                                 padding: '2px 4px',
                                                 maxWidth: 70,
                                                 overflow: 'hidden',
@@ -1027,7 +1027,7 @@ export default function JournalTable({
                                 )
                             })}
                             {assignments.length > 3 && (
-                                <span className="badge" style={{ fontSize: 10, padding: '2px 4px' }} title={`+${assignments.length - 3} weitere`}>
+                                <span className="badge" style={{ fontSize: 'var(--type-badge)', padding: '2px 4px' }} title={`+${assignments.length - 3} weitere`}>
                                     +{assignments.length - 3}
                                 </span>
                             )}

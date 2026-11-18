@@ -43,7 +43,7 @@ const EditableCell = memo(function EditableCell({
           borderRadius: 4,
           background: isEdited ? 'color-mix(in oklab, var(--primary) 5%, var(--bg))' : 'var(--bg)',
           color: 'var(--text)',
-          fontSize: 11
+          fontSize: 'var(--type-caption)'
         }}
         placeholder={isMissing ? 'Pflicht!' : undefined}
       />
@@ -86,10 +86,10 @@ const PreviewTable = memo(function PreviewTable({
     <div style={{ marginTop: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
         <strong>Vorschau</strong>
-        <span className="helper" style={{ fontSize: 11 }}>Pflichtfelder können direkt in der Tabelle bearbeitet werden</span>
+        <span className="helper" style={{ fontSize: 'var(--type-caption)' }}>Pflichtfelder können direkt in der Tabelle bearbeitet werden</span>
         {hintRowCount > 0 && (
           <span style={{ 
-            fontSize: 11, 
+            fontSize: 'var(--type-caption)',
             color: 'var(--muted)', 
             background: 'var(--bg-alt)', 
             padding: '2px 6px', 
@@ -100,7 +100,7 @@ const PreviewTable = memo(function PreviewTable({
         )}
       </div>
       <div style={{ overflowX: 'auto' }}>
-        <table cellPadding={4} style={{ fontSize: 11 }}>
+        <table cellPadding={4} style={{ fontSize: 'var(--type-caption)' }}>
           <thead>
             <tr>
               <th style={{ width: 30, textAlign: 'center' }}>#</th>
@@ -149,7 +149,7 @@ const PreviewTable = memo(function PreviewTable({
                   }} 
                   title={isHint ? 'Hinweis-Zeile (wird übersprungen)' : (st?.message || (hasErrors ? `Fehlende Felder: ${missingFields.join(', ')}` : undefined))}
                 >
-                  <td style={{ textAlign: 'center', fontSize: 10, color: 'var(--muted)' }}>
+                  <td style={{ textAlign: 'center', fontSize: 'var(--type-badge)', color: 'var(--muted)' }}>
                     {rowIdx}
                   </td>
                   <td style={{ textAlign: 'center' }}>
@@ -207,10 +207,10 @@ const PreviewTable = memo(function PreviewTable({
       </div>
       {Object.keys(editedRows).length > 0 && (
         <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, color: 'var(--primary)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconPencil size={13} aria-hidden="true" /> {Object.keys(editedRows).length} Zeile(n) bearbeitet</span>
+          <span style={{ fontSize: 'var(--type-caption)', color: 'var(--primary)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconPencil size={13} aria-hidden="true" /> {Object.keys(editedRows).length} Zeile(n) bearbeitet</span>
           <button 
             className="btn secondary" 
-            style={{ fontSize: 10, padding: '2px 6px' }}
+            style={{ fontSize: 'var(--type-badge)', padding: '2px 6px' }}
             onClick={onResetEdits}
           >
             Zurücksetzen
@@ -585,7 +585,7 @@ export function MembersImportCard({ notify }: MembersImportCardProps) {
           </div>
           
           {/* Update existing toggle */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, cursor: 'pointer', fontSize: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, cursor: 'pointer', fontSize: 'var(--type-caption)' }}>
             <input
               type="checkbox"
               checked={updateExisting}

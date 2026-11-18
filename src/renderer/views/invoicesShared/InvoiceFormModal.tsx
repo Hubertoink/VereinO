@@ -365,7 +365,7 @@ export default function InvoiceFormModal({
                     <label htmlFor="autoPostToggle">Auto-Buchung</label>
                     <input type="checkbox" id="autoPostToggle" className="toggle" checked={form.draft.autoPost} onChange={(e) => setDraft({ autoPost: e.target.checked })} />
                   </div>
-                  <div className="helper" style={{ fontSize: 11 }}>Bei vollständiger Zahlung wird automatisch eine Buchung erstellt.</div>
+                  <div className="helper">Bei vollständiger Zahlung wird automatisch eine Buchung erstellt.</div>
                 </div>
 
               </div>

@@ -6,7 +6,7 @@
 .setup-booking-choice:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
 .setup-booking-choice__heading { display: flex; align-items: center; gap: 8px; }
 .setup-booking-choice__heading input { margin: 0; accent-color: var(--accent); }
-.setup-booking-choice__description { color: var(--text-dim); font-size: 12px; line-height: 1.5; min-height: 36px; }
+.setup-booking-choice__description { color: var(--text-dim); font-size: var(--type-caption); line-height: 1.5; min-height: 36px; }
 .setup-booking-preview { display: flex; gap: 8px; min-width: 0; min-height: 174px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg, var(--surface)); font-size: 9px; line-height: 1.4; overflow: hidden; pointer-events: none; user-select: none; }
 .setup-booking-preview__sidebar { display: flex; flex-direction: column; gap: 8px; flex: 0 0 72px; border-right: 1px solid var(--border); padding-right: 8px; }
 .setup-booking-preview__calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; font-size: 7px; text-align: center; }

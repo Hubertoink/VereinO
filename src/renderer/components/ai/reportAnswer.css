@@ -13,7 +13,7 @@
 }
 .ai-report-answer .ai-report-question {
   margin: 0 0 15px;
-  font-size: 12px;
+  font-size: var(--type-caption);
   color: var(--text-dim);
 }
 .ai-report-eyebrow {
@@ -21,7 +21,7 @@
   flex-wrap: wrap;
   gap: 7px;
   align-items: center;
-  font-size: 11px;
+  font-size: var(--type-caption);
   color: var(--text-dim);
 }
 .ai-report-dot {
@@ -33,12 +33,12 @@
 .dp-ai-answers .ai-report-answer h3,
 .ai-message .ai-report-answer h3 {
   margin: 9px 0;
-  font-size: 21px;
+  font-size: var(--type-subheading);
   letter-spacing: -0.4px;
 }
 .ai-report-answer .ai-report-summary {
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--type-small-text);
   line-height: 1.65;
   margin: 0;
   max-width: 78ch;
@@ -60,12 +60,12 @@
   display: flex;
   gap: 7px;
   align-items: center;
-  font-size: 11px;
+  font-size: var(--type-label);
   color: var(--text-dim);
 }
 .ai-report-metric dd {
   margin: 10px 0;
-  font-size: clamp(19px, 2.5vw, 27px);
+  font-size: var(--type-display-value);
   font-weight: 650;
   letter-spacing: -0.7px;
   font-variant-numeric: tabular-nums;
@@ -98,15 +98,15 @@
   border: 0;
   padding: 3px 0;
   color: var(--text);
-  font-size: 11px;
+  font-size: var(--type-control);
 }
 .ai-report-metric small {
   display: block;
-  font-size: 10px;
+  font-size: var(--type-caption);
   color: var(--text-dim);
 }
 .ai-report-answer .ai-report-source-button {
-  font-size: 11px;
+  font-size: var(--type-control);
 }
 .ai-report-chart {
   border: 1px solid var(--border);
@@ -121,11 +121,11 @@
   flex-wrap: wrap;
 }
 .ai-report-chart h4 {
-  font-size: 13px;
+  font-size: var(--type-subheading);
   margin: 0 0 4px;
 }
 .ai-report-chart-heading span {
-  font-size: 11px;
+  font-size: var(--type-caption);
   color: var(--text-dim);
 }
 .ai-report-switch {
@@ -141,7 +141,7 @@
   color: var(--text-dim);
   border-radius: 6px;
   padding: 6px 9px;
-  font-size: 11px;
+  font-size: var(--type-control);
 }
 .ai-report-switch button[aria-pressed='true'] {
   border-color: var(--border);
@@ -158,7 +158,7 @@
   display: flex;
   gap: 16px;
   margin-top: 12px;
-  font-size: 11px;
+  font-size: var(--type-label);
   color: var(--text-dim);
 }
 .ai-report-legend span {
@@ -225,11 +225,11 @@
 .ai-report-month-detail > div {
   display: grid;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--type-caption);
 }
 .ai-report-month-detail > div span {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--type-label);
 }
 .ai-report-month-detail dl {
   display: flex;
@@ -239,11 +239,11 @@
   flex: 1;
 }
 .ai-report-month-detail dt {
-  font-size: 10px;
+  font-size: var(--type-label);
   color: var(--text-dim);
 }
 .ai-report-month-detail dd {
-  font-size: 12px;
+  font-size: var(--type-caption);
   margin: 4px 0 0;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
@@ -266,7 +266,7 @@
   gap: 4px;
   flex: 1;
   margin: 0;
-  font-size: 11px;
+  font-size: var(--type-caption);
 }
 .ai-report-insight strong {
   color: var(--text);
@@ -274,16 +274,16 @@
 .ai-report-sources {
   padding: 13px 0;
   border-top: 1px solid var(--border);
-  font-size: 12px;
+  font-size: var(--type-caption);
 }
 .ai-report-sources summary {
   cursor: pointer;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--type-caption);
 }
 .ai-report-sources p,
 .ai-report-sources li {
-  font-size: 11px;
+  font-size: var(--type-caption);
   line-height: 1.6;
   color: var(--text-dim);
 }
@@ -294,7 +294,7 @@
 }
 .ai-report-balances dd {
   margin: 6px 0;
-  font-size: 15px;
+  font-size: var(--type-body);
   font-weight: 600;
 }
 .ai-report-table-scroll {
@@ -304,7 +304,7 @@
 }
 .ai-report-table-scroll table {
   width: 100%;
-  font-size: 11px;
+  font-size: var(--type-table-text);
   border-collapse: collapse;
 }
 .ai-report-table-scroll caption {
@@ -338,7 +338,7 @@
   gap: 7px;
   align-items: center;
   text-align: left;
-  font-size: 11px;
+  font-size: var(--type-control);
   padding: 8px 11px;
   border: 1px solid var(--border);
   border-radius: 20px;
@@ -356,7 +356,7 @@
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 12px;
+  font-size: var(--type-caption);
 }
 .ai-message.ai-message--report {
   width: 100%;
@@ -383,7 +383,7 @@
   }
   .ai-report-metric dd {
     margin: 0;
-    font-size: 20px;
+    font-size: var(--type-metric);
   }
   .ai-report-metric button,
   .ai-report-metric small {
@@ -391,7 +391,7 @@
   }
   .dp-ai-answers .ai-report-answer h3,
   .ai-message .ai-report-answer h3 {
-    font-size: 19px;
+    font-size: var(--type-subheading);
   }
   .ai-report-chart {
     padding: 12px 10px 0;

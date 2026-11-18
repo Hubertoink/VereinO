@@ -7,6 +7,7 @@
 import type { NavKey } from '../../utils/navItems'
 import type {
   BackgroundImage,
+  DisplayDensity,
   BookingEntryPresentation,
   JournalRowDensity,
   JournalRowStyle,
@@ -133,6 +134,8 @@ export interface SettingsProps {
   setDateFmt: (f: DateFmt) => void
   sidebarCollapsed: boolean
   setSidebarCollapsed: (b: boolean) => void
+  displayDensity: DisplayDensity
+  setDisplayDensity: (value: DisplayDensity) => void
   sidebarBookingActions?: boolean
   setSidebarBookingActions?: (value: boolean) => void
   navLayout: NavLayout
@@ -187,6 +190,8 @@ export interface SettingsProps {
 
 export interface GeneralPaneProps {
   organizationProfile: OrganizationProfile
+  displayDensity: DisplayDensity
+  setDisplayDensity: (value: DisplayDensity) => void
   sidebarBookingActions?: boolean
   setSidebarBookingActions?: (value: boolean) => void
   navLayout: NavLayout

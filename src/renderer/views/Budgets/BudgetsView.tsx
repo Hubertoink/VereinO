@@ -242,7 +242,7 @@ export default function BudgetsView({
           title={showArchived ? 'Archivierte ausblenden' : 'Archivierte anzeigen'}
         >
           <span style={{ color: 'var(--text-dim)' }}><AppIcon icon={IconArchive} size="action" /></span>
-          <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>{archivedCount} archiviert</span>
+          <span style={{ fontSize: 'var(--type-small-text)', color: 'var(--text-dim)' }}>{archivedCount} archiviert</span>
           <label className="label-row" style={{ cursor: 'pointer' }}>
             <input type="checkbox" className="toggle" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
           </label>

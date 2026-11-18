@@ -309,7 +309,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
           const gx = xs(hoverIdx, labels.length)
           const tooltipX = (gx / W) * 100
           return (
-            <div style={{ position: 'absolute', top: 6, left: `${tooltipX}%`, transform: 'translateX(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 12 }}>
+            <div style={{ position: 'absolute', top: 6, left: `${tooltipX}%`, transform: 'translateX(-50%)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', pointerEvents: 'none', boxShadow: 'var(--shadow-1)', fontSize: 'var(--type-caption)' }}>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>{mLabel}</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eur.format(inVal)}</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eur.format(outVal)}</strong></div>

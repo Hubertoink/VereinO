@@ -1673,7 +1673,8 @@ export async function generateAiText(input: {
   context?: AiContext
   files?: AiInputFile[]
 }): Promise<{ model: string; result: TAiTextDraftResult; usage: AiUsage }> {
-  if (!input.files?.length && !isVereinRelevantPrompt(input.prompt)) {
+  const draftingInvitation = input.type === 'INVITATION' && !input.context
+  if (!draftingInvitation && !input.files?.length && !isVereinRelevantPrompt(input.prompt)) {
     const settings = getAiSettings()
     const model = input.model || settings.textModel
     return {
@@ -1709,16 +1710,15 @@ export async function generateAiText(input: {
               `Ton: ${input.tone || 'freundlich, klar, professionell'}.`,
               'Du bist die VereinO KI und hilfst ausschliesslich bei Vereinsverwaltung, Vereinsfinanzen, Mitgliedern, Belegen, Bankimport, Beitragen, Spenden, Einladungen und Reports.',
               'Wenn die Anfrage keinen Bezug zu VereinO oder Vereinsfragen hat, lehne sie kurz ab und verweise auf VereinO-Aufgaben.',
-              'Nutze die bereitgestellten VereinO-Daten aktiv. Bei Fragen nach Mitgliedern, Einnahmen, Ausgaben, Salden, Reports oder offenen Punkten antworte mit konkreten Zahlen/Namen aus dem Kontext.',
+              input.context ? 'Nutze die bereitgestellten VereinO-Daten aktiv. Bei Fragen nach Mitgliedern, Einnahmen, Ausgaben, Salden, Reports oder offenen Punkten antworte mit konkreten Zahlen/Namen aus dem Kontext.' : 'Verwende nur die Angaben im Schreibauftrag.',
               'Erfinde keine Daten. Wenn ein Detail im Kontext fehlt, sage konkret, welche Information fehlt.',
               'Schreibe auf Deutsch. Liefere direkt nutzbare Antworten oder Entwuerfe ohne Platzhalter, ausser fehlende Daten sind unvermeidbar.',
+              draftingInvitation ? 'Formuliere eine versandfertige E-Mail an die Mitglieder. Das Feld body enthält ausschließlich den Nachrichtentext als Klartext mit Absätzen, ohne Betreffzeile oder Erläuterungen.' : '',
               input.files?.length
                 ? 'Beruecksichtige die angehaengten Dateien. Bei Excel/CSV/Tabellen: analysiere Spalten, erkannte Stammdaten, moegliche Importzuordnung, Dublettenrisiken und fehlende Felder.'
                 : '',
               '',
-              'VereinO-Datenkontext:',
-              JSON.stringify(compactContext(input.context || {})),
-              '',
+              ...(input.context ? ['VereinO-Datenkontext:', JSON.stringify(compactContext(input.context)), ''] : []),
               input.prompt
             ].join('\n')
           },

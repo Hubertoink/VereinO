@@ -7,6 +7,20 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.3.0] - 2026-11-18
+
+### Hinzugefügt
+
+- Die Seitenleiste zeigt unter Mitglieder die Gruppen mit Mitgliederzahl. Ein Klick öffnet die gefilterte Mitgliederliste.
+- Gemeinsame Schriftgrößen für Überschriften, Tabellen und Hinweise vereinheitlichen die Darstellung in allen Modulen.
+- Bei eingerichteter KI lässt sich im Einladungsdialog neben „Nachricht“ aus Stichpunkten ein bearbeitbarer E-Mail-Text formulieren.
+- Mitglieder lassen sich über mehrere Seiten auswählen, per BCC einladen und einer oder mehreren Gruppen zuordnen. Ein Klick auf ein Gruppenbadge unter dem Vorstand zeigt die zugehörigen Mitglieder. Erneutes Anklicken hebt den Gruppenfilter auf. Änderungen der Gruppenzugehörigkeit erscheinen im Mitgliederverlauf.
+- Mitglieder: Historien-Icon beim Bearbeiten öffnet einen Änderungsverlauf mit Zeitpunkt sowie alten und neuen Feldwerten. Neue und gespeicherte Änderungen werden ab jetzt protokolliert, auch bei Importen.
+- Das Modul Mitglieder steht auch in der allgemeinen Budgetverwaltung zur Verfügung und lässt sich unter Darstellung ausblenden.
+
+- Neue Darstellungsgröße „Kompakt“ als Voreinstellung: kleinere Schrift und engere vertikale Abstände in Ansichten, Tabellen und Dialogen. Unter Einstellungen → Darstellung stellt „Standard“ die bisherigen Größen wieder her; die Auswahl gilt geräteweit auch für zusätzliche Fenster.
+- Bei einem verfügbaren Update wird die Versionsnummer in der Seitenleiste hervorgehoben. Im Changelog öffnet „Update verfügbar“ neben dem Schließen-Button den Update-Dialog.
+
 ## [5.2.2] - 2026-11-17
 
 ### Behoben

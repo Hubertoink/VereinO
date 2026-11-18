@@ -1,21 +1,21 @@
 .quick-add-modal.booking-editor { width: min(1180px, calc(100vw - 24px)); max-width: 1180px; padding: 0; container-type: inline-size; }
 .quick-add-modal.booking-editor.detached-quick-add-modal { width: 100%; max-width: none; }
 .booking-editor-title { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 16px 20px; }
-.booking-editor-title h2 { font-size: 18px; margin: 0; overflow-wrap: anywhere; }
-.booking-editor-title p { font-size: 11px; color: var(--text-dim); margin: 4px 0 0; }
+.booking-editor-title h2 { font-size: var(--type-dialog-title); margin: 0; overflow-wrap: anywhere; }
+.booking-editor-title p { font-size: var(--type-caption); color: var(--text-dim); margin: 4px 0 0; }
 .booking-editor-title-icon, .booking-overview-type-icon { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; color: var(--booking-header-tone); background: color-mix(in srgb, var(--booking-header-tone) 17%, var(--surface)); }
 .quick-add-modal.booking-editor > form.quick-add-form { display: grid; grid-template-columns: minmax(0, 1fr) 270px; grid-template-areas: "kind overview" "primary overview" "description overview" "assignments overview" "secondary overview" "footer footer"; gap: 0 22px; margin: 0; padding: 14px 20px 0; align-content: start; }
 /* Only the detached window fills spare height. Grow the last content track so
    the sticky footer meets the bottom without stretching the actual fields. */
 .quick-add-modal.booking-editor.detached-quick-add-modal > form.quick-add-form { grid-template-rows: repeat(4, max-content) minmax(max-content, 1fr) max-content; }
 .booking-editor .booking-kind-switch { grid-area: kind; width: 100%; max-width: none; margin: 0 0 6px; border: 1px solid var(--border); border-radius: 7px; -webkit-app-region: no-drag; }
-.booking-editor .booking-kind-switch button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; font-size: 12px; }
+.booking-editor .booking-kind-switch button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; font-size: var(--type-control); }
 .booking-editor .booking-primary-grid { grid-area: primary; display: grid; grid-template-columns: minmax(0, 1fr); margin: 0; }
 .quick-add-modal.booking-editor .booking-primary-grid > .form-card { height: auto; padding: 14px 0; border: 0; border-bottom: 1px solid var(--border); }
 .quick-add-modal.booking-editor .booking-primary-grid > .form-card + .form-card { border-left: 0; padding-left: 0; }
-.booking-editor .booking-editor-section-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; font-weight: 650; color: var(--text); margin: 0 0 12px; }
+.booking-editor .booking-editor-section-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: var(--type-subheading); font-weight: 650; color: var(--text); margin: 0 0 12px; }
 .booking-editor-section-title > svg { color: var(--booking-header-tone); flex-shrink: 0; }
-.booking-editor-section-title > span { font-weight: 400; font-size: 10px; color: var(--text-dim); }
+.booking-editor-section-title > span { font-weight: 400; font-size: var(--type-caption); color: var(--text-dim); }
 .booking-editor .booking-description-card { grid-area: description; }
 .booking-editor .booking-assignments-card { grid-area: assignments; }
 .quick-add-modal.booking-editor .booking-description-card, .quick-add-modal.booking-editor .booking-assignments-card { padding: 14px 0; margin: 0; border-top: 0; border-bottom: 1px solid var(--border); }
@@ -26,21 +26,21 @@
 .quick-add-modal.booking-editor .summary-card.booking-ai-summary { grid-area: overview; display: block; align-self: start; margin: 0; padding: 0 0 16px 18px; border: 0; border-left: 1px solid var(--border); background: transparent; min-width: 0; }
 .booking-overview-heading { display: flex; align-items: center; gap: 9px; margin: 4px 0 16px; }
 .booking-overview-heading > svg { color: var(--booking-header-tone); flex-shrink: 0; }
-.booking-overview-heading h3 { font-size: 13px; margin: 0; }
-.booking-overview-heading p { color: var(--text-dim); font-size: 10px; margin: 4px 0 0; }
+.booking-overview-heading h3 { font-size: var(--type-subheading); margin: 0; }
+.booking-overview-heading p { color: var(--text-dim); font-size: var(--type-caption); margin: 4px 0 0; }
 .booking-overview-card { background: color-mix(in srgb, var(--text) 3%, var(--surface)); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
 .booking-overview-type { display: flex; align-items: center; gap: 9px; }
-.booking-overview-type strong { display: block; font-size: 13px; color: var(--booking-header-tone); }
-.booking-overview-type small { display: block; margin-top: 4px; font-size: 10px; color: var(--text-dim); }
+.booking-overview-type strong { display: block; font-size: var(--type-small-text); color: var(--booking-header-tone); }
+.booking-overview-type small { display: block; margin-top: 4px; font-size: var(--type-caption); color: var(--text-dim); }
 .booking-overview-facts { display: grid; gap: 15px; margin: 20px 0 0; }
-.booking-overview-facts > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; font-size: 11px; }
+.booking-overview-facts > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; font-size: var(--type-caption); }
 .booking-overview-facts dt { display: flex; align-items: center; gap: 6px; color: var(--text-dim); }
 .booking-overview-facts dt svg { flex-shrink: 0; }
 .booking-overview-facts dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
 .booking-overview-facts .booking-overview-amount dd { color: var(--booking-header-tone); font-weight: 700; }
 .booking-overview-tip { display: flex; gap: 9px; margin-top: 14px; padding: 12px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: 8px; background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
 .booking-overview-tip svg { color: var(--accent); flex-shrink: 0; }
-.booking-overview-tip p { font-size: 10px; line-height: 1.5; color: var(--text-dim); margin: 0; }
+.booking-overview-tip p { font-size: var(--type-caption); line-height: 1.5; color: var(--text-dim); margin: 0; }
 .booking-editor .booking-ai-assist { margin-top: 12px; }
 .quick-add-modal.booking-editor .modal-footer-actions { grid-area: footer; position: sticky; bottom: 0; z-index: 5; margin: 0 -20px; padding: 12px 20px; background: var(--surface); border-top: 1px solid var(--border); border-radius: 0; }
 .quick-add-modal.booking-editor .booking-modal-save-actions .btn:disabled { background: color-mix(in srgb, var(--text-dim) 12%, var(--surface)); color: color-mix(in srgb, var(--text-dim) 65%, var(--surface)); border-color: var(--border); box-shadow: none; transform: none; cursor: not-allowed; opacity: 1; }
@@ -50,7 +50,7 @@
 .quick-add-modal.booking-editor .booking-modal-header-actions .window-controls__btn--close { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); color: var(--danger-strong, var(--danger)); }
 .quick-add-modal.booking-editor .booking-modal-header-actions .window-controls__btn--close:hover { background: #c42b36; color: #fff; }
 .quick-add-modal.booking-editor .booking-modal-header-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
-.booking-editor .booking-validation-badge { border-radius: 6px; padding: 8px 10px; font-size: 11px; }
+.booking-editor .booking-validation-badge { border-radius: 6px; padding: 8px 10px; font-size: var(--type-badge); }
 .quick-add-modal .booking-date-input-wrap { display: grid; align-self: start; }
 .booking-editor .quick-add-dropzone { min-height: 80px; }
 @container (max-width: 950px) {
@@ -98,7 +98,7 @@
 .booking-editor .quick-add-form { scroll-padding-bottom: 80px; }
 
 .booking-editor .booking-overview-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
-.booking-overview-tag { display: inline-block; max-width: 100%; padding: 3px 7px; border-radius: 12px; font-size: 10px; font-weight: 600; line-height: 1.3; }
+.booking-overview-tag { display: inline-block; max-width: 100%; padding: 3px 7px; border-radius: 12px; font-size: var(--type-badge); font-weight: 600; line-height: 1.3; }
 .booking-overview-account { font-weight: 600; }
 .quick-add-modal.booking-editor .booking-finance-party .party-selector__add { font-size: 22px; font-weight: 750; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
 @container (max-width: 950px) {

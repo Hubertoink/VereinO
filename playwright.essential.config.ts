@@ -9,6 +9,8 @@ export default defineConfig({
     'booking-ai-organizations.spec.ts',
     'booking-type-selection.spec.ts',
     'modal-header.spec.ts',
+    'changelog-updates.spec.ts',
+    'display-density.spec.ts',
     'party-selector.spec.ts',
     'bookings-plus-filters.spec.ts',
     'journal-edit-tabs.spec.ts',

@@ -9,6 +9,7 @@ import {
   type BackgroundImage,
   type BookingEntryPresentation,
   type DateFormat,
+  type DisplayDensity,
   type JournalRowDensity,
   type JournalRowStyle,
   type NavIconColorMode,
@@ -77,6 +78,26 @@ function applyColorThemeToDocument(theme: string | null | undefined) {
 }
 
 export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [displayDensity, setDisplayDensity] = useState<DisplayDensity>(() => {
+    try {
+      return localStorage.getItem('ui.displayDensity') === 'standard' ? 'standard' : 'compact'
+    } catch {
+      return 'compact'
+    }
+  })
+  useLayoutEffect(() => {
+    document.documentElement.dataset.uiDensity = displayDensity
+    safeLocalStorageSet('ui.displayDensity', displayDensity)
+  }, [displayDensity])
+  useEffect(() => {
+    const syncDensity = (event: StorageEvent) => {
+      if (event.key === 'ui.displayDensity' || event.key === null) {
+        setDisplayDensity(event.newValue === 'standard' ? 'standard' : 'compact')
+      }
+    }
+    window.addEventListener('storage', syncDensity)
+    return () => window.removeEventListener('storage', syncDensity)
+  }, [])
   const allowVoucherDeletionWasUnsetRef = useRef<boolean>((() => {
     try {
       return localStorage.getItem('ui.allowVoucherDeletion') == null
@@ -472,6 +493,8 @@ export const UIPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   return (
     <UIPreferencesContext.Provider
       value={{
+        displayDensity,
+        setDisplayDensity,
         navLayout,
         setNavLayout,
         sidebarBookingActions,

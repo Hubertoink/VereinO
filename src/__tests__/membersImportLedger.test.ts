@@ -50,6 +50,8 @@ beforeEach(() => {
       mandate_ref TEXT, mandate_date TEXT, join_date TEXT, leave_date TEXT,
       notes TEXT, next_due_date TEXT, updated_at TEXT
     );
+    CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT UNIQUE);
+    CREATE TABLE member_tags (member_id INTEGER, tag_id INTEGER, PRIMARY KEY(member_id, tag_id));
     CREATE TABLE vouchers (id INTEGER PRIMARY KEY, type TEXT, original_id INTEGER, reversed_by_id INTEGER);
     CREATE TABLE bank_transaction_ai_suggestions (id INTEGER PRIMARY KEY);
   `)

@@ -823,6 +823,7 @@ export const AiJobsDeleteOutput = z.object({ ok: z.boolean() })
 export const AiTextGenerateInput = z.object({
   type: z.enum(['INVITATION', 'MEMBER_MESSAGE', 'REPORT_TEXT']),
   prompt: z.string().min(1),
+  includeOrganizationContext: z.boolean().optional(),
   tone: z.string().optional(),
   audience: z.string().optional(),
   model: z.string().optional()

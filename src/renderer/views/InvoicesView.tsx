@@ -915,7 +915,7 @@ export default function InvoicesView({ registerPageShortcuts, initialTask }: Inv
               <div className="pagination-bar__stat"><span>Seite:</span><span className="pagination-bar__stat-value">{page} / {pages}</span></div>
             </div>
             <div className="pagination-bar__controls">
-              <select className="input" style={{ width: 'auto', padding: '4px 8px', fontSize: 12 }} value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setOffset(0) }} aria-label="Einträge pro Seite" title="Einträge pro Seite">
+              <select className="input" style={{ width: 'auto', padding: '4px 8px' }} value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setOffset(0) }} aria-label="Einträge pro Seite" title="Einträge pro Seite">
                 <option value={10}>10</option>
                 <option value={20}>20</option>
                 <option value={50}>50</option>
@@ -971,8 +971,8 @@ export default function InvoicesView({ registerPageShortcuts, initialTask }: Inv
             <ModalHeader title="Zahlweg festlegen" subtitle={`Verbindlichkeit #${showPaymentMethodModal.invoiceId}`} onClose={() => setShowPaymentMethodModal(null)} />
             <div className="helper" style={{ marginBottom: 24 }}>Die Verbindlichkeit wird automatisch verbucht. Bitte wählen Sie den Zahlweg:</div>
             <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginBottom: 16 }}>
-              <button className="btn primary btn-with-icon" style={{ fontSize: 18, padding: '16px 32px', minWidth: 160 }} onClick={() => void confirmPaymentMethod('BAR')} disabled={busyAction}><AppIcon icon={IconCash} size="action" />Bar</button>
-              <button className="btn primary btn-with-icon" style={{ fontSize: 18, padding: '16px 32px', minWidth: 160 }} onClick={() => void confirmPaymentMethod('BANK')} disabled={busyAction}><AppIcon icon={IconBuildingBank} size="action" />Bank</button>
+              <button className="btn primary btn-with-icon" style={{ fontSize: 'var(--type-control)', padding: '16px 32px', minWidth: 160 }} onClick={() => void confirmPaymentMethod('BAR')} disabled={busyAction}><AppIcon icon={IconCash} size="action" />Bar</button>
+              <button className="btn primary btn-with-icon" style={{ fontSize: 'var(--type-control)', padding: '16px 32px', minWidth: 160 }} onClick={() => void confirmPaymentMethod('BANK')} disabled={busyAction}><AppIcon icon={IconBuildingBank} size="action" />Bank</button>
             </div>
             <button className="btn" onClick={() => setShowPaymentMethodModal(null)} style={{ marginTop: 8 }}>Abbrechen</button>
           </div>

@@ -15,6 +15,8 @@ import {
   getDefaultJournalOrder
 } from './views/Journal/utils/journalColumnVisibility'
 import type { UpdateModalState } from './components/modals/UpdateAvailableModal'
+import type { UpdateState } from '../types/api'
+import { UpdateNoticeContext, type UpdateNotice } from './context/UpdateNoticeContext'
 import LoadingState from './components/LoadingState'
 import ReceiptWidget from './components/ReceiptWidget'
 import DiscardReceiptModal from './components/modals/DiscardReceiptModal'
@@ -40,7 +42,7 @@ import CompactBookingFlyout from './components/CompactBookingFlyout'
 import QuickAddModal from './components/modals/QuickAddModal'
 import { getInternalAssignmentValidationState } from './components/modals/voucherMetaValidation'
 import type { NavKey } from './utils/navItems'
-import { getProfileNavigationItems, navItems } from './utils/navItems'
+import { navItems } from './utils/navItems'
 
 import { LeaderShortcuts, type ShortcutCommand } from './components/shortcuts/LeaderShortcuts'
 import { shouldPromptDiscardForEdit } from './views/Journal/utils/journalEditDiscardPrompt'
@@ -1488,6 +1490,8 @@ function AppInner() {
 
   // Use UI preferences context
   const {
+    displayDensity,
+    setDisplayDensity,
     navLayout,
     setNavLayout,
     sidebarBookingActions,
@@ -1633,7 +1637,12 @@ function AppInner() {
   const [dashboardTaskTarget, setDashboardTaskTarget] = useState<DashboardTaskTarget | null>(null)
   const [dashboardTaskPage, setDashboardTaskPage] = useState<NavKey | null>(null)
   useEffect(() => { if (activePage !== dashboardTaskPage) { setDashboardTaskTarget(null); setDashboardTaskPage(null) } }, [activePage, dashboardTaskPage])
-  useEffect(() => window.api.organizations.onSwitched(() => { setDashboardTaskTarget(null); setDashboardTaskPage(null) }), [])
+  const [membersOrganizationId, setMembersOrganizationId] = useState<string>()
+  useEffect(() => window.api.organizations.onSwitched(org => {
+    setMembersOrganizationId(org.id)
+    setDashboardTaskTarget(null)
+    setDashboardTaskPage(null)
+  }), [])
   useOverlayScrollLock()
   useEffect(() => {
     if (!isClassicBookings) {
@@ -1755,15 +1764,14 @@ function AppInner() {
     [normalizeVisibleNavItems]
   )
   const visibleNavSet = useMemo(() => new Set(visibleNavItems), [visibleNavItems])
-  const profileAllowedNavSet = useMemo(() => new Set(getProfileNavigationItems(organizationProfile).map(item => item.key)), [organizationProfile])
   const visibleNavigationItems = useMemo(
-    () => navItems.filter((item) => visibleNavSet.has(item.key) && profileAllowedNavSet.has(item.key)),
-    [profileAllowedNavSet, visibleNavSet]
+    () => navItems.filter((item) => visibleNavSet.has(item.key)),
+    [visibleNavSet]
   )
   useEffect(() => {
-    if (visibleNavSet.has(activePage) && profileAllowedNavSet.has(activePage)) return
+    if (visibleNavSet.has(activePage)) return
     setActivePage(visibleNavSet.has('Dashboard') ? 'Dashboard' : 'Buchungen')
-  }, [activePage, profileAllowedNavSet, visibleNavSet])
+  }, [activePage, visibleNavSet])
   useEffect(() => {
     if (activePage === 'KI') setAiViewMounted(true)
   }, [activePage])
@@ -1786,6 +1794,14 @@ function AppInner() {
   // Auto-backup prompt (renderer-side modal)
   const [autoBackupPrompt, setAutoBackupPrompt] = useState<null | { intervalDays: number }>(null)
   const [updatePrompt, setUpdatePrompt] = useState<UpdateModalState | null>(null)
+  const [knownUpdateState, setKnownUpdateState] = useState<UpdateState | null>(null)
+  const updateNotice = useMemo<UpdateNotice>(() => {
+    if (!knownUpdateState || !['available', 'downloading', 'downloaded'].includes(knownUpdateState.status)) return { version: null }
+    return {
+      version: knownUpdateState.downloadedVersion || knownUpdateState.availableVersion,
+      openUpdate: () => setUpdatePrompt(knownUpdateState as UpdateModalState)
+    }
+  }, [knownUpdateState])
   const updatePromptRef = useRef<UpdateModalState | null>(null)
   const autoUpdateCheckInFlight = useRef(false)
   const startupUpdateNoticeShown = useRef(false)
@@ -1829,8 +1845,11 @@ function AppInner() {
   useEffect(() => {
     let disposed = false
 
+    let stateRevision = 0
     const off = window.api?.updates?.onStateChanged?.((state) => {
       if (disposed || !state) return
+      stateRevision++
+      setKnownUpdateState(state)
       if (state.status === 'available' || state.status === 'downloaded') {
         if (autoUpdateCheckInFlight.current) {
           showStartupUpdateNotice(state as UpdateModalState)
@@ -1847,13 +1866,18 @@ function AppInner() {
     ;(async () => {
       try {
         const initial = await window.api?.updates?.getState?.()
+        if (disposed) return
+        // A newer event may arrive before the initial IPC response.
+        if (stateRevision === 0 && initial) setKnownUpdateState(initial)
         if (initial?.status === 'unsupported') return
 
         const enabled = (await window.api?.settings?.get?.({ key: 'updates.autoCheck' }))?.value
         if (enabled === false) return
 
         autoUpdateCheckInFlight.current = true
+        const checkRevision = stateRevision
         const state = await window.api?.updates?.check?.()
+        if (!disposed && state && checkRevision === stateRevision) setKnownUpdateState(state)
         if (!disposed && (state?.status === 'available' || state?.status === 'downloaded')) {
           showStartupUpdateNotice(state as UpdateModalState)
         }
@@ -3012,6 +3036,7 @@ function AppInner() {
   const isTopNav = effectiveNavLayout === 'top'
 
   return (
+    <UpdateNoticeContext.Provider value={updateNotice}>
     <div className={`app-root-grid ${isTopNav ? 'app-root-grid--top' : 'app-root-grid--side'}`}>
       {/* Topbar with organisation header line */}
       <header
@@ -3031,7 +3056,7 @@ function AppInner() {
         {isTopNav ? (
           <div className="app-header__nav no-drag" style={{ WebkitAppRegion: 'no-drag' } as any}>
             <TopNav
-              availableItems={getProfileNavigationItems(organizationProfile)}
+              availableItems={navItems}
               visibleNavItems={visibleNavItems}
               requiredNavItems={requiredNavItems}
               onVisibleNavItemsChange={setVisibleNavItems}
@@ -3057,7 +3082,7 @@ function AppInner() {
       {!isTopNav && (
           <AppSidebar
             footerActions={useSidebarActions ? <SidebarBookingActions onNewBooking={triggerBookingEntry} onNewInvoice={openJournalInvoiceScan} onReview={id => void reviewBatchInvoice(id)} notify={notify} paymentAccounts={paymentAccounts} /> : undefined}
-            availableItems={getProfileNavigationItems(organizationProfile)}
+            availableItems={navItems}
             visibleNavItems={visibleNavItems}
             requiredNavItems={requiredNavItems}
             onVisibleNavItemsChange={setVisibleNavItems}
@@ -3069,6 +3094,11 @@ function AppInner() {
             selectedAccountId={filterPaymentAccountId}
             onSelectAccount={openSidebarAccount}
             onSelectAssignment={openSidebarAssignment}
+            onSelectMemberGroup={id => {
+              setDashboardTaskTarget({ kind: 'members', filter: 'group', id })
+              setDashboardTaskPage('Mitglieder')
+              setActivePage('Mitglieder')
+            }}
             onSelectMembershipFees={() => {
               setDashboardTaskTarget({ kind: 'members', filter: 'overdue' })
               setDashboardTaskPage('Mitglieder')
@@ -3231,7 +3261,7 @@ function AppInner() {
               activateKey={reportsActivateKey}
             />
           )}
-          {activePage === 'Dashboard' && <DashboardPlusView generalProfile={organizationProfile === 'GENERAL'} today={today} drafts={bookingDraftTabs} onOpenDraft={openBookingDraftTab} onTaskNavigate={target => {
+          {activePage === 'Dashboard' && <DashboardPlusView membersEnabled={visibleNavSet.has('Mitglieder')} generalProfile={organizationProfile === 'GENERAL'} today={today} drafts={bookingDraftTabs} onOpenDraft={openBookingDraftTab} onTaskNavigate={target => {
             const pages: Record<DashboardTaskTarget['kind'], NavKey> = { bank: 'Bankimport', members: 'Mitglieder', invoices: 'Verbindlichkeiten', receivables: 'Verbindlichkeiten', recurring: 'Dauerbuchungen', reimbursements: 'Verbindlichkeiten', advances: 'Vorschuesse', drafts: 'Buchungen', budgets: 'Budgets', bindings: 'Zweckbindungen', backup: 'Einstellungen', ai: 'KI' }
             const page = pages[target.kind]
             if (!visibleNavSet.has(page)) setVisibleNavItems([...visibleNavItems, page])
@@ -3336,6 +3366,8 @@ function AppInner() {
               setDateFmt={setDateFmt}
               sidebarCollapsed={sidebarCollapsed}
               setSidebarCollapsed={setSidebarCollapsed}
+              displayDensity={displayDensity}
+              setDisplayDensity={setDisplayDensity}
               sidebarBookingActions={sidebarBookingActions}
               setSidebarBookingActions={setSidebarBookingActions}
               navLayout={navLayout}
@@ -3448,7 +3480,7 @@ function AppInner() {
           )}
 
           {activePage === 'Mitglieder' && (
-            <MembersView registerPageShortcuts={registerPageShortcuts} initialTask={dashboardTaskTarget} />
+            <MembersView key={membersOrganizationId} registerPageShortcuts={registerPageShortcuts} initialTask={dashboardTaskTarget} />
           )}
 
           {activePage === 'Vorschuesse' && <AdvancesView />}
@@ -3866,6 +3898,7 @@ function AppInner() {
       )}
 
     </div>
+    </UpdateNoticeContext.Provider>
   )
 }
 // Wrapper with context providers

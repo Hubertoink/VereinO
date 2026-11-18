@@ -491,7 +491,7 @@ export function OrgPane({ notify }: OrgPaneProps) {
           >
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 20 }}>📎</span>
+                <span style={{ fontSize: 'calc(20px * var(--ui-symbol-scale))' }}>📎</span>
                 <strong>{taxCertificate.fileName}</strong>
               </div>
               <div className="helper">

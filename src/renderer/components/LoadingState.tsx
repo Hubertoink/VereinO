@@ -4,9 +4,9 @@ interface LoadingStateProps {
 }
 
 const dimensions = {
-  small: { spinner: 18, fontSize: 13, padding: '20px 16px' },
-  medium: { spinner: 26, fontSize: 14, padding: '32px 20px' },
-  large: { spinner: 34, fontSize: 16, padding: '40px 20px' }
+  small: { spinner: 18, fontSize: 'var(--type-small-text)', padding: '20px 16px' },
+  medium: { spinner: 26, fontSize: 'var(--type-small-text)', padding: '32px 20px' },
+  large: { spinner: 34, fontSize: 'var(--type-body)', padding: '40px 20px' }
 } as const
 
 /**

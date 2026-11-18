@@ -6,7 +6,7 @@ import path from 'node:path'
 
 let script: string, css: string
 test.beforeAll(async () => {
-  css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/finance/managementKpis.css', 'src/renderer/views/invoicesShared/invoiceDetail.css', 'src/renderer/views/reimbursements/reimbursements.css'].map(f => fs.readFile(f, 'utf8')))).join('\n')
+  css = (await Promise.all(['src/renderer/styles.css', 'src/renderer/components/finance/managementKpis.css', 'src/renderer/views/Advances/advances.css', 'src/renderer/components/modalHeader.css', 'src/renderer/views/Mitglieder/memberHistory.css', 'src/renderer/views/Mitglieder/memberGroups.css', 'src/renderer/components/compactPopover.css', 'src/renderer/views/invoicesShared/invoiceDetail.css', 'src/renderer/views/reimbursements/reimbursements.css'].map(f => fs.readFile(f, 'utf8')))).join('\n')
   script = (await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
     import React from 'react'
     import { installSelectKeyboardGuard } from './src/renderer/utils/selectKeyboard'
@@ -15,10 +15,28 @@ test.beforeAll(async () => {
     import { useOverlayScrollLock } from './src/renderer/hooks/useOverlayScrollLock'
     import MembersView from './src/renderer/views/Mitglieder/MembersView'
     import InvoicesView from './src/renderer/views/InvoicesView'
+    import RecurringBookingsView from './src/renderer/views/RecurringBookings/RecurringBookingsView'
+    import AdvancesView from './src/renderer/views/Advances/AdvancesView'
     window.requests = []
     window.memberAmount = 95
+    window.historyRequests = []; window.memberUpdates = []
+    const historyRows = [
+      { id: 3, action: 'UPDATE', createdAt: '2026-11-18T12:30:00Z', changes: [{ field: 'status', before: 'ACTIVE', after: 'PAUSED' }, { field: 'email', before: 'erika@example.org', after: 'neu@example.org' }, { field: 'notes', before: null, after: 'Hinweise zum Mitglied und zur Erreichbarkeit. '.repeat(8) }] },
+      { id: 2, action: 'UPDATE', createdAt: '2026-11-17T10:00:00Z', changes: [{ field: 'contribution_amount', before: 10, after: 15 }] },
+      { id: 1, action: 'CREATE', createdAt: '2026-11-01T10:00:00Z', changes: [{ field: 'name', before: null, after: 'Erika Muster' }] }
+    ]
+    const advance = { id: 1, recipientName: 'Erika Muster', memberName: 'Erika Muster', issuedAt: '2026-09-01', amount: 500, spentAmount: 100, openAmount: 400, settledAmount: 0, settlementCount: 0, status: 'OPEN', settlements: [], purchases: [] }
     window.api = {
-      members: { list: async input => { window.requests.push(input); return { rows: [{ id: 1, name: 'Erika Muster', memberNo: '0001', status: 'ACTIVE', email: 'erika@example.org', contribution_amount: 10, contribution_interval: 'MONTHLY' }], total: 45, summary: input.includeSummary ? { active: 42, dueMembers: 2, dueAmount: window.memberAmount } : undefined } } },
+      tags: { list: async () => ({ rows: [] }) },
+      paymentAccounts: { list: async () => ({ rows: [] }) },
+      bindings: { list: async () => ({ rows: [] }) },
+      advances: { list: async () => ({ rows: [advance], total: 1 }), get: async () => advance },
+      recurringBookings: { summary: async () => ({ due: 1, upcoming: 2, active: 3, paused: 0 }), list: async () => ({ rows: [{ id: 1, name: 'Adobe Photoshop', description: 'Vereinssoftware', counterparty: 'Adobe Inc.', type: 'OUT', sphere: 'IDEELL', amount: 10, amountMode: 'GROSS', vatRate: 0, paymentAccountName: 'Volksbank', frequency: 'MONTHLY', nextDueDate: '2026-09-01', status: 'ACTIVE', dueCount: 1, budgets: [], earmarks: [], tags: [] }] }) },
+      members: {
+        groups: { list: async () => [] },
+        history: async input => { window.historyRequests.push(input); if (window.historyFailure) throw Error('offline'); return { rows: window.emptyHistory ? [] : input.beforeId ? historyRows.slice(2) : historyRows.slice(0, 2), hasMore: !window.emptyHistory && !input.beforeId } },
+        update: async input => { window.memberUpdates.push(input); return { id: input.id } },
+        list: async input => { window.requests.push(input); return { rows: [{ id: 1, name: 'Erika Muster', memberNo: '0001', status: 'ACTIVE', join_date: '2026-01-01', email: 'erika@example.org', contribution_amount: 10, contribution_interval: 'MONTHLY' }], total: 45, summary: input.includeSummary ? { active: 42, dueMembers: 2, dueAmount: window.memberAmount } : undefined } } },
       payments: { status: async () => ({ hasPlan: 1, state: 'OVERDUE', overdue: 2 }) },
       budgets: { list: async () => ({ rows: [{ id: 1, name: 'Jugendarbeit', year: 2026 }] }) },
       reimbursements: { list: async () => [
@@ -31,6 +49,8 @@ test.beforeAll(async () => {
     const root = createRoot(document.getElementById('root'))
     function App({ view, task }) {
       useOverlayScrollLock()
+      if (view === 'recurring') return <RecurringBookingsView notify={() => {}} />
+      if (view === 'advances') return <AdvancesView />
       return view === 'members' ? <MembersView initialTask={task} /> : <InvoicesView />
     }
     window.mount = (view, task) => root.render(<App view={view} task={task} />)
@@ -52,6 +72,72 @@ test.beforeEach(async ({ page }) => {
   page.on('pageerror', error => errors.push(error.message))
   await page.addScriptTag({ content: script })
   expect(errors).toEqual([])
+})
+
+test('the invitation AI fills only the message, fits the label row and ignores dismissed drafts', async ({ page }) => {
+  await page.evaluate(() => {
+    const fixture = window as any
+    fixture.aiRequests = []
+    fixture.api.members.audience = async () => [{ id: 1, name: 'Erika Muster', email: 'erika@example.org' }]
+    fixture.api.ai = {
+      settings: { get: async () => ({ hasApiKey: !!fixture.aiAvailable }) },
+      text: { generate: (payload: unknown) => {
+        fixture.aiRequests.push(payload)
+        return new Promise((resolve, reject) => {
+          fixture.finishDraft = (body: string) => resolve({ title: 'Vorschlag', body, notes: [] })
+          fixture.failDraft = () => reject(new Error('Anbieter nicht erreichbar'))
+        })
+      } }
+    }
+  })
+  const invite = page.getByRole('button', { name: 'Einladen (E-Mail)', exact: true })
+  const message = page.getByLabel('Nachricht', { exact: true })
+  const trigger = page.getByRole('button', { name: 'Nachricht mit KI formulieren', exact: true })
+  const promptWindow = page.getByRole('dialog', { name: 'Nachricht mit KI formulieren' })
+  const prompt = promptWindow.getByRole('textbox')
+  const generate = promptWindow.getByRole('button', { name: 'Nachricht formulieren' })
+  const fieldHeight = () => message.evaluate(el => el.parentElement!.offsetHeight)
+  await invite.click()
+  await expect(page.getByLabel('Empfänger (BCC)', { exact: true })).toHaveValue('erika@example.org')
+  await expect(trigger).toHaveCount(0)
+  const height = await fieldHeight()
+  await message.fill('Mein bisheriger Entwurf')
+  await page.keyboard.press('Escape')
+  await page.evaluate(() => { (window as any).aiAvailable = true })
+  await invite.click()
+  await expect(trigger).toBeVisible()
+  expect(await fieldHeight()).toBe(height)
+  await trigger.click()
+  await expect(prompt).toBeFocused()
+  await expect(generate).toBeDisabled()
+  await prompt.fill('Freitag um 17 Uhr trainieren')
+  await generate.click()
+  await page.evaluate(() => (window as any).failDraft())
+  await expect(promptWindow.getByRole('alert')).toContainText('Anbieter nicht erreichbar')
+  await expect(message).toHaveValue('Mein bisheriger Entwurf')
+  await expect(prompt).toHaveValue('Freitag um 17 Uhr trainieren')
+  await generate.click()
+  await page.keyboard.press('Escape')
+  await expect(promptWindow).toHaveCount(0)
+  await page.evaluate(() => (window as any).finishDraft('Veraltete Antwort'))
+  await expect(message).toHaveValue('Mein bisheriger Entwurf')
+  await trigger.click()
+  await prompt.fill('Am Samstag ab 10 Uhr den Platz aufräumen')
+  await prompt.press('Control+Enter')
+  await expect(promptWindow.getByRole('button', { name: 'Wird formuliert …' })).toBeDisabled()
+  await page.evaluate(() => (window as any).finishDraft('Hallo zusammen,\n\nwir treffen uns am Samstag um 10 Uhr.'))
+  await expect(promptWindow).toHaveCount(0)
+  await expect(message).toHaveValue('Hallo zusammen,\n\nwir treffen uns am Samstag um 10 Uhr.')
+  await expect(message).toBeFocused()
+  await expect(page.getByLabel('Betreff', { exact: true })).toHaveValue('Einladung zur Sitzung')
+  await expect(page.getByLabel('Empfänger (BCC)', { exact: true })).toHaveValue('erika@example.org')
+  expect(await page.evaluate(() => (window as any).aiRequests.at(-1))).toEqual({
+    type: 'INVITATION', prompt: 'Am Samstag ab 10 Uhr den Platz aufräumen', includeOrganizationContext: false
+  })
+  await message.fill('Bearbeitet')
+  await page.keyboard.press('Escape')
+  await invite.click()
+  await expect(message).toHaveValue('Bearbeitet')
 })
 
 async function checkMemberFinanceHover(page: Page) {
@@ -180,6 +266,7 @@ test('member finance hover and selection remain stable in the installed Electron
   const app = await electron.launch({ args: [main], env })
   try {
     const page = await app.firstWindow()
+    await page.locator('#root').waitFor({ state: 'attached' })
     await page.addStyleTag({ content: css })
     await page.addScriptTag({ content: script })
     for (const zoom of [1, 1.25]) {
@@ -247,6 +334,8 @@ test('invoice details prioritize payment figures and disclose named assignments 
   await page.evaluate(() => (window as any).mount('invoices'))
   await page.getByRole('row').filter({ hasText: 'Bürobedarf Muster' }).dblclick()
   const modal = page.getByRole('dialog', { name: 'Rechnungsdetails' })
+  const title = modal.getByRole('heading', { name: 'Verbindlichkeit #R-12', exact: true })
+  await expect(title).toHaveCSS('font-size', '16px')
   await expect(modal.getByRole('region', { name: 'Zahlungsübersicht' })).toContainText('150,00')
   await expect(modal.locator('details')).toHaveCount(0)
   expect(await modal.getByRole('cell', { name: '200,00 €', exact: true }).evaluate(el => el.getBoundingClientRect().height)).toBeLessThan(60)
@@ -260,6 +349,8 @@ test('invoice details prioritize payment figures and disclose named assignments 
   await modal.getByRole('button', { name: 'Eine sehr lange Rechnung für Material.pdf' }).click()
   expect(await page.evaluate(() => (window as any).fileOpened)).toBe(true)
   await page.setViewportSize({ width: 500, height: 900 })
+  await page.evaluate(() => document.documentElement.dataset.uiDensity = 'standard')
+  await expect(title).toHaveCSS('font-size', '20px')
   expect(await modal.locator('.invoice-detail-refined').evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
 })
 
@@ -277,4 +368,107 @@ test('invoice filter select opens above its panel and selects without closing th
   await select.click()
   await page.keyboard.press('Escape')
   await expect(select).toBeVisible()
+})
+
+
+for (const [view, selector] of [
+  ['members', '.members-table tbody tr'],
+  ['invoices', '.invoices-table tbody tr'],
+  ['recurring', '.recurring-table tbody tr'],
+  ['advances', '.advances-recipient-row']
+]) {
+  test(`${view}: compact reduces row height and standard restores it`, async ({ page }, info) => {
+    await page.evaluate(view => (window as any).mount(view), view)
+    const row = page.locator(selector).first()
+    await expect(row).toBeVisible()
+    if (view === 'recurring') await expect(row).toContainText('Adobe Photoshop')
+    const heading = page.getByRole('heading', { level: 1 }).first()
+    const value = view === 'advances' ? row.locator('.advances-recipient-amount strong') : row.locator('td').nth(1)
+    const metric = page.locator('.management-kpi > strong, .recurring-summary-card strong, .advances-summary-value').first()
+    const tableHeading = page.locator('thead th:visible').last()
+    const compactHeight = (await row.boundingBox())!.height
+    await expect(heading).toHaveCSS('font-size', '18px')
+    await expect(value).toHaveCSS('font-size', '12px')
+    await expect(metric).toHaveCSS('font-size', '16px')
+    if (view !== 'advances') await expect(tableHeading).toHaveCSS('font-size', '12px')
+    if (view === 'recurring') await expect(row.locator('small').first()).toHaveCSS('font-size', '11px')
+    await page.screenshot({ path: info.outputPath(`${view}-compact.png`), animations: 'disabled', fullPage: true })
+    await page.evaluate(() => document.documentElement.dataset.uiDensity = 'standard')
+    expect((await row.boundingBox())!.height).toBeGreaterThan(compactHeight)
+    await expect(heading).toHaveCSS('font-size', '24px')
+    await expect(value).toHaveCSS('font-size', '16px')
+    await expect(metric).toHaveCSS('font-size', '20px')
+    if (view !== 'advances') await expect(tableHeading).toHaveCSS('font-size', '13px')
+    await page.screenshot({ path: info.outputPath(`${view}-standard.png`), animations: 'disabled', fullPage: true })
+    await page.evaluate(() => document.documentElement.dataset.uiDensity = 'compact')
+    expect((await row.boundingBox())!.height).toBeCloseTo(compactHeight, 0)
+    await expect(value).toHaveCSS('font-size', '12px')
+  })
+}
+
+
+test('member history opens beside status, paginates and preserves the unsaved edit on Escape', async ({ page }, info) => {
+  await page.locator('.members-table .btn-edit').click()
+  const editor = page.getByRole('dialog', { name: 'Mitglied bearbeiten' })
+  await editor.locator('#member-name').fill('Ungespeicherter Entwurf')
+  const trigger = editor.getByRole('button', { name: 'Änderungsverlauf anzeigen' })
+  await trigger.click()
+  const history = page.getByRole('dialog', { name: 'Änderungsverlauf', exact: true })
+  await expect(history).toBeVisible()
+  await expect(history.getByRole('button', { name: 'Historie schließen' })).toBeFocused()
+  await expect(history.locator('.member-history-entry')).toHaveCount(2)
+  await expect(history).toContainText('Pausiert')
+  await expect(history).toContainText('neu@example.org')
+  await expect(history).toContainText('15,00')
+  await page.keyboard.press('Control+s')
+  expect(await page.evaluate(() => (window as any).memberUpdates)).toEqual([])
+  await history.getByRole('button', { name: 'Ältere Änderungen laden' }).click()
+  await expect(history.locator('.member-history-entry')).toHaveCount(3)
+  await expect(history.getByRole('button', { name: 'Ältere Änderungen laden' })).toHaveCount(0)
+  expect(await page.evaluate(() => (window as any).historyRequests.at(-1))).toMatchObject({ memberId: 1, beforeId: 2 })
+  for (const width of [1100, 390]) {
+    await page.evaluate(width => { document.documentElement.dataset.theme = width === 390 ? 'dark' : 'light'; document.documentElement.dataset.colorTheme = width === 390 ? 'earthy-tones' : 'professional-light' }, width)
+    await page.setViewportSize({ width, height: 700 })
+    expect(await history.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1)
+    await expect(history.getByRole('button', { name: 'Historie schließen' })).toBeInViewport()
+    if (width === 390) {
+      const values = history.locator('.member-history-change').first().locator('dd')
+      const before = (await values.nth(0).boundingBox())!, after = (await values.nth(1).boundingBox())!
+      expect(before.width).toBeGreaterThan(120)
+      expect(Math.abs(before.width - after.width)).toBeLessThanOrEqual(1)
+    }
+    const bounds = (await history.boundingBox())!
+    expect(bounds.y).toBeGreaterThanOrEqual(0)
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(700)
+    await history.locator('.member-history-body').evaluate(el => { el.scrollTop = el.scrollHeight })
+    await expect(history.locator('.member-history-entry').last()).toBeInViewport()
+    await history.locator('.member-history-body').evaluate(el => { el.scrollTop = 0 })
+    await page.screenshot({ path: info.outputPath(`member-history-${width}.png`), animations: 'disabled' })
+  }
+  await page.keyboard.press('Escape')
+  await expect(history).toHaveCount(0)
+  await expect(editor).toBeVisible()
+  await expect(trigger).toBeFocused()
+  await expect(editor.locator('#member-name')).toHaveValue('Ungespeicherter Entwurf')
+  await page.keyboard.press('Escape')
+  await expect(editor).toHaveCount(0)
+})
+
+test('member history retries loading errors and explains the empty history of existing members', async ({ page }) => {
+  await page.getByRole('button', { name: 'Neu', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Änderungsverlauf anzeigen' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Abbrechen', exact: true }).click()
+  await page.evaluate(() => { (window as any).historyFailure = true })
+  await page.locator('.members-table .btn-edit').click()
+  await page.getByRole('button', { name: 'Änderungsverlauf anzeigen' }).click()
+  const history = page.getByRole('dialog', { name: 'Änderungsverlauf', exact: true })
+  await expect(history.getByRole('alert')).toContainText('nicht geladen')
+  await page.evaluate(() => { (window as any).historyFailure = false; (window as any).emptyHistory = true })
+  await history.getByRole('button', { name: 'Erneut versuchen' }).click()
+  await expect(history).toContainText('Noch keine Änderungen protokolliert.')
+  await expect(history).toContainText('Änderungen vor Einführung des Verlaufs sind nicht enthalten.')
+  await page.keyboard.press('Tab')
+  expect(await history.evaluate(el => el.contains(document.activeElement))).toBe(true)
+  await history.getByRole('button', { name: 'Historie schließen' }).click()
+  await expect(page.getByRole('dialog', { name: 'Mitglied bearbeiten' })).toBeVisible()
 })

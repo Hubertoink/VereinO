@@ -1,3 +1,7 @@
+import { MemberHistoryInput, MemberHistoryOutput } from '../../../shared/memberHistory'
+import { getMemberHistory } from '../repositories/memberHistory'
+import { GroupChangeSchema, MemberAudienceSchema } from '../../../shared/memberGroups'
+import { changeMemberGroup, listMemberGroups } from '../repositories/memberGroups'
 import { normalizeLookup as normalizeAiLookup } from '../../../shared/textLookup'
 import { withBankAiReviewLock } from '../services/bankAiReviewLock'
 import { AiImportFileSchema, AiImportCreateSchema, AiImportIdentitySchema, AiImportSaveSchema } from '../../../shared/aiImport'
@@ -307,6 +311,7 @@ import {
 import { listTags, upsertTag, deleteTag, tagUsage } from '../repositories/tags'
 import {
   listMembers,
+  memberAudience,
   createMember,
   updateMember,
   deleteMember,
@@ -1380,12 +1385,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     return AiJobsDeleteOutput.parse(deleteAiJob(parsed.id))
   })
   ipcMain.handle('ai.text.generate', async (_e, payload) => {
-    const parsed = AiTextGenerateInput.parse(payload)
-    const [{ generateAiText }, { buildAiContext }] = await Promise.all([
-      loadAiService(),
-      loadAiContextService()
+    const { includeOrganizationContext = true, ...input } = AiTextGenerateInput.parse(payload)
+    const [{ generateAiText }, contextService] = await Promise.all([
+      loadAiService(), includeOrganizationContext ? loadAiContextService() : undefined
     ])
-    const generated = await generateAiText({ ...parsed, context: buildAiContext() })
+    const generated = await generateAiText({ ...input, context: contextService?.buildAiContext() })
     return AiTextGenerateOutput.parse(generated.result)
   })
   ipcMain.handle('ai.actions.plan', async (_e, payload) => {
@@ -2305,6 +2309,12 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   })
 
   // Members
+  ipcMain.handle('members.groups.list', () => listMemberGroups())
+  ipcMain.handle('members.groups.change', (_event, payload) => changeMemberGroup(GroupChangeSchema.parse(payload)))
+  ipcMain.handle('members.audience', (_event, payload) => memberAudience(MemberAudienceSchema.parse(payload)))
+  ipcMain.handle('members.history', async (_e, payload) => {
+    return MemberHistoryOutput.parse(getMemberHistory(MemberHistoryInput.parse(payload)))
+  })
   ipcMain.handle('members.list', async (_e, payload) => {
     const parsed = MembersListInput.parse(payload) ?? { limit: 50 }
     return MembersListOutput.parse(listMembers(parsed as any))

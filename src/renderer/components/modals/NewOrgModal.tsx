@@ -86,7 +86,7 @@ export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalP
               />{' '}
               <strong>Verein / gemeinnützig</strong>
               <span className="helper" style={{ display: 'block', marginLeft: 22, marginTop: 3 }}>
-                Nutzt die vier steuerlichen Sphären und die Vereinsfunktionen.
+                Nutzt die vier steuerlichen Sphären und Funktionen für gemeinnützige Vereine.
               </span>
             </label>
             <label
@@ -109,7 +109,7 @@ export default function NewOrgModal({ onClose, onCreated, notify }: NewOrgModalP
               />{' '}
               <strong>Allgemeine Budgetverwaltung</strong>
               <span className="helper" style={{ display: 'block', marginLeft: 22, marginTop: 3 }}>
-                Für Kleingewerbe, Projekte und Teams mit frei angelegten Kategorien.
+                Für Kleingewerbe, Projekte und Teams mit freien Kategorien und optionaler Mitgliederverwaltung.
               </span>
             </label>
           </div>

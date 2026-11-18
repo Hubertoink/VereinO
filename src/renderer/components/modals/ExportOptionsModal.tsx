@@ -349,7 +349,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               {!flyout && <h2 style={{ margin: 0 }}>Export Optionen</h2>}
               {(dateFrom || dateTo) && (
-                <div className="helper" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                <div className="helper" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--type-small-text)' }}>
                   <span>📅</span>
                   <span>{dateFrom || '…'} – {dateTo || '…'}</span>
                 </div>
@@ -387,7 +387,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                     📋 Kassierbericht
                   </button>
                 </div>
-                <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
+                <div className="helper" style={{ fontSize: 'var(--type-caption)', marginTop: 6, opacity: 0.85 }}>
                   {exportType === 'standard'
                     ? 'Standard-Export für Controlling und Analyse mit frei wählbaren Feldern und Zeitraum'
                     : exportType === 'fiscal'
@@ -414,7 +414,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
-              <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
+              <div className="helper" style={{ fontSize: 'var(--type-caption)', marginTop: 6, opacity: 0.85 }}>
                 Zeitraum: 01.01.{fiscalYear || currentYear} – 31.12.{fiscalYear || currentYear}
               </div>
             </div>
@@ -467,7 +467,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                             </option>
                           ))}
                         </select>
-                        <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
+                        <div className="helper" style={{ fontSize: 'var(--type-caption)', marginTop: 6, opacity: 0.85 }}>
                           Mehrfachauswahl mit `Strg` oder `Shift`. Standardmäßig werden nur aktive Zweckbindungen angeboten.
                         </div>
                       </div>
@@ -519,7 +519,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                             </option>
                           ))}
                         </select>
-                        <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
+                        <div className="helper" style={{ fontSize: 'var(--type-caption)', marginTop: 6, opacity: 0.85 }}>
                           Mehrfachauswahl mit `Strg` oder `Shift`. Standardmäßig werden nur unarchivierte Budgets des gewählten Geschäftsjahres angeboten.
                         </div>
                       </div>
@@ -554,7 +554,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   Interne Buchungen einbeziehen
                 </label>
                 {fiscalListsLoading && (
-                  <div className="helper" style={{ fontSize: 11, opacity: 0.85 }}>
+                  <div className="helper" style={{ fontSize: 'var(--type-caption)', opacity: 0.85 }}>
                     Lade verfügbare Budgets und Zweckbindungen...
                   </div>
                 )}
@@ -578,7 +578,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
-              <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
+              <div className="helper" style={{ fontSize: 'var(--type-caption)', marginTop: 6, opacity: 0.85 }}>
                 Berichtszeitraum: 01.01.{fiscalYear || currentYear} – 31.12.{fiscalYear || currentYear}
               </div>
             </div>
@@ -591,14 +591,14 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 value={trCashBalanceDate}
                 onChange={(e) => setTrCashBalanceDate(e.target.value)}
               />
-              <div className="helper" style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
+              <div className="helper" style={{ fontSize: 'var(--type-caption)', marginTop: 6, opacity: 0.85 }}>
                 Der Kassenstand im Bericht wird bis zu diesem Datum berechnet. So kannst du z. B. den Kassenstand vom 01.01.2026 im Kassierbericht 2025 ausweisen.
               </div>
             </div>
 
             <ExportSection title="Sektionen im Bericht" summary={'Mitglieder, Budgets und weitere Auswertungen'}><div className="field" style={{ gridColumn: '1 / span 2' }}>
               <label>Sektionen im Bericht</label>
-              <div className="helper" style={{ fontSize: 11, marginBottom: 8, opacity: 0.85 }}>
+              <div className="helper" style={{ fontSize: 'var(--type-caption)', marginBottom: 8, opacity: 0.85 }}>
                 Kassenstand, Einnahmen/Ausgaben, Kassenprüfung und Sphären sind immer enthalten. Leere Sektionen werden automatisch ausgeblendet.
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -640,15 +640,15 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 <label>Buchungsauflistung – Zeitraum &amp; Sortierung</label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginTop: 6 }}>
                   <div>
-                    <label className="helper" style={{ fontSize: 11 }}>Von</label>
+                    <label className="helper" style={{ fontSize: 'var(--type-caption)' }}>Von</label>
                     <input type="date" className="input" value={trVoucherListFrom || `${fiscalYear || currentYear}-01-01`} onChange={(e) => setTrVoucherListFrom(e.target.value)} />
                   </div>
                   <div>
-                    <label className="helper" style={{ fontSize: 11 }}>Bis</label>
+                    <label className="helper" style={{ fontSize: 'var(--type-caption)' }}>Bis</label>
                     <input type="date" className="input" value={trVoucherListTo || `${fiscalYear || currentYear}-12-31`} onChange={(e) => setTrVoucherListTo(e.target.value)} />
                   </div>
                   <div>
-                    <label className="helper" style={{ fontSize: 11 }}>Sortierung</label>
+                    <label className="helper" style={{ fontSize: 'var(--type-caption)' }}>Sortierung</label>
                     <div className="btn-group" role="group">
                       <button className="btn" onClick={() => setTrVoucherListSort('ASC')} style={{ background: trVoucherListSort === 'ASC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Aufsteigend</button>
                       <button className="btn" onClick={() => setTrVoucherListSort('DESC')} style={{ background: trVoucherListSort === 'DESC' ? 'color-mix(in oklab, var(--accent) 15%, transparent)' : undefined }}>Absteigend</button>
@@ -734,7 +734,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                 </div>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
-                  <table className="table" style={{ fontSize: 12, marginBottom: 0 }}>
+                  <table className="table" style={{ fontSize: 'var(--type-caption)', marginBottom: 0 }}>
                     <thead>
                       <tr>
                         {fields.map(key => (
@@ -815,7 +815,7 @@ export default function ExportOptionsModal({ open, onClose, fields, setFields, o
                   padding: '8px 12px',
                   background: 'color-mix(in oklab, var(--accent) 8%, transparent)',
                   borderTop: '1px solid var(--border)',
-                  fontSize: 11,
+                  fontSize: 'var(--type-caption)',
                   color: 'var(--text-dim)',
                   textAlign: 'center'
                 }}>

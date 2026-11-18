@@ -2,6 +2,7 @@ import { createContext } from 'react'
 import type { ColorTheme } from './uiTheme'
 
 export type NavLayout = 'top' | 'left'
+export type DisplayDensity = 'compact' | 'standard'
 export type NavIconColorMode = 'color' | 'mono'
 export type DateFormat = 'de' | 'iso'
 export type JournalRowStyle = 'both' | 'lines' | 'zebra' | 'none'
@@ -11,6 +12,8 @@ export type QuickAddAfterSave = 'close' | 'new'
 export type BookingEntryPresentation = 'modal' | 'flyout' | 'detached'
 
 interface UIPreferencesContextValue {
+  displayDensity: DisplayDensity
+  setDisplayDensity: (value: DisplayDensity) => void
   navLayout: NavLayout
   setNavLayout: (val: NavLayout) => void
   sidebarBookingActions: boolean

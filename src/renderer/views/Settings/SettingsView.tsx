@@ -117,6 +117,8 @@ export function SettingsView(props: SettingsProps) {
         {activeTile === 'general' && (
           <GeneralPane
             organizationProfile={props.organizationProfile}
+            displayDensity={props.displayDensity}
+            setDisplayDensity={props.setDisplayDensity}
             sidebarBookingActions={props.sidebarBookingActions}
             setSidebarBookingActions={props.setSidebarBookingActions}
             navLayout={props.navLayout}
@@ -265,7 +267,7 @@ function DevBadge({ appVersion }: { appVersion: string }) {
         right: 0,
         display: 'flex',
         alignItems: 'stretch',
-        fontSize: 11.5,
+        fontSize: 'var(--type-caption)',
         color: 'var(--text)',
         zIndex: 10,
         userSelect: 'none'
@@ -296,7 +298,7 @@ function DevBadge({ appVersion }: { appVersion: string }) {
         }}
       >
         <div
-          style={{ fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+          style={{ fontWeight: 600, fontSize: 'var(--type-caption)', cursor: 'pointer' }}
           onClick={() => setShowChangelog(true)}
           title="Changelog anzeigen"
           role="button"
@@ -315,7 +317,7 @@ function DevBadge({ appVersion }: { appVersion: string }) {
             Hubertoink
           </a>
         </div>
-        <div style={{ fontSize: 10, opacity: 0.6, marginTop: 2 }}>© 2025</div>
+        <div style={{ fontSize: 'var(--type-badge)', opacity: 0.6, marginTop: 2 }}>© 2025</div>
       </div>
       {/* Handle */}
       <button

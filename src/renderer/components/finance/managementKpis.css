@@ -1,25 +1,25 @@
 .management-kpis { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:14px 0 18px; }
-.management-kpi { display:grid; grid-template-columns:1fr auto; align-items:center; gap:6px 16px; min-width:0; padding:14px 16px; border:1px solid var(--border); border-radius:12px; background:var(--surface); }
-.management-kpi > span { font-size:12px; color:var(--text-dim); }
-.management-kpi > strong { font-size:21px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.management-kpi > small { grid-column:1 / -1; font-size:11px; color:var(--text-dim); }
+.management-kpi { display:grid; grid-template-columns:1fr auto; align-items:center; gap:6px 16px; min-width:0; padding:calc(14px * var(--ui-space-scale, 1)) 16px calc(14px * var(--ui-space-scale, 1)) 16px; border:1px solid var(--border); border-radius:12px; background:var(--surface); }
+.management-kpi > span { font-size:var(--type-label); color:var(--text-dim); }
+.management-kpi > strong { font-size:var(--type-metric); font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.management-kpi > small { grid-column:1 / -1; font-size:var(--type-caption); color:var(--text-dim); }
 .management-kpi--warning > strong { color:var(--danger); }
 .management-kpi--success > strong { color:var(--success); }
 .management-kpis--compact { gap:8px; }
-.management-kpis--compact .management-kpi { position:relative; display:flex; flex-direction:column; align-items:flex-start; justify-content:space-between; box-sizing:border-box; min-height:58px; gap:10px; padding:8px 10px 7px 13px; border:0; border-radius:0; background:var(--surface-alt,var(--surface)); }
+.management-kpis--compact .management-kpi { position:relative; display:flex; flex-direction:column; align-items:flex-start; justify-content:space-between; box-sizing:border-box; min-height:calc(58px * var(--ui-space-scale, 1)); gap:10px; padding:calc(8px * var(--ui-space-scale, 1)) 10px 7px 13px; border:0; border-radius:0; background:var(--surface-alt,var(--surface)); }
 .management-kpis--compact .management-kpi::before { content:''; position:absolute; top:8px; bottom:8px; left:0; width:3px; border-radius:0 4px 4px 0; background:var(--accent); }
-.management-kpis--compact .management-kpi > span { font-size:11px; font-weight:650; line-height:1.2; }
-.management-kpis--compact .management-kpi > strong { align-self:flex-end; margin-top:auto; font-size:18px; line-height:1; }
+.management-kpis--compact .management-kpi > span { font-weight:650; line-height:1.2; }
+.management-kpis--compact .management-kpi > strong { align-self:flex-end; margin-top:auto; line-height:1; }
 .management-kpis--compact .management-kpi > small { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-.management-status { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-size:11px; padding:4px 7px; border-radius:6px; background:color-mix(in srgb,var(--status-color,var(--accent)) 12%,var(--surface)); }
+.management-status { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; font-size:var(--type-badge); padding:4px 7px; border-radius:6px; background:color-mix(in srgb,var(--status-color,var(--accent)) 12%,var(--surface)); }
 .management-status::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--status-color,var(--accent)); }
 .management-payment { display:grid; justify-items:end; gap:4px; font-variant-numeric:tabular-nums; }
 .management-payment progress { width:90px; height:4px; border:0; border-radius:4px; overflow:hidden; accent-color:var(--success); }
 .management-payment progress::-webkit-progress-bar { background:var(--border); }
 .management-payment progress::-webkit-progress-value { background:var(--success); }
-.management-payment small,.management-due { font-size:10px; color:var(--text-dim); }
+.management-payment small,.management-due { font-size:var(--type-caption); color:var(--text-dim); }
 .management-due { display:block; margin-top:4px; }
 .management-due--late { color:var(--danger); font-weight:600; }
-.management-contribution-interval { display:block; font-size:10px; color:var(--text-dim); margin-top:3px; }
+.management-contribution-interval { display:block; font-size:var(--type-caption); color:var(--text-dim); margin-top:3px; }
 @media(max-width:1050px) { .management-kpi { grid-template-columns:1fr; } .management-kpi > small { grid-column:auto; } }
-@media(max-width:600px) { .management-kpis { grid-template-columns:1fr; gap:6px; } .management-kpi { grid-template-columns:1fr auto; padding:10px 12px; } .management-kpi > small { grid-column:1 / -1; } }
+@media(max-width:600px) { .management-kpis { grid-template-columns:1fr; gap:6px; } .management-kpi { grid-template-columns:1fr auto; padding:calc(10px * var(--ui-space-scale, 1)) 12px calc(10px * var(--ui-space-scale, 1)) 12px; } .management-kpi > small { grid-column:1 / -1; } }

@@ -828,6 +828,26 @@ const MIGRATIONS: Mig[] = [
   {
     version: 44,
     up: migrateMembershipLedger
+  },
+  {
+    version: 45,
+    up: `CREATE INDEX IF NOT EXISTS idx_audit_entity_record ON audit_log(entity, entity_id, id);`
+  },
+  {
+    version: 46,
+    up: `
+      CREATE TABLE member_groups (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        name_key TEXT NOT NULL UNIQUE
+      );
+      CREATE TABLE member_group_members (
+        member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+        group_id INTEGER NOT NULL REFERENCES member_groups(id) ON DELETE CASCADE,
+        PRIMARY KEY (member_id, group_id)
+      );
+      CREATE INDEX idx_member_group_members_group ON member_group_members(group_id, member_id);
+    `
   }
 ]
 

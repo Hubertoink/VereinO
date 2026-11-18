@@ -1,5 +1,7 @@
 import ModalHeader from '../ModalHeader'
 import React, { useMemo } from 'react'
+import { IconDownload } from '@tabler/icons-react'
+import { useUpdateNotice } from '../../context/UpdateNoticeContext'
 import changelogRaw from '../../../../CHANGELOG.md?raw'
 
 interface ChangelogEntry {
@@ -56,6 +58,7 @@ interface ChangelogModalProps {
 
 export function ChangelogModal({ onClose, appVersion }: ChangelogModalProps): React.JSX.Element {
   const entries = useMemo(() => parseChangelog(changelogRaw), [])
+  const { version: updateVersion, openUpdate } = useUpdateNotice()
 
   return (
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
@@ -66,7 +69,12 @@ export function ChangelogModal({ onClose, appVersion }: ChangelogModalProps): Re
         {/* Header */}
         <ModalHeader
           className="modal-header"
-          title={<>📋 Changelog {appVersion && <span className="changelog-version-badge">v{appVersion}</span>}</>}
+          title={<>📋 Changelog {appVersion && <span className={`changelog-version-badge${updateVersion ? ' changelog-version-badge--update' : ''}`}>v{appVersion}</span>}</>}
+          actions={updateVersion && openUpdate && <button type="button" className="btn primary changelog-update-button"
+            title={`VereinO ${updateVersion} ist verfügbar – Update öffnen`}
+            onClick={() => { onClose(); openUpdate() }}>
+            <IconDownload size={16} aria-hidden="true" /> Update verfügbar
+          </button>}
           onClose={onClose}
           closeLabel="Schließen"
           closeOnEscape={false}

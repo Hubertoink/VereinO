@@ -1,10 +1,14 @@
 import ResponsiveSearch from '../../components/common/ResponsiveSearch'
 import ManagementKpis from '../../components/finance/ManagementKpis'
+import MemberHistoryModal from './MemberHistoryModal'
+import MemberInviteMessageField from './MemberInviteMessageField'
+import { MemberGroupDialog, MemberGroupBar } from './MemberGroups'
+import type { MemberFilters, MemberGroup, MemberAudience } from '../../../../shared/memberGroups'
 import MemberContributionDialog from './MemberContributionDialog'
 import type { DashboardTaskTarget } from '../../../../shared/dashboardTasks'
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { IconCalendarCheck, IconCalendarDue, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconFileExport, IconFilter, IconMail, IconPencil, IconPlus, IconTrash, IconX } from '@tabler/icons-react';
+import { IconCalendarCheck, IconCalendarDue, IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight, IconFileExport, IconFilter, IconHistory, IconMail, IconPencil, IconPlus, IconTrash, IconX } from '@tabler/icons-react';
 import ModalHeader from '../../components/ModalHeader';
 
 import ColumnSelectDropdown from '../../components/dropdowns/ColumnSelectDropdown'
@@ -39,9 +43,34 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
     const debouncedQ = useDebouncedValue(q, 250)
     const loadRequestIdRef = useRef(0)
     const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'>('ALL')
-    const [contributionFilter, setContributionFilter] = useState<MemberContributionFilter>(initialTask?.kind === 'members' ? 'DUE' : 'ALL')
+    const [contributionFilter, setContributionFilter] = useState<MemberContributionFilter>(initialTask?.kind === 'members' && initialTask.filter !== 'group' ? 'DUE' : 'ALL')
     const [intervalFilter, setIntervalFilter] = useState<MemberIntervalFilter>('ALL')
     const [boardFilter, setBoardFilter] = useState<MemberBoardFilter>('ALL')
+    const [groupId, setGroupId] = useState<MemberFilters['groupId']>(initialTask?.kind === 'members' && initialTask.filter === 'group' ? initialTask.id : undefined)
+    const filters = useMemo<MemberFilters>(() => ({
+        q: debouncedQ || undefined, status, contributionFilter, intervalFilter, boardFilter, groupId
+    }), [debouncedQ, status, contributionFilter, intervalFilter, boardFilter, groupId])
+    const [groups, setGroups] = useState<MemberGroup[]>([])
+    const [groupError, setGroupError] = useState(false)
+    const [groupRevision, setGroupRevision] = useState(0)
+    const [groupDialog, setGroupDialog] = useState<{ mode: 'assign' | 'create'; ids: number[] } | null>(null)
+    const [selected, setSelected] = useState<Set<number>>(() => new Set())
+    const selectionRequest = useRef(0)
+    const [selectionBusy, setSelectionBusy] = useState(false)
+    const [loadedFilters, setLoadedFilters] = useState<MemberFilters>()
+    useEffect(() => {
+        let live = true
+        window.api.members.groups.list().then(result => {
+            if (live) { setGroups(result); setGroupError(false) }
+        }).catch(() => { if (live) setGroupError(true) })
+        return () => { live = false }
+    }, [groupRevision])
+    useEffect(() => addDataChangedListener(['members'], () => setGroupRevision(r => r + 1)), [])
+    useEffect(() => {
+        setSelected(new Set())
+        setSelectionBusy(false)
+        return () => { selectionRequest.current++ }
+    }, [q, filters])
     const [sortBy, setSortBy] = useState<'memberNo'|'name'|'email'|'status'>(() => { try { return (localStorage.getItem('members.sortBy') as any) || 'name' } catch { return 'name' } })
     const [sort, setSort] = useState<'ASC'|'DESC'>(() => { try { return (localStorage.getItem('members.sort') as any) || 'ASC' } catch { return 'ASC' } })
     useEffect(() => { try { localStorage.setItem('members.sortBy', sortBy) } catch { } }, [sortBy])
@@ -55,12 +84,14 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
         if (initialTask?.kind !== 'members') return
         setQ('')
         setStatus('ALL')
-        setContributionFilter('DUE')
+        setContributionFilter(initialTask.filter === 'group' ? 'ALL' : 'DUE')
         setIntervalFilter('ALL')
         setBoardFilter('ALL')
+        setGroupId(initialTask.filter === 'group' ? initialTask.id : undefined)
         setOffset(0)
     }, [initialTask])
     const [busy, setBusy] = useState(false)
+    const [showHistory, setShowHistory] = useState(false)
     const [showPayments, setShowPayments] = useState(false)
     const [form, setForm] = useState<null | { mode: 'create' | 'edit'; draft: { id?: number; memberNo?: string | null; name: string; email?: string | null; phone?: string | null; address?: string | null; status?: 'ACTIVE'|'NEW'|'PAUSED'|'LEFT'; boardRole?: 'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT' | null;
         iban?: string | null; bic?: string | null; contribution_amount?: number | null; contribution_interval?: 'MONTHLY'|'QUARTERLY'|'YEARLY' | null;
@@ -68,7 +99,11 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
     const [deleteConfirm, setDeleteConfirm] = useState<null | { id: number; label: string }>(null)
     const [deleteBusy, setDeleteBusy] = useState(false)
     const [boardRoleError, setBoardRoleError] = useState<string | null>(null)
-    const [showInvite, setShowInvite] = useState(false)
+    useEffect(() => { if (!form) setShowHistory(false) }, [form])
+    const [inviteScope, setInviteScope] = useState<MemberAudience | null>(null)
+    const showInvite = inviteScope !== null
+    const inviteSelected = !!inviteScope && 'memberIds' in inviteScope
+    const canLimitInviteToActive = !!inviteScope && 'filters' in inviteScope && inviteScope.filters.status === 'ALL'
     const [showExport, setShowExport] = useState(false)
     const [inviteBusy, setInviteBusy] = useState(false)
     const [inviteEmails, setInviteEmails] = useState<string[]>([])
@@ -217,30 +252,73 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
         const requestId = ++loadRequestIdRef.current
         setBusy(true)
         try {
-            const res = await (window as any).api?.members?.list?.({
+            const res = await window.api.members.list({
                 includeSummary: true,
-                q: debouncedQ || undefined,
-                status,
-                contributionFilter,
-                intervalFilter,
-                boardFilter,
+                ...filters,
                 limit,
                 offset,
                 sortBy,
                 sort
             })
             if (requestId !== loadRequestIdRef.current) return
-            setRows(res?.rows || [])
-            setTotal(res?.total || 0)
-            setMemberSummary(res?.summary || null)
+            setLoadedFilters(filters)
+            if (offset > 0 && offset >= res.total) setOffset(Math.max(0, Math.floor((res.total - 1) / limit)) * limit)
+            setRows(res.rows)
+            setTotal(res.total)
+            setMemberSummary(res.summary ?? null)
         } catch (e: any) {
-            if (requestId === loadRequestIdRef.current) { setMemberSummary(null); console.error('members.list failed', e) }
+            if (requestId === loadRequestIdRef.current) { setLoadedFilters(undefined); setMemberSummary(null); console.error('members.list failed', e) }
         } finally {
             if (requestId === loadRequestIdRef.current) setBusy(false)
         }
-    }, [boardFilter, contributionFilter, debouncedQ, intervalFilter, limit, offset, sort, sortBy, status])
+    }, [filters, limit, offset, sort, sortBy])
     useEffect(() => { void load() }, [load])
     useEffect(() => addDataChangedListener(['members', 'vouchers'], () => { void load() }), [load])
+
+    const pageSelected = rows.length > 0 && rows.every(row => selected.has(row.id))
+    const selectionDisabled = busy || selectionBusy || q !== debouncedQ || loadedFilters !== filters
+    function toggleMembers(ids: number[], checked: boolean) {
+        setSelected(previous => {
+            const next = new Set(previous)
+            for (const id of ids) { if (checked) next.add(id); else next.delete(id) }
+            return next
+        })
+    }
+    async function selectAllMatches() {
+        const request = ++selectionRequest.current
+        setSelectionBusy(true)
+        try {
+            const matches = await window.api.members.audience({ filters })
+            if (request === selectionRequest.current) setSelected(new Set(matches.map(row => row.id)))
+        } catch {
+            if (request === selectionRequest.current) notify('error', 'Die vollständige Auswahl konnte nicht geladen werden.')
+        } finally {
+            if (request === selectionRequest.current) setSelectionBusy(false)
+        }
+    }
+    function filterGroup(id: MemberFilters['groupId']) {
+        setGroupId(id)
+        setOffset(0)
+    }
+    async function removeFromGroup() {
+        if (typeof groupId !== 'number' || !selected.size) return
+        setSelectionBusy(true)
+        try {
+            const { changed } = await window.api.members.groups.change({ action: 'remove', groupId, memberIds: [...selected] })
+            setSelected(new Set())
+            dispatchDataChanged(['members'])
+            notify('success', changed === 1 ? 'Ein Mitglied aus der Gruppe entfernt.' : `${changed} Mitglieder aus der Gruppe entfernt.`)
+        } catch (err) {
+            notify('error', err instanceof Error ? err.message : 'Die Zuordnung konnte nicht entfernt werden.')
+        } finally { setSelectionBusy(false) }
+    }
+    function openInvite() {
+        setInviteEmails([])
+        setInviteRecipientNames({})
+        setInviteStats({ candidates: 0, withoutEmail: 0 })
+        setInviteBusy(true)
+        setInviteScope(selected.size ? { memberIds: [...selected] } : { filters })
+    }
 
     const saveMemberForm = useCallback(async () => {
         if (!form) return
@@ -313,48 +391,35 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
     }, [openCreateMember, registerPageShortcuts])
 
     useEffect(() => {
-        if (!showInvite) return
+        if (!inviteScope) return
         setInviteFeedback(null)
         setInviteBatchIndex(0)
         let alive = true
         ;(async () => {
             setInviteBusy(true)
             try {
-                const pageSize = 200
-                let ofs = 0
-                let emails: string[] = []
+                const scope = canLimitInviteToActive && inviteActiveOnly && 'filters' in inviteScope
+                    ? { filters: { ...inviteScope.filters, status: 'ACTIVE' as const } } : inviteScope
+                const contacts = await window.api.members.audience(scope)
+                const emails: string[] = []
                 const recipientNames: Record<string, string> = {}
-                let totalCount = 0
-                let candidateCount = 0
                 let withoutEmailCount = 0
-                do {
-                    const effectiveStatus = inviteActiveOnly ? 'ACTIVE' : status
-                    const res = await (window as any).api?.members?.list?.({ q: q || undefined, status: effectiveStatus, limit: pageSize, offset: ofs })
-                    const rows = res?.rows || []
-                    totalCount = res?.total || rows.length
-                    candidateCount += rows.length
-                    rows.forEach((r: any) => {
-                        const email = String(r.email || '').trim()
-                        if (!!email && /@/.test(email)) {
-                            emails.push(email)
-                            const key = email.toLowerCase()
-                            if (!recipientNames[key] && String(r.name || '').trim()) {
-                                recipientNames[key] = String(r.name).trim()
-                            }
-                        }
-                        else withoutEmailCount += 1
-                    })
-                    ofs += pageSize
-                } while (ofs < totalCount)
                 const seen = new Set<string>()
-                const unique = emails.filter(e => { const k = e.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
+                for (const contact of contacts) {
+                    const email = contact.email?.trim()
+                    if (!email || !email.includes('@')) { withoutEmailCount++; continue }
+                    const key = email.toLowerCase()
+                    if (!seen.has(key)) { emails.push(email); seen.add(key) }
+                    if (!recipientNames[key]) recipientNames[key] = contact.name
+                }
                 if (alive) {
-                    setInviteEmails(unique)
+                    setInviteEmails(emails)
                     setInviteRecipientNames(recipientNames)
-                    setInviteStats({ candidates: candidateCount, withoutEmail: withoutEmailCount })
+                    setInviteStats({ candidates: contacts.length, withoutEmail: withoutEmailCount })
                 }
             } catch {
                 if (alive) {
+                    setInviteFeedback({ type: 'error', text: 'Die Empfängerliste konnte nicht geladen werden.' })
                     setInviteEmails([])
                     setInviteRecipientNames({})
                     setInviteStats({ candidates: 0, withoutEmail: 0 })
@@ -363,7 +428,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
             finally { if (alive) setInviteBusy(false) }
         })()
         return () => { alive = false }
-    }, [showInvite, q, status, inviteActiveOnly])
+    }, [inviteScope, canLimitInviteToActive, inviteActiveOnly])
 
     useEffect(() => {
         if (!showInvite) setShowInviteRecipients(false)
@@ -393,7 +458,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
             if (e.key === 'Escape') {
                 e.preventDefault()
                 if (showInviteRecipients) setShowInviteRecipients(false)
-                else setShowInvite(false)
+                else setInviteScope(null)
             }
         }
         window.addEventListener('keydown', onKeydown)
@@ -450,7 +515,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
     }, [copyInviteBcc, inviteCurrentBatch, inviteSubject, inviteBody, inviteBatchIndex, inviteTotalBatches, notify])
 
     useEffect(() => {
-        if (!form) return
+        if (!form || showHistory) return
         // Keyboard shortcuts: Ctrl+S to save, Esc to close
         function onKey(e: KeyboardEvent) {
             if (e.key === 'Escape') { setForm(null); e.preventDefault(); return }
@@ -461,7 +526,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
-    }, [form, saveMemberForm])
+    }, [form, showHistory, saveMemberForm])
 
     const pages = Math.max(1, Math.ceil(total / Math.max(1, limit)))
     const page = Math.floor(offset / Math.max(1, limit)) + 1
@@ -477,11 +542,14 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                         contributionFilter={contributionFilter}
                         intervalFilter={intervalFilter}
                         boardFilter={boardFilter}
+                        groupId={groupId}
+                        groups={groups}
                         onApply={(values) => {
                             setStatus(values.status)
                             setContributionFilter(values.contributionFilter)
                             setIntervalFilter(values.intervalFilter)
                             setBoardFilter(values.boardFilter)
+                            setGroupId(values.groupId)
                             setOffset(0)
                         }}
                     />
@@ -522,12 +590,12 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                         ]}
                     />
                     {(() => { const hasFilters = !!(q.trim() || status !== 'ALL' || contributionFilter !== 'ALL' || intervalFilter !== 'ALL' || boardFilter !== 'ALL'); return hasFilters ? (
-                        <button className="btn btn-accent" onClick={() => { setQ(''); setStatus('ALL'); setContributionFilter('ALL'); setIntervalFilter('ALL'); setBoardFilter('ALL'); setOffset(0) }} title="Filter zurücksetzen"><AppIcon icon={IconX} size="action" /></button>
+                        <button className="btn btn-accent" onClick={() => { setQ(''); setStatus('ALL'); setContributionFilter('ALL'); setIntervalFilter('ALL'); setBoardFilter('ALL'); filterGroup(undefined) }} title="Filter zurücksetzen"><AppIcon icon={IconX} size="action" /></button>
                     ) : null })()}
                 </div>
                 <div className="members-header-right">
                     <button className="btn members-export-trigger" title="Mitglieder als Excel oder PDF exportieren" onClick={() => setShowExport(true)}><AppIcon icon={IconFileExport} size="action" /></button>
-                    <button className="btn btn-with-icon" title="Alle gefilterten Mitglieder per E-Mail einladen" onClick={() => setShowInvite(true)}><AppIcon icon={IconMail} size="control" />Einladen (E-Mail)</button>
+                    <button className="btn btn-with-icon" disabled={selectionDisabled} title={selected.size ? 'Ausgewählte Mitglieder per E-Mail einladen' : 'Alle gefilterten Mitglieder per E-Mail einladen'} onClick={openInvite}><AppIcon icon={IconMail} size="control" />Einladen (E-Mail)</button>
                     <button className="btn btn-accent btn-with-icon" onClick={openCreateMember}>
                         <AppIcon icon={IconPlus} size="control" />Neu
                     </button>
@@ -546,7 +614,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                 {boardRows.length === 0 ? (
                     <div className="helper" style={{ padding: '16px 0', textAlign: 'center' }}>
                         <div style={{ marginBottom: 4 }}>Kein Vorstand vorhanden</div>
-                        <div style={{ fontSize: '0.9em', opacity: 0.7 }}>Vorstandsfunktionen können bei der Mitgliedschaft zugewiesen werden.</div>
+                        <div style={{ opacity: 0.7 }}>Vorstandsfunktionen können bei der Mitgliedschaft zugewiesen werden.</div>
                     </div>
                 ) : (
                     <div className="members-board-table-scroll-wrapper">
@@ -573,10 +641,29 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                     </div>
                 )}
             </div>
+            <MemberGroupBar groups={groups} active={groupId} error={groupError} onFilter={filterGroup} selectedCount={selected.size}
+                onCreate={() => setGroupDialog({ mode: 'create', ids: [] })} onRetry={() => setGroupRevision(r => r + 1)}>
+                {pageSelected && total > selected.size && <button className="btn" disabled={selectionDisabled} onClick={selectAllMatches}>Alle {total} Treffer auswählen</button>}
+                <button className="btn btn-with-icon" disabled={selectionDisabled} onClick={openInvite}><IconMail size={15} />Einladen ({selected.size})</button>
+                <button className="btn" disabled={selectionDisabled || groupError} onClick={() => setGroupDialog({ mode: 'assign', ids: [...selected] })}>Gruppe zuordnen</button>
+                {typeof groupId === 'number' && <button className="btn" disabled={selectionDisabled} onClick={removeFromGroup}>Aus Gruppe entfernen</button>}
+                <button className="btn" disabled={selectionBusy} onClick={() => setSelected(new Set())}>Auswahl aufheben</button>
+            </MemberGroupBar>
+            {groupDialog && <MemberGroupDialog mode={groupDialog.mode} groups={groups} memberIds={groupDialog.ids} onClose={() => setGroupDialog(null)}
+                onSaved={(change, changed) => {
+                    setGroupDialog(null)
+                    if (change.memberIds.length) setSelected(new Set())
+                    dispatchDataChanged(['members'])
+                    notify('success', !change.memberIds.length ? 'Gruppe erstellt.' : changed === 0 ? 'Alle ausgewählten Mitglieder gehören bereits zur Gruppe.' : changed === 1 ? 'Ein Mitglied zugeordnet.' : `${changed} Mitglieder zugeordnet.`)
+                }} />}
             <div className="members-table-scroll-wrapper">
                 <table cellPadding={6} className="members-table">
                     <thead>
                         <tr>
+                            <th className="member-selection-cell"><input type="checkbox" aria-label="Mitglieder dieser Seite auswählen"
+                                disabled={selectionDisabled || !rows.length} checked={pageSelected}
+                                ref={input => { if (input) input.indeterminate = !pageSelected && rows.some(row => selected.has(row.id)) }}
+                                onChange={event => toggleMembers(rows.map(row => row.id), event.target.checked)} /></th>
                             {colPrefs.showMemberNo && (
                                 <th align="left" className="members-sort-header" onClick={() => { setOffset(0); setSortBy('memberNo' as any); setSort(s => (sortBy === 'memberNo' ? (s === 'ASC' ? 'DESC' : 'ASC') : 'ASC')) }}>
                                     Nr. <span aria-hidden="true" style={{ color: (sortBy as any) === 'memberNo' ? 'var(--warning)' : 'var(--text-dim)' }}>{(sortBy as any) === 'memberNo' ? (sort === 'ASC' ? '↑' : '↓') : '↕'}</span>
@@ -601,7 +688,9 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                     </thead>
                     <tbody>
                         {rows.map(r => (
-                            <tr key={r.id}>
+                            <tr key={r.id} className={selected.has(r.id) ? 'is-selected' : undefined}>
+                                <td className="member-selection-cell"><input type="checkbox" aria-label={`${r.name} auswählen`} disabled={selectionDisabled}
+                                    checked={selected.has(r.id)} onChange={event => toggleMembers([r.id], event.target.checked)} /></td>
                                 {colPrefs.showMemberNo && (<td>{r.memberNo || '—'}</td>)}
                                 <td>
                                     <span>{r.name}</span>
@@ -647,7 +736,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                             </td>
                         </tr>
                     ))}
-                    {rows.length === 0 && (() => { const base = 6; const colSpan = base + (colPrefs.showAddress ? 1 : 0) + (colPrefs.showIBAN ? 1 : 0) + (colPrefs.showContribution ? 1 : 0) + (colPrefs.showNotes ? 1 : 0); return (
+                    {rows.length === 0 && (() => { const base = 6; const colSpan = base + Number(colPrefs.showMemberNo) + Number(colPrefs.showAddress) + Number(colPrefs.showIBAN) + Number(colPrefs.showContribution) + Number(colPrefs.showNotes); return (
                         <tr><td colSpan={colSpan}><div className="helper">Keine Einträge</div></td></tr>
                     )})()}
                 </tbody>
@@ -682,7 +771,9 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                     variant="compact"
                     anchorAlign="end"
                     className="member-modal standard-floating-modal member-floating-modal"
-                    headerAccessory={<span className="badge member-modal-status" title="Status" style={{ background: (form.draft.status === 'ACTIVE' ? '#00C853' : form.draft.status === 'NEW' ? '#2196F3' : form.draft.status === 'PAUSED' ? '#FF9800' : 'var(--danger)'), color: '#fff' }}>{form.draft.status || '—'}</span>}
+                    headerAccessory={<><span className="badge member-modal-status" title="Status" style={{ background: (form.draft.status === 'ACTIVE' ? '#00C853' : form.draft.status === 'NEW' ? '#2196F3' : form.draft.status === 'PAUSED' ? '#FF9800' : 'var(--danger)'), color: '#fff' }}>{({ ACTIVE: 'Aktiv', NEW: 'Neu', PAUSED: 'Pausiert', LEFT: 'Ausgetreten' })[form.draft.status || 'ACTIVE']}</span>
+                        {form.mode === 'edit' && form.draft.id && <button type="button" className="btn ghost member-history-button" title="Änderungsverlauf anzeigen" aria-label="Änderungsverlauf anzeigen" onClick={() => setShowHistory(true)}><AppIcon icon={IconHistory} size="control" /></button>}
+                    </>}
                 >
                     <div className="member-modal-body">
 
@@ -842,12 +933,13 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                         </div>
                 </BookingPopupFrame>
             )}
+            {form?.mode === 'edit' && form.draft.id && showHistory && <MemberHistoryModal memberId={form.draft.id} name={form.draft.name} onClose={() => setShowHistory(false)} />}
             {showInvite && (
                 <BookingPopupFrame
                     title="Einladung per E-Mail"
                     titleId="invite-modal-title"
-                    subtitle="Gefilterte Mitglieder gesammelt per BCC einladen"
-                    onClose={() => setShowInvite(false)}
+                    subtitle={inviteSelected ? 'Ausgewählte Mitglieder per BCC einladen' : 'Gefilterte Mitglieder gesammelt per BCC einladen'}
+                    onClose={() => setInviteScope(null)}
                     variant="compact"
                     anchorAlign="end"
                     className="invite-modal member-invite-modal"
@@ -856,7 +948,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                             <div className="invite-summary-row">
                                 <div className="invite-summary-stats">
                                     <div className="invite-stat-card">
-                                        <div className="helper">Gefunden</div>
+                                        <div className="helper">E-Mail-Empfänger</div>
                                         <strong>{inviteEmails.length}</strong>
                                     </div>
                                     <div className="invite-stat-card">
@@ -864,14 +956,14 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                                         <strong>{inviteStats.withoutEmail}</strong>
                                     </div>
                                     <div className="invite-stat-card">
-                                        <div className="helper">In Ansicht gesamt</div>
+                                        <div className="helper">{inviteSelected ? 'Ausgewählt' : 'Gefilterte Mitglieder'}</div>
                                         <strong>{inviteStats.candidates}</strong>
                                     </div>
                                 </div>
-                                <label className="invite-active-toggle">
+                                {canLimitInviteToActive && <label className="invite-active-toggle">
                                     <span>Nur aktive einladen</span>
-                                    <input className="toggle" type="checkbox" role="switch" checked={inviteActiveOnly} aria-checked={inviteActiveOnly} onChange={(e)=>setInviteActiveOnly(e.target.checked)} />
-                                </label>
+                                    <input className="toggle" type="checkbox" role="switch" checked={inviteActiveOnly} aria-checked={inviteActiveOnly} onChange={e => { setInviteBusy(true); setInviteEmails([]); setInviteActiveOnly(e.target.checked) }} />
+                                </label>}
                             </div>
                             <div className="invite-grid">
                                 <div className="compact-booking-field">
@@ -894,10 +986,7 @@ export default function MembersView({ registerPageShortcuts, initialTask }: Memb
                                         <span>Empfänger anzeigen</span>
                                     </button>
                                 </div>
-                                <div className="compact-booking-field invite-grid-span">
-                                    <label htmlFor="member-invite-message">Nachricht</label>
-                                    <textarea id="member-invite-message" className="input invite-message-input" rows={6} value={inviteBody} onChange={(e)=>setInviteBody(e.target.value)} />
-                                </div>
+                                <MemberInviteMessageField value={inviteBody} onChange={setInviteBody} />
                                 <div className="invite-grid-span">
                                     <div className="compact-booking-field">
                                         <label htmlFor="member-invite-bcc">Empfänger (BCC)</label>
@@ -1046,17 +1135,22 @@ function MemberFilterDropdown({
     contributionFilter,
     intervalFilter,
     boardFilter,
+    groupId,
+    groups,
     onApply
 }: {
     status: 'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'
     contributionFilter: MemberContributionFilter
     intervalFilter: MemberIntervalFilter
     boardFilter: MemberBoardFilter
+    groupId: MemberFilters['groupId']
+    groups: MemberGroup[]
     onApply: (values: {
         status: 'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'
         contributionFilter: MemberContributionFilter
         intervalFilter: MemberIntervalFilter
         boardFilter: MemberBoardFilter
+        groupId: MemberFilters['groupId']
     }) => void
 }) {
     const closeRef = useRef<(() => void) | null>(null)
@@ -1064,27 +1158,31 @@ function MemberFilterDropdown({
     const [draftContributionFilter, setDraftContributionFilter] = useState(contributionFilter)
     const [draftIntervalFilter, setDraftIntervalFilter] = useState(intervalFilter)
     const [draftBoardFilter, setDraftBoardFilter] = useState(boardFilter)
+    const [draftGroupId, setDraftGroupId] = useState(groupId)
 
     useEffect(() => {
         setDraftStatus(status)
         setDraftContributionFilter(contributionFilter)
         setDraftIntervalFilter(intervalFilter)
         setDraftBoardFilter(boardFilter)
-    }, [status, contributionFilter, intervalFilter, boardFilter])
+        setDraftGroupId(groupId)
+    }, [status, contributionFilter, intervalFilter, boardFilter, groupId])
 
-    const hasFilters = status !== 'ALL' || contributionFilter !== 'ALL' || intervalFilter !== 'ALL' || boardFilter !== 'ALL'
+    const hasFilters = status !== 'ALL' || contributionFilter !== 'ALL' || intervalFilter !== 'ALL' || boardFilter !== 'ALL' || groupId !== undefined
 
     function apply(values?: {
         status: 'ALL' | 'ACTIVE' | 'NEW' | 'PAUSED' | 'LEFT'
         contributionFilter: MemberContributionFilter
         intervalFilter: MemberIntervalFilter
         boardFilter: MemberBoardFilter
+        groupId: MemberFilters['groupId']
     }) {
         onApply(values || {
             status: draftStatus,
             contributionFilter: draftContributionFilter,
             intervalFilter: draftIntervalFilter,
-            boardFilter: draftBoardFilter
+            boardFilter: draftBoardFilter,
+            groupId: draftGroupId
         })
         closeRef.current?.()
     }
@@ -1094,12 +1192,14 @@ function MemberFilterDropdown({
             status: 'ALL' as const,
             contributionFilter: 'ALL' as const,
             intervalFilter: 'ALL' as const,
-            boardFilter: 'ALL' as const
+            boardFilter: 'ALL' as const,
+            groupId: undefined
         }
         setDraftStatus(values.status)
         setDraftContributionFilter(values.contributionFilter)
         setDraftIntervalFilter(values.intervalFilter)
         setDraftBoardFilter(values.boardFilter)
+        setDraftGroupId(undefined)
         apply(values)
     }
 
@@ -1156,6 +1256,16 @@ function MemberFilterDropdown({
                         <option value="SCHRIFT">Schriftführer</option>
                         <option value="KASSENPR1">1. Kassenprüfer</option>
                         <option value="KASSENPR2">2. Kassenprüfer</option>
+                    </select>
+                </div>
+                <div className="filter-dropdown__field">
+                    <label className="filter-dropdown__label" htmlFor="member-filter-group">Gruppe</label>
+                    <select id="member-filter-group" className="input" value={draftGroupId ?? ''} onChange={event => {
+                        const value = event.target.value
+                        setDraftGroupId(value === '' ? undefined : value === 'none' ? 'none' : Number(value))
+                    }}>
+                        <option value="">Alle</option><option value="none">Ohne Gruppe</option>
+                        {groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
                     </select>
                 </div>
             </div>

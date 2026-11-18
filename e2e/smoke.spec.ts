@@ -134,6 +134,8 @@ test.beforeEach(async () => {
   // IPC handlers are ready. Wait for the actual renderer shell so each test
   // starts against a fully initialized database.
   await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 20_000 })
+  const deferSetup = page.getByRole('button', { name: 'Später einrichten', exact: true })
+  await page.addLocatorHandler(deferSetup, () => deferSetup.click(), { times: 1 })
   const laterButton = page.getByRole('button', { name: 'Später', exact: true })
   await laterButton.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined)
   if (await laterButton.isVisible()) {

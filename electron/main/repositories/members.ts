@@ -1,6 +1,8 @@
 import Database from 'better-sqlite3'
 import { getDb, withTransaction } from '../db/database'
+import { memberHistorySnapshot, recordMemberHistory } from './memberHistory'
 import { getMemberPaymentStatuses } from './members_payments'
+import type { MemberFilters, MemberAudience, MemberContact } from '../../../shared/memberGroups'
 import { initializeMemberPlan, prepareMemberPlanChange, refreshNextDue, reconcileMemberCredit } from './membershipLedger'
 
 type DB = InstanceType<typeof Database>
@@ -44,40 +46,28 @@ function setMemberTags(d: DB, memberId: number, tags?: string[]) {
   }
 }
 
-export type MembersListParams = {
+export type MembersListParams = MemberFilters & {
   includeSummary?: boolean
-  q?: string
-  status?: MemberStatus | 'ALL'
   limit?: number
   offset?: number
   sortBy?: 'memberNo'|'name'|'email'|'status'
   sort?: 'ASC'|'DESC'
-  contributionFilter?: 'ALL'|'DUE'|'NOT_DUE'|'NO_PLAN'
-  intervalFilter?: 'ALL'|'MONTHLY'|'QUARTERLY'|'YEARLY'
-  boardFilter?: 'ALL'|'ANY'|'NONE'|'V1'|'V2'|'KASSIER'|'KASSENPR1'|'KASSENPR2'|'SCHRIFT'
 }
 
-export function listMembers(params: MembersListParams): { rows: MemberRow[]; total: number; summary?: { active: number; dueMembers: number; dueAmount: number } } {
-  const d = getDb()
-  const {
-    q,
-    status,
-    limit = 50,
-    offset = 0,
-    sortBy = 'name',
-    sort = 'ASC',
-    contributionFilter = 'ALL',
-    intervalFilter = 'ALL',
-    boardFilter = 'ALL'
-  } = params || {} as MembersListParams
+function memberQuery({ q, status, groupId, contributionFilter, intervalFilter = 'ALL', boardFilter = 'ALL' }: MemberFilters) {
   const wh: string[] = []
-  const args: any[] = []
+  const args: (string | number)[] = []
   if (q && q.trim()) {
     const like = `%${q.trim()}%`
     wh.push('(m.name LIKE ? OR m.email LIKE ? OR m.phone LIKE ? OR m.member_no LIKE ? OR m.address LIKE ? )')
     args.push(like, like, like, like, like)
   }
   if (status && status !== 'ALL') { wh.push('m.status = ?'); args.push(status) }
+  if (groupId === 'none') wh.push('NOT EXISTS (SELECT 1 FROM member_group_members gm WHERE gm.member_id=m.id)')
+  else if (groupId !== undefined) {
+    wh.push('EXISTS (SELECT 1 FROM member_group_members gm WHERE gm.member_id=m.id AND gm.group_id=?)')
+    args.push(groupId)
+  }
   if (intervalFilter !== 'ALL') { wh.push('m.contribution_interval = ?'); args.push(intervalFilter) }
   if (boardFilter === 'ANY') wh.push('m.board_role IS NOT NULL')
   else if (boardFilter === 'NONE') wh.push('m.board_role IS NULL')
@@ -88,7 +78,26 @@ export function listMembers(params: MembersListParams): { rows: MemberRow[]; tot
     wh.push('m.contribution_interval IS NOT NULL AND IFNULL(m.contribution_amount, 0) > 0')
   }
   const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
-  const base = `FROM members m${whereSql}`
+  return { base: `FROM members m${whereSql}`, args }
+}
+
+function filterByContribution<T extends { id: number }>(rows: T[], statuses: ReturnType<typeof getMemberPaymentStatuses>, filter: MemberFilters['contributionFilter']) {
+  if (filter !== 'DUE' && filter !== 'NOT_DUE') return rows
+  return rows.filter(member => ((statuses.get(member.id)?.overdue || 0) > 0) === (filter === 'DUE'))
+}
+
+export function memberAudience(scope: MemberAudience): MemberContact[] {
+  const { base, args } = 'filters' in scope ? memberQuery(scope.filters)
+    : { base: 'FROM members m WHERE m.id IN (SELECT value FROM json_each(?))', args: [JSON.stringify(scope.memberIds)] }
+  const rows = getDb().prepare(`SELECT m.id, m.name, m.email ${base} ORDER BY m.name COLLATE NOCASE, m.id`).all(...args) as MemberContact[]
+  const filter = 'filters' in scope ? scope.filters.contributionFilter : undefined
+  return filter === 'DUE' || filter === 'NOT_DUE' ? filterByContribution(rows, getMemberPaymentStatuses(rows), filter) : rows
+}
+
+export function listMembers(params: MembersListParams): { rows: MemberRow[]; total: number; summary?: { active: number; dueMembers: number; dueAmount: number } } {
+  const d = getDb()
+  const { limit = 50, offset = 0, sortBy = 'name', sort = 'ASC', contributionFilter } = params
+  const { base, args } = memberQuery(params)
   const dir = String(sort).toUpperCase() === 'DESC' ? 'DESC' : 'ASC'
   // Custom ORDER BY to ensure numeric sorting for member numbers
   const orderClause = (() => {
@@ -121,10 +130,7 @@ export function listMembers(params: MembersListParams): { rows: MemberRow[]; tot
   if (params.includeSummary || contributionFilter === 'DUE' || contributionFilter === 'NOT_DUE') {
     const candidates = mapRows(d.prepare(selectSql).all(...args) as any[])
     const statuses = getMemberPaymentStatuses(candidates)
-    const filtered = candidates.filter((member) => {
-      const isDue = (statuses.get(member.id)?.overdue || 0) > 0
-      return contributionFilter === 'DUE' ? isDue : contributionFilter === 'NOT_DUE' ? !isDue : true
-    })
+    const filtered = filterByContribution(candidates, statuses, contributionFilter)
     const summary = filtered.reduce((acc, member) => {
       if (member.status === 'ACTIVE') acc.active++
       const overdue = Math.max(0, statuses.get(member.id)?.overdue || 0)
@@ -174,6 +180,7 @@ export function createMember(input: { memberNo?: string | null; name: string; em
     const id = Number(info.lastInsertRowid)
     initializeMemberPlan(d, id)
     setMemberTags(d, id, input.tags)
+    recordMemberHistory(d, id, null)
     return { id }
   })
 }
@@ -184,6 +191,7 @@ export function updateMember(input: { id: number; contribution_effective_date?: 
   return withTransaction((d: DB) => {
     const cur = d.prepare('SELECT * FROM members WHERE id=?').get(input.id) as Record<string, unknown> | undefined
     if (!cur) throw new Error('Mitglied nicht gefunden')
+    const historyBefore = memberHistorySnapshot(d, input.id)
     prepareMemberPlanChange(d, cur, input)
     const fields: string[] = []
     const args: any[] = []
@@ -213,6 +221,7 @@ export function updateMember(input: { id: number; contribution_effective_date?: 
     if (input.tags) setMemberTags(d, input.id, input.tags)
     refreshNextDue(input.id, d)
     if (['contribution_amount', 'contribution_interval', 'contribution_effective_date', 'leave_date', 'next_due_date'].some(key => (input as any)[key] !== undefined && (input as any)[key] !== cur[key])) reconcileMemberCredit(input.id, d)
+    recordMemberHistory(d, input.id, historyBefore)
     return { id: input.id }
   })
 }

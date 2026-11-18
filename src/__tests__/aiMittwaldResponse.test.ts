@@ -17,7 +17,7 @@ jest.mock('electron', () => ({
 jest.mock('../../electron/main/services/settings', () => ({ getSetting: jest.fn(), setSetting: jest.fn() }))
 
 import { getSetting, setSetting } from '../../electron/main/services/settings'
-import { createAiResponse, getAiSettings, setAiSettings, reviewBankImportTransactions, testAiConnection } from '../../electron/main/services/ai'
+import { createAiResponse, generateAiText, getAiSettings, setAiSettings, reviewBankImportTransactions, testAiConnection } from '../../electron/main/services/ai'
 import { AI_BOOKING_COMMENTS_SETTING } from '../../shared/aiBookingPolicy'
 import { AI_MASTER_DATA_SETTING } from '../../shared/aiMasterDataPolicy'
 
@@ -53,6 +53,17 @@ it('honors a structured request budget instead of capping it at 2048 tokens', as
   mockChatCreate.mockResolvedValue(completion('{"ok":true}'))
   expect((await createAiResponse({ ...structuredRequest, max_output_tokens: 8192 })).output_parsed).toEqual({ ok: true })
   expect(mockChatCreate.mock.calls[0][0]).toMatchObject({ max_tokens: 8192, chat_template_kwargs: { enable_thinking: false } })
+})
+
+it('drafts an invitation from short instructions using the configured text model without a club data block', async () => {
+  const prompt = 'Freitag um 17 Uhr gemeinsam trainieren, bitte kurz zusagen.'
+  const result = { title: 'Training', body: 'Hallo zusammen,\n\ntrainiert am Freitag um 17 Uhr mit uns!', notes: [] }
+  mockChatCreate.mockResolvedValue(completion(JSON.stringify(result)))
+  expect((await generateAiText({ type: 'INVITATION', prompt })).result).toEqual(result)
+  const [{ model, messages }] = mockChatCreate.mock.calls[0]
+  expect(model).toBe(getAiSettings().textModel)
+  expect(JSON.stringify(messages)).toContain(prompt)
+  expect(JSON.stringify(messages)).not.toContain('VereinO-Datenkontext')
 })
 
 it('retries a truncated answer once with a larger budget and counts both responses', async () => {

@@ -309,7 +309,7 @@ export default function BalanceAreaChart({ from, to, baseSaldo }: BalanceAreaCha
               return (
                 <>
                   <div className="chart-tooltip-header">{labelText}</div>
-                  <div className="helper" style={{ fontSize: '11px', marginBottom: '2px' }}>Saldo kumuliert</div>
+                  <div className="helper" style={{ fontSize: 'var(--type-caption)', marginBottom: '2px' }}>Saldo kumuliert</div>
                   <div style={{ fontWeight: 700, color }}>{eur.format(val)}</div>
                 </>
               )

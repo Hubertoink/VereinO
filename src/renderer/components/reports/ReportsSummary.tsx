@@ -133,7 +133,7 @@ export default function ReportsSummary(props: { hideKpis?: boolean; refreshKey?:
                     : colors[r.key] || { bg: 'var(--muted)', text: 'var(--text)' }
                   return (
                     <div key={r.key} className="report-summary-row" style={{ '--report-row-color': c.text } as React.CSSProperties}>
-                      <span style={{ fontWeight: 500, color: c.text, fontSize: 13 }}>{r.key}</span>
+                      <span style={{ fontWeight: 500, color: c.text, fontSize: 'var(--type-small-text)' }}>{r.key}</span>
                       <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{eurFmt.format(r.gross)}</span>
                     </div>
                   )

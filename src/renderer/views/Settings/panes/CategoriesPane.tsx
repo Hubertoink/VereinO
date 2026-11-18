@@ -56,7 +56,7 @@ export function CategoriesPane({ notify }: OrgPaneProps) {
         return <div key={category.id} className="settings-record-row" style={{ opacity: category.isActive ? 1 : .58 }}>
           <span className="settings-record-color" style={{ background: color }} title={category.color || 'Keine Farbe'} />
           {category.icon && <CategoryIcon value={category.icon} size={18} />}
-          <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{category.name}</div><div className="helper" style={{ fontSize: 11 }}>{category.isActive ? 'Aktiv' : 'Archiviert'}</div></div>
+          <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, fontSize: 'var(--type-small-text)', marginBottom: 2 }}>{category.name}</div><div className="helper">{category.isActive ? 'Aktiv' : 'Archiviert'}</div></div>
           <div style={{ display: 'flex', gap: 4 }}><button className="btn btn-edit" onClick={() => setEditCategory({ id: category.id, name: category.name, color: category.color, icon: category.icon })} title="Bearbeiten" aria-label={`${category.name} bearbeiten`}><IconPencil size={16} aria-hidden="true" /></button><button className="btn ghost" onClick={() => setArchiveConfirm(category)} aria-label={`${category.name} ${category.isActive ? 'archivieren' : 'reaktivieren'}`} title={category.isActive ? 'Archivieren' : 'Reaktivieren'} style={{ padding: '6px 8px' }}>{category.isActive ? <IconArchive size={16} aria-hidden="true" /> : <IconArchiveOff size={16} aria-hidden="true" />}</button></div>
         </div>
       })}

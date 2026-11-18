@@ -89,7 +89,7 @@ function Donut({ data, colors, title }: { data: Array<{ key: string; value: numb
         </g>
       </svg>
       {hover && pt && (
-        <div style={{ position: 'absolute', top: pt.y + 6, left: pt.x + 6, pointerEvents: 'none', background: 'color-mix(in oklab, var(--bg) 85%, black)', color: 'var(--text)', padding: '4px 8px', borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,.2)', fontSize: 12, minWidth: 140 }}>
+        <div style={{ position: 'absolute', top: pt.y + 6, left: pt.x + 6, pointerEvents: 'none', background: 'color-mix(in oklab, var(--bg) 85%, black)', color: 'var(--text)', padding: '4px 8px', borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,.2)', fontSize: 'var(--type-caption)', minWidth: 140 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: colors[hover.key] || 'var(--accent)' }} />

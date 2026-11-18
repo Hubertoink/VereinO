@@ -494,7 +494,7 @@ export function ImportXlsxCard({ notify }: ImportXlsxCardProps) {
         <div style={{ marginTop: 12 }}>
           <strong>Vorschau</strong>
           <div style={{ overflowX: 'auto', marginTop: 6 }}>
-            <table cellPadding={4} style={{ fontSize: 11 }}>
+            <table cellPadding={4} style={{ fontSize: 'var(--type-caption)' }}>
               <thead><tr><th>#</th>{headers.map((h) => <th key={h} align="left">{h || '(leer)'}</th>)}</tr></thead>
               <tbody>{sample.map((row, i) => <tr key={i}><td>{(headerRowIndex || 1) + 1 + i}</td>{headers.map((h) => <td key={h}>{String(row[h] ?? '')}</td>)}</tr>)}</tbody>
             </table>

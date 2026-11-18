@@ -33,7 +33,7 @@ export default function ReportsCashBars(props: { refreshKey?: number; from?: str
     <div className="card dither-chart-card" style={{ padding: 12, overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <strong>Kassenstand nach Zahlungskonto</strong>
-        <div style={{ fontSize: 15, fontWeight: 600, color: total >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+        <div style={{ fontSize: 'var(--type-body)', fontWeight: 600, color: total >= 0 ? 'var(--success)' : 'var(--danger)' }}>
           {eurFmt.format(total || 0)}
         </div>
       </div>
@@ -49,7 +49,7 @@ export default function ReportsCashBars(props: { refreshKey?: number; from?: str
                 onMouseEnter={() => setHoverIdx(index)}
                 onMouseLeave={() => setHoverIdx(null)}
               >
-                <span style={{ width: 86, fontSize: 12, fontWeight: 500, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{account.name}</span>
+                <span style={{ width: 86, fontSize: 'var(--type-caption)', fontWeight: 500, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{account.name}</span>
                 <div className="dither-bar-track" style={{ flex: 1, height: 24 }}>
                   <div
                     className={`dither-bar-fill ${index % 2 === 0 ? 'dither-bar-fill--dotted' : 'dither-bar-fill--hatched'}`}
@@ -61,12 +61,12 @@ export default function ReportsCashBars(props: { refreshKey?: number; from?: str
                       '--dither-color': color
                     } as React.CSSProperties}
                   />
-                  <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 'var(--type-small-text)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                     {eurFmt.format(account.balance)}
                   </span>
                 </div>
                 {hoverIdx === index && (
-                  <div style={{ position: 'absolute', left: 96, top: -28, padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, boxShadow: 'var(--shadow-1)', whiteSpace: 'nowrap', zIndex: 10, pointerEvents: 'none' }}>
+                  <div style={{ position: 'absolute', left: 96, top: -28, padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 'var(--type-caption)', boxShadow: 'var(--shadow-1)', whiteSpace: 'nowrap', zIndex: 10, pointerEvents: 'none' }}>
                     Anteil: <strong>{absoluteTotal > 0 ? Math.round((Math.abs(account.balance) / absoluteTotal) * 100) : 0}%</strong>
                   </div>
                 )}

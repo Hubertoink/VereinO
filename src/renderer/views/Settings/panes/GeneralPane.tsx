@@ -2,7 +2,7 @@ import React from 'react'
 import { GeneralPaneProps } from '../types'
 import { compressImageFileToDataUrl } from '../../../utils/imageCompression'
 import { BACKGROUND_IMAGE_OPTIONS, COLOR_THEME_OPTIONS } from '../../../utils/appearanceOptions'
-import { getProfileNavigationItems, type NavKey } from '../../../utils/navItems'
+import { navItems, type NavKey } from '../../../utils/navItems'
 import { getNavIcon } from '../../../utils/navIcons'
 import { SettingsPageHeader, SettingsSection, SettingsRow } from '../components'
 
@@ -15,7 +15,8 @@ import { SettingsPageHeader, SettingsSection, SettingsRow } from '../components'
  * - Navigation layout (left/top)
  */
 export function GeneralPane({
-  organizationProfile,
+  displayDensity = 'compact',
+  setDisplayDensity,
   sidebarBookingActions = false,
   setSidebarBookingActions,
   navLayout,
@@ -121,9 +122,38 @@ export function GeneralPane({
       />
       <SettingsPageHeader
         title="Darstellung"
-        description="Passe Farben, Hintergrund und Navigation an deinen Arbeitsstil an."
+        description="Passe Schriftgröße, Farben, Hintergrund und Navigation an deinen Arbeitsstil an."
         meta="Änderungen werden automatisch übernommen."
       />
+      <SettingsSection
+        title="Schriftgröße & Abstände"
+        description="Gilt für alle Bereiche und Fenster auf diesem Gerät."
+      >
+        <SettingsRow
+          title="Darstellungsgröße"
+          description="Mit Kompakt passen mehr Einträge ins Fenster. Standard zeigt größere Schrift und lässt mehr Abstand."
+        >
+          <div className="settings-density-options" role="group" aria-label="Darstellungsgröße">
+            <button
+              type="button"
+              className={`btn ${displayDensity === 'compact' ? 'primary' : ''}`}
+              aria-pressed={displayDensity === 'compact'}
+              onClick={() => setDisplayDensity('compact')}
+            >Kompakt</button>
+            <button
+              type="button"
+              className={`btn ${displayDensity === 'standard' ? 'primary' : ''}`}
+              aria-pressed={displayDensity === 'standard'}
+              onClick={() => setDisplayDensity('standard')}
+            >Standard</button>
+          </div>
+        </SettingsRow>
+        <div className="settings-density-preview" aria-label="Vorschau der Darstellungsgröße">
+          <strong>Mitgliedsbeitrag</strong>
+          <span>Max Mustermann · Bank</span>
+          <b>25,00 €</b>
+        </div>
+      </SettingsSection>
       <SettingsSection
         title="Farben & Hintergrund"
         description="Diese Einstellungen werden pro Organisation gespeichert."
@@ -360,7 +390,7 @@ export function GeneralPane({
                 </span>
               </div>
               <div className="settings-nav-visibility-grid">
-                {getProfileNavigationItems(organizationProfile).map((item) => {
+                {navItems.map((item) => {
                   const locked = lockedNavItems.has(item.key)
                   const checked = locked || visibleNavItems.includes(item.key)
                   return (

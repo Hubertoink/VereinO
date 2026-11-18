@@ -663,7 +663,7 @@ Status: ${statusLabel}`
                         title={ba.amount ? `${eurFmt.format(ba.amount)}` : undefined}
                       >
                         {ba.label || `#${ba.budgetId}`}
-                        {ba.amount ? <span style={{ marginLeft: 4, opacity: 0.8, fontSize: 11 }}>({eurFmt.format(ba.amount)})</span> : null}
+                        {ba.amount ? <span style={{ marginLeft: 4, opacity: 0.8, fontSize: 'var(--type-caption)' }}>({eurFmt.format(ba.amount)})</span> : null}
                       </span>
                     )
                   })
@@ -739,7 +739,7 @@ Status: ${statusLabel}`
                         title={ea.amount ? `${eurFmt.format(ea.amount)}` : undefined}
                       >
                         {ea.code}
-                        {ea.amount ? <span style={{ marginLeft: 4, opacity: 0.8, fontSize: 11 }}>({eurFmt.format(ea.amount)})</span> : null}
+                        {ea.amount ? <span style={{ marginLeft: 4, opacity: 0.8, fontSize: 'var(--type-caption)' }}>({eurFmt.format(ea.amount)})</span> : null}
                       </span>
                     )
                   })
@@ -771,7 +771,7 @@ Status: ${statusLabel}`
                         color: tag.color ? getContrastTextColor(tag.color) : undefined,
                         padding: '2px 8px',
                         borderRadius: 4,
-                        fontSize: 12
+                        fontSize: 'var(--type-caption)'
                       }}
                     >
                       {tag.name}
@@ -827,7 +827,7 @@ Status: ${statusLabel}`
           {canEditMeta ? <button className="btn primary voucher-info-footer__button" disabled={editingMeta && (!canSaveMeta || budgetExceedsGross || earmarkExceedsGross)} onClick={() => { if (editingMeta) { void saveMeta() } else { setSavedVoucherId(null); setEditingMeta(true) } }}>{showSaved ? <IconSaved size={18} /> : editingMeta ? <IconSave size={18} /> : <IconEdit size={18} />}<span aria-live="polite">{showSaved ? 'Gespeichert' : editingMeta ? savingMeta ? 'Speichert ...' : 'Speichern' : 'Bearbeiten'}</span></button> : null}
         </div>
 
-        <div className="helper" style={{ marginTop: 8, marginBottom: windowMode ? 10 : 16, flexShrink: 0, fontSize: 11, textAlign: 'center' }}>
+        <div className="helper" style={{ marginTop: 8, marginBottom: windowMode ? 10 : 16, flexShrink: 0, fontSize: 'var(--type-caption)', textAlign: 'center' }}>
           Esc = Schließen
         </div>
       </div>

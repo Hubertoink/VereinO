@@ -277,10 +277,10 @@ for (const presentation of ['modal', 'detached']) {
           expect(close.width).toBe(48)
           expect(close.height).toBe(44)
         } else {
-          // Standard ModalHeader uses 20px horizontal/16px vertical padding;
-          // below 601px it uses 16px/14px. The modal adds its 1px border.
+          // Compact reduces the shared header’s vertical padding by 20%.
+          // Horizontal insets and native window controls keep their sizes.
           const horizontal = size.width <= 600 ? 16 : 20
-          const vertical = size.width <= 600 ? 14 : 16
+          const vertical = size.width <= 600 ? 11.2 : 12.8
           expect(headerPadding).toEqual({ top: `${vertical}px`, right: `${horizontal}px`, bottom: `${vertical}px`, left: `${horizontal}px` })
           expect(header.x + header.width - close.x - close.width).toBeCloseTo(horizontal, 0)
           expect(bounds.x + bounds.width - close.x - close.width).toBeCloseTo(horizontal + 1, 0)

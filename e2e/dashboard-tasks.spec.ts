@@ -20,7 +20,7 @@ test.beforeAll(async () => {
       settings:{set:async payload=>{window.settingsWrites.push(payload);return {ok:true}}},
       backup:{make:async()=>{window.taskData.groups.find(g=>g.kind==='backup').level='clear';window.taskData.groups.find(g=>g.kind==='backup').items=[];return {ok:true}}}
     }
-    function App(){const [general,setGeneral]=useState(false);window.changeProfile=setGeneral;return <div className='dashboard-plus'><DashboardTasks today='2026-10-04' generalProfile={general} drafts={[{id:'draft',title:'Rechnung Jugendfahrt'}]} onOpenDraft={id=>window.nav.push({draft:id})} onNavigate={target=>window.nav.push(target)}/></div>}
+    function App(){const [general,setGeneral]=useState(false); const [membersEnabled,setMembersEnabled]=useState(true);window.changeProfile=setGeneral;window.setMembersEnabled=setMembersEnabled;return <div className='dashboard-plus'><DashboardTasks today='2026-10-04' generalProfile={general} membersEnabled={membersEnabled} drafts={[{id:'draft',title:'Rechnung Jugendfahrt'}]} onOpenDraft={id=>window.nav.push({draft:id})} onNavigate={target=>window.nav.push(target)}/></div>}
     createRoot(document.getElementById('root')).render(<App/>);
   ` }, bundle: true, platform: 'browser', write: false, jsx: 'automatic', define: { 'process.env.NODE_ENV':'"production"' } })).outputFiles[0].text
 })
@@ -62,8 +62,10 @@ test('data changes refresh task counts and errors are retryable', async ({page})
   await page.getByRole('button',{name:'Erneut versuchen'}).click()
   await expect(page.locator('.dp-task').filter({hasText:'Mitgliedsbeiträge'})).toContainText('1 Mitglied')
 })
-test('general profile omits membership and purpose-binding tasks', async ({page}) => {
+test('general profile includes membership tasks unless the module is hidden', async ({page}) => {
   await page.evaluate(()=>(window as any).changeProfile(true))
+  await expect(page.getByRole('button',{name:/Mitgliedsbeiträge/})).toBeVisible()
+  await page.evaluate(() => (window as any).setMembersEnabled(false))
   await expect(page.getByRole('button',{name:/Mitgliedsbeiträge/})).toHaveCount(0)
   await expect(page.getByRole('button',{name:/Zweckbindungen/})).toHaveCount(0)
   await page.getByRole('button',{name:'Nichts offen',exact:true}).click()

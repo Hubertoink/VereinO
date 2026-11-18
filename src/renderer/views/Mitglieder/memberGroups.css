@@ -1,0 +1,62 @@
+.member-groups {
+  --member-bar-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 8px;
+  container: member-bar / inline-size;
+}
+.member-groups__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.member-groups__badges {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--member-bar-height);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+.member-groups__badges > * { flex: none; }
+.member-groups__badges input[type="search"] { width: 10rem; max-width: 100%; height: 24px; }
+.member-groups__badge {
+  --group-color: var(--accent);
+  --group-text: var(--on-accent, #111);
+  padding: 3px 10px;
+  border: 1px solid color-mix(in oklab, var(--group-color) 60%, var(--text-dim));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--type-control);
+  font-weight: 600;
+  line-height: 1.35;
+  cursor: pointer;
+}
+.member-groups__badge:hover { border-color: var(--group-color); background: color-mix(in oklab, var(--group-color) 12%, transparent); }
+.member-groups__badge[aria-pressed="true"] { border-color: var(--group-color); background: var(--group-color); color: var(--group-text); }
+.member-groups__badge:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+.member-groups__create, .member-selection { flex: none; white-space: nowrap; }
+.member-groups .btn { height: var(--member-bar-height); padding-block: 0; }
+.member-selection { display: flex; align-items: center; gap: 5px; font-size: var(--type-small-text); }
+.member-selection-menu { display: grid; gap: 4px; }
+.member-selection-menu .btn { text-align: start; font-size: inherit; }
+@container member-bar (max-width: 390px) {
+  .member-groups__create span { display: none; }
+  .member-groups__create { justify-content: center; width: var(--member-bar-height); padding-inline: 0; }
+}
+:root:not([data-ui-density='standard']) .member-groups { --member-bar-height: 30px; }
+.members-table tr.is-selected { background: color-mix(in oklab, var(--accent) 12%, var(--surface)); }
+.members-table .member-selection-cell { width: 2rem; text-align: center; }
+.member-selection-cell input { accent-color: var(--accent); }

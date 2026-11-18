@@ -11,8 +11,8 @@ const labels = { urgent: 'Jetzt erledigen', soon: 'Demnächst prüfen', open: 'O
 const rank = { urgent: 0, soon: 1, open: 2, clear: 3 }
 type Draft = { id: string; title: string }
 
-export default function DashboardTasks({ today, generalProfile, drafts = [], onOpenDraft, onNavigate }: {
-  today: string; generalProfile: boolean; drafts?: Draft[]; onOpenDraft?: (id: string) => void; onNavigate: (target: DashboardTaskTarget) => void
+export default function DashboardTasks({ today, generalProfile, membersEnabled = true, drafts = [], onOpenDraft, onNavigate }: {
+  today: string; generalProfile: boolean; membersEnabled?: boolean; drafts?: Draft[]; onOpenDraft?: (id: string) => void; onNavigate: (target: DashboardTaskTarget) => void
 }) {
   const [data, setData] = useState<TaskData | null>(null)
   const [error, setError] = useState('')
@@ -64,7 +64,7 @@ export default function DashboardTasks({ today, generalProfile, drafts = [], onO
   }
   const changePanel = (kind: NonNullable<typeof panel>, isOpen: boolean) => { setPanel(isOpen ? kind : null); setActionError('') }
   const draftGroup: DashboardTaskGroup = { kind: 'drafts', title: 'Offene Entwürfe', value: `${drafts.length} ${drafts.length === 1 ? 'Entwurf' : 'Entwürfe'}`, detail: 'Buchungen und Belege fertigstellen', count: drafts.length, level: drafts.length ? 'open' : 'clear', target: { kind: 'drafts' }, items: [] }
-  const groups = [...(data?.groups || []), draftGroup].filter(group => !generalProfile || !['members', 'bindings'].includes(group.kind))
+  const groups = [...(data?.groups || []), draftGroup].filter(group => (membersEnabled || group.kind !== 'members') && (!generalProfile || group.kind !== 'bindings'))
   const open = groups.filter(group => group.level !== 'clear')
   const clear = groups.filter(group => group.level === 'clear')
   const navigate = (target: DashboardTaskTarget) => {

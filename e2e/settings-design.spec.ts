@@ -50,7 +50,7 @@ test.beforeAll(async () => {
         backup:{getDir:async()=>({ok:true,dir:'D:/VereinO/Sicherungen'}),getProgress:async()=>null,onProgress:()=>()=>{},list:async()=>({ok:true,backups:[{filePath:'D:/VereinO/Sicherungen/database_manual.sqlite',size:1234567,mtime:1794610800000}]})},
       }
       const labels={actions:'Aktionen',date:'Datum',description:'Beschreibung',gross:'Brutto',sphere:'Kategorie',paymentMethod:'Zahlweg'}
-      const initial={organizationProfile:profile,cols:{actions:true,date:true,description:true,gross:true},order:['actions','date','description','gross'],journalLimit:20,dateFmt:'ISO',sidebarCollapsed:false,navLayout:'left',navIconColorMode:'color',colorTheme:'earthy-tones',journalRowStyle:'both',journalRowDensity:'normal',backgroundImage:'none',backgroundImageVisibility:60,customBackgroundImage:null,glassModals:false,bookingView:'classic',showBookingDraftTabs:true,showBookingEditTabs:false,bookingEntryPresentation:'modal',allowVoucherDeletion:false,quickAddAfterSave:'close',visibleNavItems:['Dashboard','Buchungen','Budgets','Einstellungen'],tagDefs:tags,paymentAccounts:accounts}
+      const initial={organizationProfile:profile,displayDensity:'compact',cols:{actions:true,date:true,description:true,gross:true},order:['actions','date','description','gross'],journalLimit:20,dateFmt:'ISO',sidebarCollapsed:false,navLayout:'left',navIconColorMode:'color',colorTheme:'earthy-tones',journalRowStyle:'both',journalRowDensity:'normal',backgroundImage:'none',backgroundImageVisibility:60,customBackgroundImage:null,glassModals:false,bookingView:'classic',showBookingDraftTabs:true,showBookingEditTabs:false,bookingEntryPresentation:'modal',allowVoucherDeletion:false,quickAddAfterSave:'close',visibleNavItems:['Dashboard','Buchungen','Budgets','Einstellungen'],tagDefs:tags,paymentAccounts:accounts}
       function Fixture() {
         const [state,setState]=React.useState(initial)
         const setters=React.useMemo(()=>Object.fromEntries(Object.keys(initial).map(key=>['set'+key[0].toUpperCase()+key.slice(1),value=>setState(old=>({...old,[key]:typeof value==='function'?value(old[key]):value}))])),[])
@@ -132,7 +132,7 @@ for (const theme of ['earthy-tones', 'light']) {
       await selectPane(page, tile)
       const header = page.locator('.settings-page-header h2')
       await expect(header).toContainText(title)
-      await expect(header).toHaveCSS('font-size', '20px')
+      await expect(header).toHaveCSS('font-size', '14px')
       await page.screenshot({ path: info.outputPath(`${tile}-desktop.png`), fullPage: true })
       await page.setViewportSize({ width: 560, height: 850 })
       await expect
@@ -194,4 +194,15 @@ test('donation defaults still require explicit saving', async ({ page }, info) =
   expect(
     await page.locator('.settings-content').evaluate((el) => el.scrollWidth - el.clientWidth)
   ).toBeLessThanOrEqual(1)
+})
+
+
+test('general budget management offers members as an optional navigation module', async ({ page }) => {
+  await openSettings(page, 'GENERAL')
+  await selectPane(page, 'general')
+  const toggle = page.getByRole('checkbox', { name: 'Mitglieder in Navigation anzeigen', exact: true })
+  await toggle.check()
+  expect(await page.evaluate(() => (window as any).preferences.visibleNavItems)).toContain('Mitglieder')
+  await toggle.uncheck()
+  expect(await page.evaluate(() => (window as any).preferences.visibleNavItems)).not.toContain('Mitglieder')
 })
