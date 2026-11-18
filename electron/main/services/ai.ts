@@ -4,6 +4,9 @@ import type { BankAiAnalysisProgress } from '../../../shared/bankAiReviewProgres
 import { safeStorage, session } from 'electron'
 import { visibleAiText } from '../../../shared/aiVisibleText'
 import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
+import { createClaudeResponder } from './aiClaude'
+import { AI_PROVIDER_CONFIG, normalizeProviderModel, type AiProviderId as AiProvider } from '../../../shared/aiProviders'
 import { zodTextFormat } from 'openai/helpers/zod'
 import { PDFDocument } from 'pdf-lib'
 import { z } from 'zod'
@@ -27,10 +30,11 @@ import {
 import { getSetting, setSetting } from './settings'
 import { normalizeInvoicePacketGroups } from './invoicePacketSegmentation'
 import { normalizeCreditAmounts, normalizeInvoiceDirection, validateInvoiceExtraction } from './invoiceValidation'
-import { isPdfInputFile } from './aiDocumentRouting'
+import { isPdfInputFile, readEmbeddedPdfText } from './aiDocumentRouting'
 import { validateBankReviewResult } from './aiBankReviewValidation'
 import {
   isMittwaldThinkingModel,
+  supportsMittwaldVision,
   normalizeAiTaskProfile,
   resolveAiTaskModel,
   toMittwaldReasoningEffort,
@@ -50,49 +54,18 @@ const TEXT_PROFILE_SETTING = 'ai.text.profile'
 const MITTWALD_AVAILABLE_MODELS_SETTING = 'ai.mittwald.availableModels'
 const DEFAULT_PROVIDER = 'openai'
 
-type AiProvider = 'openai' | 'minimax' | 'mittwald'
 type AiProxyMode = 'system' | 'direct' | 'manual'
-
-type AiProviderPreset = {
-  apiBaseUrl: string
-  defaultModel: string
-  defaultTextModel: string
-  allowedModels: string[]
-}
-
-const AI_PROVIDER_PRESETS: Record<AiProvider, AiProviderPreset> = {
-  openai: {
-    apiBaseUrl: 'https://api.openai.com/v1',
-    defaultModel: 'gpt-5.5',
-    defaultTextModel: 'gpt-5.4-mini',
-    allowedModels: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano']
-  },
-  minimax: {
-    apiBaseUrl: 'https://api.minimaxi.com/v1',
-    defaultModel: 'MiniMax-M3',
-    defaultTextModel: 'MiniMax-M3',
-    allowedModels: ['MiniMax-M3', 'MiniMax-M1', 'MiniMax-Text-01']
-  },
-  mittwald: {
-    apiBaseUrl: 'https://llm.aihosting.mittwald.de/v1',
-    defaultModel: 'Qwen3.6-35B-A3B-FP8',
-    defaultTextModel: 'Qwen3.6-35B-A3B-FP8',
-    allowedModels: [
-      'GLM-OCR',
-      'Ministral-3-14B-Instruct-2512',
-      'Qwen3.5-122B-A10B-FP8',
-      'Qwen3.6-35B-A3B-FP8',
-      'Qwen3.8-27B-NVFP4',
-      'gpt-oss-120b',
-      'Qwen3.5-0.8B'
-    ]
-  }
-}
 
 const MODEL_PRICING_USD_PER_MILLION: Record<
   string,
   { input: number; cachedInput: number; output: number }
 > = {
+  'gpt-6-luna': { input: 0.1, cachedInput: 0.01, output: 0.5 },
+  'gpt-6.1-terra': { input: 1, cachedInput: 0.05, output: 5 },
+  'gpt-6.2-sol': { input: 2, cachedInput: 0.1, output: 10 },
+  'claude-haiku-5-5': { input: 0.1, cachedInput: 0.01, output: 0.5 },
+  'claude-sonnet-5-5': { input: 2, cachedInput: 0.1, output: 10 },
+  'claude-opus-5-5': { input: 4, cachedInput: 0.2, output: 20 },
   'gpt-5.5': { input: 5, cachedInput: 0.5, output: 30 },
   'gpt-5.4': { input: 2.5, cachedInput: 0.25, output: 15 },
   'gpt-5.4-mini': { input: 0.75, cachedInput: 0.075, output: 4.5 },
@@ -111,6 +84,7 @@ export type AiSettings = {
   masterDataCreation: AiMasterDataPermissions
   bookingCommentsEnabled: boolean
   hasApiKey: boolean
+  availableModels?: string[]
   model: string
   textModel: string
   defaultReasoningEffort: 'low' | 'medium' | 'high'
@@ -266,33 +240,47 @@ function decryptSecret(stored?: AiStoredSecret | string | null) {
   }
 }
 
-function getProviderPreset(provider?: string | null): AiProviderPreset {
-  if (provider === 'minimax') return AI_PROVIDER_PRESETS.minimax
-  if (provider === 'mittwald') return AI_PROVIDER_PRESETS.mittwald
-  return AI_PROVIDER_PRESETS.openai
+function activeProvider(): AiProvider {
+  return getSetting<AiProvider>(PROVIDER_SETTING) || DEFAULT_PROVIDER
 }
 
-function normalizeProviderModel(
-  provider: AiProvider,
-  model: string | null | undefined,
-  kind: 'model' | 'textModel'
-) {
-  const preset = getProviderPreset(provider)
-  const fallback = kind === 'model' ? preset.defaultModel : preset.defaultTextModel
-  const value = model?.trim()
-  // Mittwald expands its model catalog regularly. Models returned by /v1/models
-  // must remain selectable even when they are newer than this build.
-  if (provider === 'mittwald' && value) return value
-  return value && preset.allowedModels.includes(value) ? value : fallback
+function providerKey(provider: AiProvider) {
+  return 'ai.providers.' + provider + '.apiKey'
 }
 
-function getStoredMittwaldModels() {
-  const stored = getSetting<unknown>(MITTWALD_AVAILABLE_MODELS_SETTING)
-  if (!Array.isArray(stored)) return []
-  return stored
-    .filter((model): model is string => typeof model === 'string')
-    .map((model) => model.trim())
-    .filter(Boolean)
+function storedSecret(provider: AiProvider) {
+  return getSetting<AiStoredSecret | string>(providerKey(provider)) ??
+    (provider === activeProvider() ? getSetting<AiStoredSecret | string>(API_KEY_SETTING) : undefined)
+}
+
+function catalogKey(provider: AiProvider) {
+  return provider === 'mittwald' ? MITTWALD_AVAILABLE_MODELS_SETTING : 'ai.providers.' + provider + '.availableModels'
+}
+
+function getStoredModels(provider: AiProvider): string[] {
+  const stored = getSetting<unknown>(catalogKey(provider))
+  return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string' && !!id.trim()) : []
+}
+
+type ModelPreferences = Pick<AiSettings, 'model' | 'textModel' | 'invoiceProfile' | 'textProfile'>
+
+function modelPreferences(provider: AiProvider): ModelPreferences {
+  const scoped = getSetting<ModelPreferences>('ai.providers.' + provider + '.models')
+  if (scoped) return scoped
+  const legacy = provider === activeProvider()
+  const model = legacy ? getSetting<string>(MODEL_SETTING) : undefined
+  const textModel = legacy ? getSetting<string>(TEXT_MODEL_SETTING) : undefined
+  // OpenAI previously exposed model IDs directly, even when a hidden profile was stored.
+  const legacyProfile = (key: string, value: string | undefined, previousDefault: string) => {
+    if (provider === 'openai') return value && value !== previousDefault ? 'custom' : 'auto'
+    return normalizeAiTaskProfile(legacy ? getSetting(key) : undefined)
+  }
+  return {
+    model: normalizeProviderModel(provider, model, 'invoice'),
+    textModel: normalizeProviderModel(provider, textModel, 'text'),
+    invoiceProfile: legacyProfile(INVOICE_PROFILE_SETTING, model, 'gpt-5.5'),
+    textProfile: legacyProfile(TEXT_PROFILE_SETTING, textModel, 'gpt-5.4-mini')
+  }
 }
 
 function resolveProviderTaskModel(
@@ -306,35 +294,30 @@ function resolveProviderTaskModel(
     task,
     profile,
     configuredModel,
-    availableModels: provider === 'mittwald' ? getStoredMittwaldModels() : []
+    availableModels: getStoredModels(provider)
   })
 }
 
 function isMittwaldGenerationModel(modelId: string) {
   const normalized = modelId.toLowerCase()
-  return !['embedding', 'reranker', 'whisper', 'tts'].some((kind) => normalized.includes(kind))
+  return !['embedding', 'reranker', 'whisper', 'tts', 'transcribe'].some((kind) => normalized.includes(kind))
 }
 
-export function getAiSettings(): AiSettings {
-  const apiKey = decryptSecret(getSetting<AiStoredSecret | string>(API_KEY_SETTING))
+export function getAiSettings(provider = activeProvider()): AiSettings {
+  const apiKey = decryptSecret(storedSecret(provider))
   const effort = getSetting<'low' | 'medium' | 'high'>(EFFORT_SETTING) || 'medium'
-  const provider = getSetting<AiProvider>(PROVIDER_SETTING) || DEFAULT_PROVIDER
-  const invoiceProfile = normalizeAiTaskProfile(getSetting(INVOICE_PROFILE_SETTING))
-  const textProfile = normalizeAiTaskProfile(getSetting(TEXT_PROFILE_SETTING))
-  const configuredModel = normalizeProviderModel(provider, getSetting<string>(MODEL_SETTING), 'model')
-  const configuredTextModel = normalizeProviderModel(
-    provider,
-    getSetting<string>(TEXT_MODEL_SETTING),
-    'textModel'
-  )
-  const model = resolveProviderTaskModel(provider, 'invoice', invoiceProfile, configuredModel)
-  const textModel = resolveProviderTaskModel(provider, 'text', textProfile, configuredTextModel)
-  const apiBaseUrl = getProviderPreset(provider).apiBaseUrl
+  const preferences = modelPreferences(provider)
+  const { invoiceProfile, textProfile } = preferences
+  const availableModels = getStoredModels(provider)
+  const model = resolveAiTaskModel({ provider, task: 'invoice', profile: invoiceProfile, configuredModel: preferences.model, availableModels })
+  const textModel = resolveAiTaskModel({ provider, task: 'text', profile: textProfile, configuredModel: preferences.textModel, availableModels })
+  const apiBaseUrl = AI_PROVIDER_CONFIG[provider].apiBaseUrl
   const proxyMode = getSetting<AiProxyMode>(PROXY_MODE_SETTING) || 'system'
   return {
     bookingCommentsEnabled: getSetting(AI_BOOKING_COMMENTS_SETTING) !== false,
     masterDataCreation: normalizeMasterDataPermissions(getSetting(AI_MASTER_DATA_SETTING)),
     hasApiKey: !!apiKey.trim(),
+    availableModels: availableModels.length ? availableModels : undefined,
     model,
     textModel,
     defaultReasoningEffort: effort,
@@ -365,25 +348,7 @@ export function setAiSettings(input: {
 }) {
   const current = getAiSettings()
   const provider = input.provider || current.provider
-  const invoiceProfile = normalizeAiTaskProfile(input.invoiceProfile ?? current.invoiceProfile)
-  const textProfile = normalizeAiTaskProfile(input.textProfile ?? current.textProfile)
-
-  if (input.apiKey !== undefined) {
-    const trimmed = input.apiKey.trim()
-    if (trimmed) setSetting(API_KEY_SETTING, encryptSecret(trimmed))
-  }
-  const currentModel = provider === current.provider ? current.model : undefined
-  const currentTextModel = provider === current.provider ? current.textModel : undefined
-  setSetting(MODEL_SETTING, normalizeProviderModel(provider, input.model ?? currentModel, 'model'))
-  setSetting(
-    TEXT_MODEL_SETTING,
-    normalizeProviderModel(provider, input.textModel ?? currentTextModel, 'textModel')
-  )
-  if (input.defaultReasoningEffort) setSetting(EFFORT_SETTING, input.defaultReasoningEffort)
-  if (input.provider) setSetting(PROVIDER_SETTING, input.provider)
-  setSetting(INVOICE_PROFILE_SETTING, invoiceProfile)
-  setSetting(TEXT_PROFILE_SETTING, textProfile)
-  if (input.proxyMode) setSetting(PROXY_MODE_SETTING, input.proxyMode)
+  const preferences = modelPreferences(provider)
   if (input.proxyUrl !== undefined) {
     const proxyUrl = input.proxyUrl.trim()
     if (proxyUrl) {
@@ -402,32 +367,39 @@ export function setAiSettings(input: {
     }
     setSetting(PROXY_URL_SETTING, proxyUrl)
   }
+
+  // Move the shared legacy secret before changing its owner, including encrypted values.
+  const legacyKey = getSetting<AiStoredSecret | string>(API_KEY_SETTING)
+  if (legacyKey) {
+    if (!getSetting(providerKey(current.provider))) setSetting(providerKey(current.provider), legacyKey)
+    setSetting(API_KEY_SETTING, null)
+  }
+  if (input.apiKey?.trim()) {
+    setSetting(providerKey(provider), encryptSecret(input.apiKey.trim()))
+    setSetting(catalogKey(provider), [])
+  }
+  if (provider !== current.provider) {
+    setSetting('ai.providers.' + current.provider + '.models', modelPreferences(current.provider))
+  }
+  setSetting('ai.providers.' + provider + '.models', {
+    model: normalizeProviderModel(provider, input.model ?? preferences.model, 'invoice'),
+    textModel: normalizeProviderModel(provider, input.textModel ?? preferences.textModel, 'text'),
+    invoiceProfile: input.invoiceProfile ?? (provider === 'openai' && input.model ? 'custom' : preferences.invoiceProfile),
+    textProfile: input.textProfile ?? (provider === 'openai' && input.textModel ? 'custom' : preferences.textProfile)
+  })
+  if (input.defaultReasoningEffort) setSetting(EFFORT_SETTING, input.defaultReasoningEffort)
+  if (input.provider) setSetting(PROVIDER_SETTING, input.provider)
+  if (input.proxyMode) setSetting(PROXY_MODE_SETTING, input.proxyMode)
   if (input.proxyBypassRules !== undefined) {
     setSetting(PROXY_BYPASS_SETTING, input.proxyBypassRules.trim())
   }
   if (input.bookingCommentsEnabled !== undefined) setSetting(AI_BOOKING_COMMENTS_SETTING, input.bookingCommentsEnabled)
   if (input.masterDataCreation !== undefined) setSetting(AI_MASTER_DATA_SETTING, normalizeMasterDataPermissions({ ...current.masterDataCreation, ...input.masterDataCreation }))
-  const next = getAiSettings()
-  return {
-    ok: true,
-    bookingCommentsEnabled: next.bookingCommentsEnabled,
-    masterDataCreation: next.masterDataCreation,
-    hasApiKey: next.hasApiKey,
-    model: next.model,
-    textModel: next.textModel,
-    defaultReasoningEffort: next.defaultReasoningEffort,
-    provider: next.provider,
-    apiBaseUrl: next.apiBaseUrl,
-    invoiceProfile: next.invoiceProfile,
-    textProfile: next.textProfile,
-    proxyMode: next.proxyMode,
-    proxyUrl: next.proxyUrl,
-    proxyBypassRules: next.proxyBypassRules
-  }
+  return { ok: true, ...getAiSettings() }
 }
 
-function getApiKey() {
-  const key = decryptSecret(getSetting<AiStoredSecret | string>(API_KEY_SETTING)).trim()
+function getApiKey(provider: AiProvider) {
+  const key = decryptSecret(storedSecret(provider)).trim()
   if (!key) throw new Error('API-Key fehlt. Bitte in KI > Einstellungen hinterlegen.')
   return key
 }
@@ -471,16 +443,29 @@ function createElectronFetch(settings: AiSettings): typeof fetch {
   }) as typeof fetch
 }
 
-export function createClient() {
-  const settings = getAiSettings()
+export function createClient(settings = getAiSettings()) {
   return new OpenAI({
-    apiKey: getApiKey(),
+    apiKey: getApiKey(settings.provider),
     baseURL: settings.apiBaseUrl,
     fetch: createElectronFetch(settings),
     // A stalled provider request must not block the invoice batch for many minutes.
     timeout: 120_000,
     maxRetries: 1
   })
+}
+
+function createClaudeClient(settings: AiSettings) {
+  return new Anthropic({
+    apiKey: getApiKey('anthropic'),
+    baseURL: settings.apiBaseUrl,
+    fetch: createElectronFetch(settings),
+    timeout: 120_000,
+    maxRetries: 1
+  })
+}
+
+export function createClaudeConversation(settings: AiSettings) {
+  return createClaudeResponder(createClaudeClient(settings))
 }
 
 function mittwaldChatContent(content: any[]) {
@@ -519,9 +504,9 @@ function parseMittwaldJson(text: string) {
  * Mittwald implements Chat Completions as its stable OpenAI-compatible surface.
  * The Responses API is kept for providers that support OpenAI structured output natively.
  */
-export async function createAiResponse(request: any): Promise<any> {
-  const settings = getAiSettings()
-  const client = createClient()
+export async function createAiResponse(request: any, settings = getAiSettings()): Promise<any> {
+  if (settings.provider === 'anthropic') return createClaudeConversation(settings)(request)
+  const client = createClient(settings)
   if (settings.provider !== 'mittwald') return client.responses.create(request)
 
   const input = Array.isArray(request.input)
@@ -554,7 +539,7 @@ export async function createAiResponse(request: any): Promise<any> {
     model: request.model,
     messages,
     // Low temperature helps the prompt-enforced JSON fallback stay parseable.
-    temperature: request.text?.format ? 0.1 : undefined,
+    temperature: request.text?.format || request.model === 'GLM-OCR' ? 0.1 : undefined,
     // Structured extraction and classification do not benefit from thinking.
     // In particular Qwen 3.8 otherwise defaults to expensive xhigh reasoning.
     ...(chatTemplateKwargs ? { chat_template_kwargs: chatTemplateKwargs } : {}),
@@ -628,27 +613,24 @@ export function extractOutputText(response: any) {
   return visibleAiText(parts.join('\n'))
 }
 
-async function extractMittwaldDocumentText(file: AiInputFile) {
+async function extractMittwaldDocumentText(file: AiInputFile, settings: AiSettings, localTextAvailable = false) {
+  // Scans and mixed PDFs can contain amounts missing from either source alone.
+  const embedded = !localTextAvailable && isPdfInputFile(file)
+    ? await readEmbeddedPdfText(file.dataBase64).catch(() => '')
+    : ''
   const response = await createAiResponse({
     model: 'GLM-OCR',
-    input: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'input_text',
-            text: 'Extrahiere den vollständigen, quellengetreuen Text aus diesem Dokument. Bewahre Zahlen, Daten, Rechnungsnummern und IBAN exakt.'
-          },
-          toResponseFileContent(file)
-        ]
-      }
-    ]
-  } as any)
-  const text = extractOutputText(response)
-  if (!text.trim()) {
+    max_output_tokens: 8192,
+    input: [{
+      role: 'user',
+      content: [toResponseFileContent(file), { type: 'input_text', text: 'Extract all text from this document.' }]
+    }]
+  }, settings)
+  const ocr = extractOutputText(response)
+  if (!ocr && !embedded && !localTextAvailable) {
     throw new Error('Mittwald GLM-OCR hat keinen auswertbaren Dokumenttext geliefert.')
   }
-  return text
+  return [embedded && 'Eingebetteter PDF-Text:\n' + embedded, ocr && 'Texterkennung:\n' + ocr].filter(Boolean).join('\n\n')
 }
 
 function parseStructured<T>(response: any, schema: { parse: (value: unknown) => T }): T {
@@ -784,24 +766,26 @@ function mergeAiUsage(primary: AiUsage, additional: AiUsage): AiUsage {
 
 export function normalizeUsage(response: any, model: string): AiUsage {
   const usage = response?.usage || {}
-  const inputTokens = Number(usage.input_tokens ?? usage.prompt_tokens ?? 0)
+  const details = usage.input_tokens_details ?? usage.prompt_tokens_details ?? {}
+  const claude = model.startsWith('claude-')
+  const cachedInputTokens = Number(usage.cache_read_input_tokens ?? details.cached_tokens ?? 0)
+  const writeTokens = Number(usage.cache_creation_input_tokens ?? details.cache_write_tokens ?? 0)
+  const longWrites = Number(usage.cache_creation?.ephemeral_1h_input_tokens ?? details.cache_write_tokens_details?.ttl_12h_tokens ?? 0)
+  // Anthropic reports cache reads/writes separately from ordinary input. OpenAI includes them.
+  const inputTokens = Number(usage.input_tokens ?? usage.prompt_tokens ?? 0) + (claude ? cachedInputTokens + writeTokens : 0)
   const outputTokens = Number(usage.output_tokens ?? usage.completion_tokens ?? 0)
   const totalTokens = Number(usage.total_tokens ?? inputTokens + outputTokens)
-  const cachedInputTokens = Number(
-    usage.input_tokens_details?.cached_tokens ?? usage.prompt_tokens_details?.cached_tokens ?? 0
-  )
-  const reasoningTokens = Number(
-    usage.output_tokens_details?.reasoning_tokens ??
-      usage.completion_tokens_details?.reasoning_tokens ??
-      0
-  )
+  const reasoningTokens = Number(usage.output_tokens_details?.reasoning_tokens ?? usage.completion_tokens_details?.reasoning_tokens ?? 0)
   const pricing = MODEL_PRICING_USD_PER_MILLION[model]
-  const billableInputTokens = Math.max(0, inputTokens - cachedInputTokens)
+  const longHaiku = model === 'claude-haiku-5-5' && inputTokens > 100_000
+  const longGpt = model.startsWith('gpt-6') && inputTokens > 272_000
+  const inputFactor = longHaiku ? 5 : longGpt ? 2 : 1
+  const outputFactor = longHaiku ? 5 : longGpt ? 1.5 : 1
+  const ordinaryInput = Math.max(0, inputTokens - cachedInputTokens - writeTokens)
+  const weightedWrites = (writeTokens - longWrites) * 1.25 + longWrites * (claude ? 2 : 2.5)
   const estimatedCostUsd = pricing
-    ? (billableInputTokens * pricing.input +
-        cachedInputTokens * pricing.cachedInput +
-        outputTokens * pricing.output) /
-      1_000_000
+    ? (((ordinaryInput + weightedWrites) * pricing.input + cachedInputTokens * pricing.cachedInput) * inputFactor +
+        outputTokens * pricing.output * outputFactor) / 1_000_000
     : null
   return {
     inputTokens,
@@ -812,7 +796,7 @@ export function normalizeUsage(response: any, model: string): AiUsage {
     estimatedCostUsd:
       estimatedCostUsd == null ? null : Math.round(estimatedCostUsd * 1_000_000) / 1_000_000,
     pricingNote: pricing
-      ? 'Geschaetzt mit OpenAI Standard API-Preisen pro 1M Token, ohne Batch/Flex/Priority/Data-Residency-Aufschlaege.'
+      ? 'Geschätzt mit den Standard-API-Preisen von ' + (claude ? 'Anthropic' : 'OpenAI') + ' pro Million Token.'
       : `Keine lokale Preistabelle fuer Modell ${model}.`
   }
 }
@@ -1019,72 +1003,57 @@ export async function testAiConnection() {
   try {
     await configureAiNetwork(settings)
     resolvedProxy = await aiNetworkSession().resolveProxy(settings.apiBaseUrl)
-    if (settings.provider === 'mittwald') {
-      const availableModels = (await createClient().models.list()).data
-        .map((model) => model.id.trim())
-        .filter((modelId) => modelId && isMittwaldGenerationModel(modelId))
-        .filter((modelId, index, all) => all.indexOf(modelId) === index)
-
-      if (!availableModels.length) {
-        throw new Error(
-          'Mitwald hat für diesen API-Key keine Modelle für Text- oder Beleganalyse zurückgegeben.'
-        )
-      }
-
-      setSetting(MITTWALD_AVAILABLE_MODELS_SETTING, availableModels)
-
-      const testModel = resolveAiTaskModel({
-        provider: 'mittwald',
-        task: 'text',
-        profile: settings.textProfile,
-        configuredModel: settings.textModel,
-        availableModels
-      })
-      const usableTestModel = availableModels.includes(testModel) && testModel !== 'GLM-OCR'
-        ? testModel
-        : availableModels.find((model) => model !== 'GLM-OCR')
-      if (usableTestModel) {
-        const connectionSchema = z.object({ ok: z.literal(true) })
-        const response = await createAiResponse({
-          model: usableTestModel,
-          input: 'Bestätige die Verbindung mit dem JSON-Objekt {"ok":true}.',
-          text: { format: zodTextFormat(connectionSchema, 'vereino_connection_test'), verbosity: 'low' },
-          reasoning: { effort: 'low' }
-        } as any)
-        try {
-          parseStructured(response, connectionSchema)
-        } catch {
-          throw new Error('Mittwald ist erreichbar, hat aber keine passende strukturierte Testantwort geliefert.')
-        }
+    const provider = settings.provider
+    const secret = getApiKey(provider)
+    const config = AI_PROVIDER_CONFIG[provider]
+    let availableModels: string[] | undefined
+    if (provider !== 'minimax') {
+      let ids: string[]
+      if (provider === 'anthropic') {
+        ids = []
+        for await (const model of createClaudeClient(settings).models.list()) ids.push(model.id)
       } else {
-        throw new Error('Mittwald hat kein Textmodell für die Prüfung strukturierter Antworten bereitgestellt.')
+        ids = (await createClient(settings).models.list()).data.map(model => model.id)
       }
-
-      return {
-        ok: true,
-        availableModels,
-        proxyMode: settings.proxyMode,
-        resolvedProxy: resolvedProxy || 'DIRECT',
-        targetUrl: settings.apiBaseUrl
+      // OpenAI and Claude also list specialized models that cannot handle these workflows.
+      availableModels = [...new Set(ids.map(id => id.trim()).filter(id => id && (
+        provider === 'mittwald' ? isMittwaldGenerationModel(id) : config.modelOptions.some(option => option.value === id)
+      )))]
+      if (!availableModels.length) throw new Error(config.label + ' meldet keine passenden Modelle für diesen API-Key.')
+      if (provider === 'mittwald' && !availableModels.includes('GLM-OCR')) {
+        throw new Error('Mittwald meldet GLM-OCR für die Beleganalyse mit diesem API-Key als nicht verfügbar.')
       }
-    } else {
-      await createAiResponse({
-        model: settings.model,
-        input: 'Antworte nur mit OK.',
-        text: { verbosity: 'low' },
+    }
+    const selectedModels = [
+      resolveAiTaskModel({ provider, task: 'invoice', profile: settings.invoiceProfile, configuredModel: settings.model, availableModels }),
+      resolveAiTaskModel({ provider, task: 'text', profile: settings.textProfile, configuredModel: settings.textModel, availableModels })
+    ]
+    const schema = z.object({ ok: z.literal(true) })
+    for (const model of new Set(selectedModels)) {
+      if (availableModels && !availableModels.includes(model)) {
+        throw new Error('Das ausgewählte Modell ' + model + ' ist für diesen API-Key nicht verfügbar.')
+      }
+      // GLM-OCR needs a document. Its availability was checked above.
+      if (provider === 'mittwald' && model === 'GLM-OCR') continue
+      const structured = provider !== 'minimax'
+      const response = await createAiResponse({
+        model,
+        input: structured ? 'Bestätige die Verbindung mit dem JSON-Objekt {"ok":true}.' : 'Antworte nur mit OK.',
+        text: structured ? { format: zodTextFormat(schema, 'vereino_connection_test') } : { verbosity: 'low' },
         reasoning: { effort: 'low' }
-      } as any)
-      if (settings.textModel !== settings.model) {
-        await createAiResponse({
-          model: settings.textModel,
-          input: 'Antworte nur mit OK.',
-          text: { verbosity: 'low' },
-          reasoning: { effort: 'low' }
-        } as any)
+      }, settings)
+      if (structured) {
+        try { parseStructured(response, schema) } catch {
+          throw new Error(config.label + ' hat mit ' + model + ' keine passende strukturierte Testantwort geliefert.')
+        }
       }
+    }
+    if (availableModels && secret === decryptSecret(storedSecret(provider)).trim()) {
+      setSetting(catalogKey(provider), availableModels)
     }
     return {
       ok: true,
+      availableModels,
       proxyMode: settings.proxyMode,
       resolvedProxy: resolvedProxy || 'DIRECT',
       targetUrl: settings.apiBaseUrl
@@ -1141,15 +1110,18 @@ export async function analyzeBookingDocuments(input: {
   const settings = getAiSettings()
   const model = input.model || settings.model
   const expandedFiles = await expandInputFilesForAnalysis(input.files)
-  const filesForAnalysis: Array<ExpandedAiInputFile & { mittwaldOcrText?: string }> = []
+  const filesForAnalysis: Array<ExpandedAiInputFile & { documentText?: string }> = []
   for (const item of expandedFiles) {
-    // Mittwald accepts PDF documents only through GLM-OCR. Qwen gets the OCR
-    // text afterwards, so it can still produce the requested structured result.
-    const mittwaldOcrText =
-      settings.provider === 'mittwald' && model !== 'GLM-OCR' && isPdfInputFile(item.file)
-        ? await extractMittwaldDocumentText(item.file)
-        : undefined
-    filesForAnalysis.push({ ...item, mittwaldOcrText })
+    // PDFs and spreadsheets need the document proxy. Text-only models need OCR for images too.
+    const mime = inferInputFileMimeType(item.file)
+    const textFile = mime.startsWith('text/') || /\.(csv|tsv)$/i.test(item.file.fileName)
+    const requiresOcr = !mime.startsWith('image/') || !supportsMittwaldVision(model)
+    let documentText: string | undefined
+    if (settings.provider === 'mittwald' && model !== 'GLM-OCR') {
+      if (textFile) documentText = Buffer.from(item.file.dataBase64, 'base64').toString('utf8')
+      else if (requiresOcr) documentText = await extractMittwaldDocumentText(item.file, settings)
+    }
+    filesForAnalysis.push({ ...item, documentText })
   }
   const sourceManifest = filesForAnalysis
     .map((item, idx) => `${idx + 1}. ${item.source.label}`)
@@ -1192,14 +1164,14 @@ export async function analyzeBookingDocuments(input: {
           { type: 'input_text', text: prompt },
           ...filesForAnalysis.flatMap((item, idx) => [
             { type: 'input_text', text: `Quelle ${idx + 1}: ${item.source.label}` },
-            ...(item.mittwaldOcrText
-              ? [{ type: 'input_text', text: `Mittwald GLM-OCR-Text:\n${item.mittwaldOcrText.slice(0, 80_000)}` }]
+            ...(item.documentText !== undefined
+              ? [{ type: 'input_text', text: `Dokumenttext:\n${item.documentText.slice(0, 80_000)}` }]
               : [toResponseFileContent(item.file)])
           ])
         ]
       }
     ]
-  } as any)
+  }, settings)
   return {
     model,
     result: (() => {
@@ -1311,7 +1283,7 @@ export async function segmentInvoicePacket(file: AiInputFile): Promise<{
         ]
       }
     ]
-  } as any)
+  }, settings)
   const segmented = InvoicePacketSegmentationStructured.parse(
     parseStructured(response, InvoicePacketSegmentationStructured)
   )
@@ -1394,7 +1366,7 @@ export async function analyzeInvoiceDocument(input: {
   let ocrMs: number | null = null
   if (settings.provider === 'mittwald' && model !== 'GLM-OCR') {
     const ocrStartedAt = Date.now()
-    mittwaldOcrText = await extractMittwaldDocumentText(input.file)
+    mittwaldOcrText = await extractMittwaldDocumentText(input.file, settings, !!input.localDocumentText?.trim())
     ocrMs = Date.now() - ocrStartedAt
   }
   const context = {
@@ -1470,7 +1442,7 @@ export async function analyzeInvoiceDocument(input: {
       ? `Lokaler OCR-/Docling-Text:\n${input.localDocumentText.slice(0, 80_000)}`
       : '',
     mittwaldOcrText
-      ? `Mittwald GLM-OCR-Text:\n${mittwaldOcrText.slice(0, 80_000)}`
+      ? `Dokumentinhalt:\n${mittwaldOcrText.slice(0, 80_000)}`
       : '',
     '',
     'Minimaler VereinO-Stammdatenkontext:',
@@ -1489,15 +1461,15 @@ export async function analyzeInvoiceDocument(input: {
           role: 'user',
           content: [
             { type: 'input_text', text: prompt },
-            // Qwen receives text from GLM-OCR: it supports images but not the
-            // PDF document proxy used by Mittwald's batch submission files.
-            ...(settings.provider === 'mittwald' && analysisModel !== 'GLM-OCR'
-              ? []
-              : [toResponseFileContent(input.file)])
+            // Vision models can cross-check a photo against OCR. Only GLM-OCR accepts raw PDFs.
+            ...(settings.provider !== 'mittwald' || analysisModel === 'GLM-OCR' ||
+              (inferInputFileMimeType(input.file).startsWith('image/') && supportsMittwaldVision(analysisModel))
+              ? [toResponseFileContent(input.file)]
+              : [])
           ]
         }
       ]
-    } as any)
+    }, settings)
   let response = await analyzeWithModel(model)
   const validatedResult = (response: unknown) => {
     const parsed = parseInvoiceExtraction(response)
@@ -1655,7 +1627,7 @@ export async function planAiAction(input: {
         ]
       }
     ]
-  } as any)
+  }, settings)
 
   return {
     model,
@@ -1726,7 +1698,7 @@ export async function generateAiText(input: {
         ]
       }
     ]
-  } as any)
+  }, settings)
   return {
     model,
     result: AiTextDraftResult.parse(parseStructured(response, AiTextDraftResultStructured)),
@@ -1841,7 +1813,7 @@ export async function reviewBankImportTransactions(input: {
         content: [{ type: 'input_text', text: reviewPrompt }]
       }
     ]
-  } as any)
+  }, settings)
 
   const response = await requestReview(prompt)
   let usage = normalizeUsage(response, model)

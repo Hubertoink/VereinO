@@ -11,12 +11,16 @@ test.beforeAll(async () => {
     import { createRoot } from 'react-dom/client'
     import { AiSettingsDrawer } from './src/renderer/views/AI/AiSettingsDrawer'
     import { useAiSettings } from './src/renderer/views/AI/useAiSettings'
-    import { DEFAULT_AI_SETTINGS } from './src/renderer/views/AI/aiSettings'
+    import { AI_PROVIDER_OPTIONS, DEFAULT_AI_SETTINGS } from './src/renderer/views/AI/aiSettings'
+    import { AI_PROVIDER_CONFIG } from './shared/aiProviders'
     const root = createRoot(document.getElementById('root'))
     let stored = { ...DEFAULT_AI_SETTINGS }
     window.savedSettings = []
     window.api = { ai: { settings: {
-      get: async () => ({ ...stored }),
+      get: async (provider = stored.provider) => provider === stored.provider ? { ...stored } : {
+        ...DEFAULT_AI_SETTINGS, provider, model: AI_PROVIDER_CONFIG[provider].defaultModel,
+        textModel: AI_PROVIDER_CONFIG[provider].defaultTextModel, apiBaseUrl: AI_PROVIDER_CONFIG[provider].apiBaseUrl
+      },
       set: async payload => { window.savedSettings.push(payload); stored = { ...stored, ...payload }; return { ...stored, ok: true } }
     } } }
     const notify = () => {}
@@ -25,7 +29,7 @@ test.beforeAll(async () => {
       const state = useAiSettings(notify, setBusy)
       useEffect(() => { void state.loadSettings() }, [state.loadSettings])
       return <div className="modal-overlay"><AiSettingsDrawer settings={state.settings} apiKey={state.apiKey} modelOptions={state.providerModelOptions}
-        providerOptions={[{ value: 'openai', label: 'OpenAI' }]} connectionTest={null} busy={busy}
+        providerOptions={AI_PROVIDER_OPTIONS} connectionTest={null} connectionNeedsSave={state.connectionNeedsSave} busy={busy}
         onClose={() => {}} onApiKeyChange={state.updateApiKey} onSettingsChange={state.setSettings} onProviderChange={state.handleProviderChange}
         onInvalidateConnection={state.invalidateConnection} onSave={state.saveSettings} onTestConnection={() => {}} /></div>
     }
@@ -34,6 +38,24 @@ test.beforeAll(async () => {
     window.renderSettings()
   ` }, bundle: true, write: false, platform: 'browser', jsx: 'automatic', loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' } })
   script = result.outputFiles[0].text
+})
+
+test('switches to Claude with a fresh key field and previews the selected profile', async ({ page }) => {
+  await page.route('http://settings.test/**', route => route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' }))
+  await page.goto('http://settings.test/')
+  await page.addScriptTag({ content: script })
+  await expect(page.getByText('Text & KI-Agent: GPT-6 Luna')).toBeVisible()
+  await page.getByLabel('API-Key', { exact: true }).fill('pending-openai-key')
+  await page.getByRole('combobox', { name: 'Anbieter', exact: true }).selectOption('anthropic')
+  await expect(page.getByLabel('API-Key', { exact: true })).toHaveValue('')
+  await expect(page.getByText('Beleganalyse: Claude Sonnet 5.5')).toBeVisible()
+  await page.getByRole('combobox', { name: 'Text & KI-Agent', exact: true }).selectOption('quality')
+  await expect(page.getByText('Text & KI-Agent: Claude Opus 5.5')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Verbindung testen' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Speichern' }).click()
+  const [saved] = await page.evaluate(() => (window as any).savedSettings)
+  expect(saved).toMatchObject({ provider: 'anthropic', textProfile: 'quality' })
+  expect(saved.apiKey).toBeUndefined()
 })
 
 test('AI booking comments default on, persist after save and can be disabled', async ({ page }, info) => {

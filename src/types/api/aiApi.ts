@@ -51,7 +51,7 @@ import type {
 export interface AiApi {
   ai: {
     settings: {
-      get: () => Promise<TAiSettingsGetOutput>
+      get: (provider?: TAiSettingsGetOutput['provider']) => Promise<TAiSettingsGetOutput>
       set: (payload: TAiSettingsSetInput) => Promise<TAiSettingsSetOutput>
       testConnection: () => Promise<TAiSettingsTestOutput>
     }

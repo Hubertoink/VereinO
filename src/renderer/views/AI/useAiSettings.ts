@@ -1,15 +1,14 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { AiMasterDataPermissions } from '../../../../shared/aiMasterDataPolicy'
-import { resolveAiTaskModel } from '../../../../shared/aiModelProfiles'
+import { AI_PROVIDER_CONFIG, type AiModelOption } from '../../../../shared/aiProviders'
 import type { TAiSettingsGetOutput } from '../../../../electron/main/ipc/schemas'
 import type { Notify } from './aiViewTypes'
-import {
-  AI_PROVIDER_CONFIG,
-  DEFAULT_AI_SETTINGS,
-  getAiProviderConfig,
-  normalizeAiSettings,
-  type AiModelOption
-} from './aiSettings'
+import { DEFAULT_AI_SETTINGS, normalizeAiSettings } from './aiSettings'
+
+function connectionConfig(settings: TAiSettingsGetOutput) {
+  return [settings.provider, settings.invoiceProfile, settings.textProfile, settings.model, settings.textModel,
+    settings.defaultReasoningEffort, settings.proxyMode, settings.proxyUrl, settings.proxyBypassRules].join('\n')
+}
 
 export function useAiSettings(notify: Notify, setBusy: (busy: boolean) => void) {
   const [settings, setSettings] = useState<TAiSettingsGetOutput>(DEFAULT_AI_SETTINGS)
@@ -17,7 +16,7 @@ export function useAiSettings(notify: Notify, setBusy: (busy: boolean) => void) 
   const [settingsLoaded, setSettingsLoaded] = useState(false)
   const settingsGeneration = useRef(0)
   const [apiKey, setApiKey] = useState('')
-  const [mittwaldModels, setMittwaldModels] = useState<string[] | null>(null)
+  const [savedConnection, setSavedConnection] = useState('')
   const [connectionTest, setConnectionTest] = useState<Awaited<
     ReturnType<typeof window.api.ai.settings.testConnection>
   > | null>(null)
@@ -29,7 +28,11 @@ export function useAiSettings(notify: Notify, setBusy: (busy: boolean) => void) 
     try {
       const loaded = await window.api.ai.settings.get()
       if (generation !== settingsGeneration.current) return
-      setSettings(normalizeAiSettings(loaded))
+      const normalized = normalizeAiSettings(loaded)
+      setSettings(normalized)
+      setSavedConnection(connectionConfig(normalized))
+      setApiKey('')
+      setConnectionTest(null)
       setSettingsLoaded(true)
     } catch (error: any) {
       notify('error', error?.message || String(error))
@@ -52,23 +55,10 @@ export function useAiSettings(notify: Notify, setBusy: (busy: boolean) => void) 
         proxyUrl: settings.proxyUrl,
         proxyBypassRules: settings.proxyBypassRules
       })
-      setSettings(
-        normalizeAiSettings({
-          masterDataCreation: next.masterDataCreation,
-          bookingCommentsEnabled: next.bookingCommentsEnabled,
-          hasApiKey: next.hasApiKey,
-          model: next.model,
-          textModel: next.textModel,
-          defaultReasoningEffort: next.defaultReasoningEffort,
-          provider: next.provider,
-          apiBaseUrl: next.apiBaseUrl,
-          invoiceProfile: next.invoiceProfile,
-          textProfile: next.textProfile,
-          proxyMode: next.proxyMode,
-          proxyUrl: next.proxyUrl,
-          proxyBypassRules: next.proxyBypassRules
-        })
-      )
+      const normalized = normalizeAiSettings(next)
+      setSettings(normalized)
+      setSavedConnection(connectionConfig(normalized))
+      setConnectionTest(null)
       setApiKey('')
       notify('success', 'KI-Einstellungen gespeichert.')
     } catch (error: any) {
@@ -83,92 +73,49 @@ export function useAiSettings(notify: Notify, setBusy: (busy: boolean) => void) 
     try {
       const result = await window.api.ai.settings.testConnection()
       setConnectionTest(result)
-      if (result.ok && settings.provider === 'mittwald' && result.availableModels) {
-        const availableModels = result.availableModels
-        setMittwaldModels(availableModels)
-        setSettings((current) => {
-          if (current.provider !== 'mittwald' || !availableModels.length) return current
-          const model = resolveAiTaskModel({
-            provider: 'mittwald',
-            task: 'invoice',
-            profile: current.invoiceProfile,
-            configuredModel: current.model,
-            availableModels
-          })
-          const textModel = resolveAiTaskModel({
-            provider: 'mittwald',
-            task: 'text',
-            profile: current.textProfile,
-            configuredModel: current.textModel,
-            availableModels
-          })
-          return {
-            ...current,
-            model: availableModels.includes(current.model) ? current.model : model,
-            textModel: availableModels.includes(current.textModel) ? current.textModel : textModel
-          }
-        })
-      }
       if (result.ok) {
-        const modelMessage = result.availableModels
-          ? ` ${result.availableModels.length} Mitwald-Modelle wurden geladen.`
-          : ''
-        notify('success', `KI-Verbindung funktioniert.${modelMessage}`)
+        if (result.availableModels) {
+          const loaded = normalizeAiSettings(await window.api.ai.settings.get())
+          setSettings(current => ({ ...current, model: loaded.model, textModel: loaded.textModel, availableModels: loaded.availableModels }))
+          setSavedConnection(connectionConfig(loaded))
+        }
+        notify('success', 'KI-Verbindung funktioniert.')
       } else notify('error', result.error || 'KI-Verbindung fehlgeschlagen.')
+    } catch (error: any) {
+      notify('error', error?.message || String(error))
     } finally {
       setBusy(false)
     }
   }
 
-  const providerConfig = getAiProviderConfig(settings.provider)
   const providerModelOptions = useMemo<AiModelOption[]>(() => {
-    if (settings.provider !== 'mittwald') return providerConfig.modelOptions
-    const knownOptions = new Map(
-      AI_PROVIDER_CONFIG.mittwald.modelOptions.map((option) => [option.value, option])
+    const options = AI_PROVIDER_CONFIG[settings.provider].modelOptions
+    const models = settings.availableModels || options.map(option => option.value)
+    // Keep explicit choices visible even if a later catalog no longer lists them.
+    return [...new Set([...models, settings.model, settings.textModel])].map(id =>
+      options.find(option => option.value === id) || { value: id, label: id, hint: 'Anbietermodell' }
     )
-    const modelIds = mittwaldModels || [
-      ...AI_PROVIDER_CONFIG.mittwald.modelOptions.map((option) => option.value),
-      settings.model,
-      settings.textModel
-    ]
-    return modelIds
-      .filter((modelId, index, all) => modelId && all.indexOf(modelId) === index)
-      .map(
-        (modelId) =>
-          knownOptions.get(modelId) || {
-            value: modelId,
-            label: modelId,
-            hint: 'Von Mitwald bereitgestellt'
-          }
-      )
-  }, [
-    mittwaldModels,
-    providerConfig.modelOptions,
-    settings.model,
-    settings.provider,
-    settings.textModel
-  ])
+  }, [settings.provider, settings.availableModels, settings.model, settings.textModel])
 
-  const handleProviderChange = (provider: TAiSettingsGetOutput['provider']) => {
-    const nextConfig = getAiProviderConfig(provider)
-    const allowedModels = new Set(nextConfig.modelOptions.map((option) => option.value))
+  const handleProviderChange = async (provider: TAiSettingsGetOutput['provider']) => {
+    setBusy(true)
     setConnectionTest(null)
-    setMittwaldModels(null)
-    setSettings((current) => ({
-      ...current,
-      provider,
-      apiBaseUrl: nextConfig.apiBaseUrl,
-      model: allowedModels.has(current.model) ? current.model : nextConfig.defaultModel,
-      textModel: allowedModels.has(current.textModel)
-        ? current.textModel
-        : nextConfig.defaultTextModel
-    }))
+    setApiKey('')
+    try {
+      const next = normalizeAiSettings(await window.api.ai.settings.get(provider))
+      setSettings(current => ({ ...current, provider, hasApiKey: next.hasApiKey, apiBaseUrl: next.apiBaseUrl,
+        model: next.model, textModel: next.textModel, invoiceProfile: next.invoiceProfile, textProfile: next.textProfile,
+        availableModels: next.availableModels }))
+    } catch (error: any) {
+      notify('error', error?.message || String(error))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const updateApiKey = (value: string) => {
     setApiKey(value)
     setConnectionTest(null)
-    setMittwaldModels(null)
   }
 
   const saveMasterDataPermission = async (key: keyof AiMasterDataPermissions, enabled: boolean) => {
@@ -191,6 +138,7 @@ export function useAiSettings(notify: Notify, setBusy: (busy: boolean) => void) 
     setSettings,
     apiKey,
     connectionTest,
+    connectionNeedsSave: !!apiKey.trim() || connectionConfig(settings) !== savedConnection,
     providerModelOptions,
     loadSettings,
     saveSettings,

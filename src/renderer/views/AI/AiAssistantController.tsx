@@ -145,6 +145,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     apiKey,
     connectionTest,
     providerModelOptions,
+    connectionNeedsSave,
     loadSettings,
     saveSettings,
     testConnection,
@@ -4257,7 +4258,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
         ) {
           await createContributionPayment()
         } else if (!settings.hasApiKey) {
-          notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
+          notify('error', 'Bitte zuerst den API-Key des gewählten Anbieters in den KI-Einstellungen hinterlegen.')
           setShowSettings(true)
         } else {
           await processText(userPrompt)
@@ -4401,7 +4402,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
       return
     }
     if (!settings.hasApiKey) {
-      notify('error', 'Bitte zuerst einen OpenAI API-Key in den KI-Einstellungen hinterlegen.')
+      notify('error', 'Bitte zuerst den API-Key des gewählten Anbieters in den KI-Einstellungen hinterlegen.')
       setShowSettings(true)
       return
     }
@@ -4831,6 +4832,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
           modelOptions={providerModelOptions}
           providerOptions={AI_PROVIDER_OPTIONS}
           connectionTest={connectionTest}
+          connectionNeedsSave={connectionNeedsSave}
           busy={busy}
           onClose={() => setShowSettings(false)}
           onApiKeyChange={updateApiKey}

@@ -1,3 +1,4 @@
+import { AI_PROVIDER_IDS } from '../../../../shared/aiProviders'
 import { AiMasterDataPermissions, AiMasterDataProposal } from '../../../../shared/aiMasterDataPolicy'
 import { z } from 'zod'
 import { AiReportAnswerSchema } from './aiReporting'
@@ -703,13 +704,14 @@ export const AiJobDetailSchema = AiJobSchema.extend({
   )
 })
 
-export const AiProvider = z.enum(['openai', 'minimax', 'mittwald'])
+export const AiProvider = z.enum(AI_PROVIDER_IDS)
 export const AiProxyMode = z.enum(['system', 'direct', 'manual'])
 export const AiTaskProfile = z.enum(['auto', 'fast', 'quality', 'custom'])
 export const AiSettingsGetOutput = z.object({
   masterDataCreation: AiMasterDataPermissions.default({}),
   bookingCommentsEnabled: z.boolean().default(true),
   hasApiKey: z.boolean(),
+  availableModels: z.array(z.string()).optional(),
   model: z.string(),
   textModel: z.string(),
   defaultReasoningEffort: z.enum(['low', 'medium', 'high']).default('medium'),
@@ -741,6 +743,7 @@ export const AiSettingsSetOutput = z.object({
   bookingCommentsEnabled: z.boolean().default(true),
   ok: z.boolean(),
   hasApiKey: z.boolean(),
+  availableModels: z.array(z.string()).optional(),
   model: z.string(),
   textModel: z.string(),
   defaultReasoningEffort: z.enum(['low', 'medium', 'high']),

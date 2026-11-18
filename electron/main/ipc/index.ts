@@ -240,6 +240,7 @@ import {
   AiMcpConfigureInput,
   AiMcpConfigureOutput,
   AiMcpStatusOutput,
+  AiProvider,
   AiSettingsGetOutput,
   AiSettingsSetInput,
   AiSettingsSetOutput,
@@ -911,9 +912,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       } catch {}
     }
   })
-  ipcMain.handle('ai.settings.get', async () => {
+  ipcMain.handle('ai.settings.get', async (_event, provider) => {
     const { getAiSettings } = await loadAiService()
-    return AiSettingsGetOutput.parse(getAiSettings())
+    return AiSettingsGetOutput.parse(getAiSettings(AiProvider.optional().parse(provider)))
   })
   ipcMain.handle('clipboard.readImage', async (event) => {
     if (!BrowserWindow.fromWebContents(event.sender)?.isFocused()) return null

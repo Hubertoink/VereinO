@@ -7,6 +7,18 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.5.0] - 2026-11-18
+
+### Hinzugefügt
+
+- Claude (Anthropic) steht für Beleganalyse, Texte und den KI-Agenten zur Auswahl. Das automatische Profil nutzt Sonnet 5.5 für Belege und Haiku 5.5 für Texte. Für anspruchsvolle Aufgaben lässt sich Opus 5.5 wählen.
+- Die KI-Einstellungen zeigen das Modell für jede Aufgabe an. Der Verbindungstest gleicht die Auswahl bei OpenAI, Claude und Mittwald mit den für den jeweiligen API-Schlüssel verfügbaren Modellen ab. VereinO speichert Schlüssel und Modellauswahl je Anbieter.
+
+### Geändert
+
+- Bei OpenAI verwendet das automatische Profil GPT‑6.1 Terra für Belege und GPT‑6 Luna für Texte und den KI-Agenten. Luna steht auch für schnelle Belegstapel zur Verfügung. Das Qualitätsprofil verwendet GPT‑6.2 Sol.
+- Bei Mittwald übernimmt Qwen 3.6 weiterhin die Standardzuordnung. Für schwierige Belege und gründliche Agentenaufgaben verwendet das Qualitätsprofil Qwen 3.8. Bei digitalen PDFs berücksichtigt VereinO neben der Texterkennung durch GLM-OCR auch den eingebetteten PDF-Text, damit Betragszeilen zuverlässiger erfasst werden.
+
 ## [5.4.0] - 2026-11-18
 
 ### Hinzugefügt

@@ -162,7 +162,7 @@ const rendererApi = {
   ping: () => 'pong',
   ai: {
     settings: {
-      get: () => invoke('ai.settings.get'),
+      get: (provider) => invoke('ai.settings.get', provider),
       set: (payload) => cleanInvoke('ai.settings.set', payload),
       testConnection: () => cleanInvoke('ai.settings.testConnection')
     },

@@ -4,10 +4,12 @@ import { AiReportAnswerSchema } from '../ipc/schemas/aiReporting'
 import {
   compactContext,
   createClient,
+  createClaudeConversation,
   extractOutputText,
   getAiSettings,
   normalizeUsage,
   type AiContext,
+  type AiSettings,
   type AiUsage
 } from './ai'
 import {
@@ -65,7 +67,7 @@ function emptyUsage(model: string): AiUsage {
     reasoningTokens: 0,
     totalTokens: 0,
     estimatedCostUsd: 0,
-    pricingNote: `Keine OpenAI-Nutzung fuer Modell ${model}.`
+    pricingNote: `Keine KI-Nutzung fuer Modell ${model}.`
   }
 }
 
@@ -204,6 +206,30 @@ async function createMittwaldAgentResponse(input: {
   }
 }
 
+function createAgentResponder(settings: AiSettings) {
+  if (settings.provider === 'anthropic') return createClaudeConversation(settings)
+  const client = createClient(settings)
+  if (settings.provider !== 'mittwald') return (request: any) => client.responses.create(request)
+
+  const messages: any[] = []
+  return async (request: any) => {
+    if (!messages.length) messages.push({ role: 'system', content: request.instructions })
+    for (const item of request.input) {
+      if (item.type === 'function_call_output') {
+        messages.push({ role: 'tool', tool_call_id: item.call_id, content: item.output })
+      } else {
+        messages.push({ role: item.role, content: item.content.map((part: { text: string }) => part.text).join('\n') })
+      }
+    }
+    const response = await createMittwaldAgentResponse({
+      client, model: request.model, messages, tools: request.tools,
+      reasoningEffort: request.reasoning.effort, toolChoice: request.tool_choice
+    })
+    messages.push(response.mittwaldMessage)
+    return response
+  }
+}
+
 function readJsonResource<T>(resource: any, fallback: T): T {
   const text = resource?.contents?.find((item: any) => typeof item?.text === 'string')?.text
   if (!text) return fallback
@@ -321,8 +347,7 @@ export async function runAiAgent(input: {
         payload: { memory, autoRules }
       }
     ]
-    const client = createClient()
-    const usesMittwaldChatCompletions = settings.provider === 'mittwald'
+    const respond = createAgentResponder(settings)
     const baseRequest = {
       model,
       instructions: instructions || buildAgentInstructions(settings.bookingCommentsEnabled, input.context.organization?.profile, settings.masterDataCreation),
@@ -331,29 +356,10 @@ export async function runAiAgent(input: {
       text: { verbosity: 'medium' }
     }
 
-    const mittwaldMessages: any[] = usesMittwaldChatCompletions
-      ? [
-          { role: 'system', content: instructions || buildAgentInstructions(settings.bookingCommentsEnabled, input.context.organization?.profile, settings.masterDataCreation) },
-          { role: 'user', content: prompt }
-        ]
-      : []
-    let response: any = usesMittwaldChatCompletions
-      ? await createMittwaldAgentResponse({
-          client,
-          model,
-          messages: mittwaldMessages,
-          tools: providerTools,
-          reasoningEffort: settings.defaultReasoningEffort
-        })
-      : await client.responses.create({
-          ...baseRequest,
-          input: [
-            {
-              role: 'user',
-              content: [{ type: 'input_text', text: prompt }]
-            }
-          ]
-        } as any)
+    let response: any = await respond({
+      ...baseRequest,
+      input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }] }]
+    })
     usage = mergeUsage(usage, normalizeUsage(response, model))
 
     const maxSteps = Math.max(1, Math.min(8, Number(input.maxSteps || 5)))
@@ -512,29 +518,7 @@ export async function runAiAgent(input: {
         }
       }
 
-      if (usesMittwaldChatCompletions) {
-        mittwaldMessages.push(response.mittwaldMessage)
-        mittwaldMessages.push(
-          ...outputs.map((output) => ({
-            role: 'tool',
-            tool_call_id: output.call_id,
-            content: output.output
-          }))
-        )
-        response = await createMittwaldAgentResponse({
-          client,
-          model,
-          messages: mittwaldMessages,
-          tools: providerTools,
-          reasoningEffort: settings.defaultReasoningEffort
-        })
-      } else {
-        response = await client.responses.create({
-          ...baseRequest,
-          previous_response_id: response.id,
-          input: outputs
-        } as any)
-      }
+      response = await respond({ ...baseRequest, previous_response_id: response.id, input: outputs } as any)
       usage = mergeUsage(usage, normalizeUsage(response, model))
     }
 
@@ -547,26 +531,12 @@ export async function runAiAgent(input: {
           type: 'function_call_output' as const, call_id: call.call_id,
           output: JSON.stringify({ ok: false, error: 'Schrittlimit erreicht. Dieser Aufruf wurde nicht ausgeführt. Nutze die bereits vorliegenden Ergebnisse und benenne verbleibende Lücken.' })
         }))
-        if (usesMittwaldChatCompletions) {
-          mittwaldMessages.push(response.mittwaldMessage)
-          mittwaldMessages.push(...unfinishedCalls.map(call => ({ role: 'tool', tool_call_id: call.call_id, content: call.output })))
-          mittwaldMessages.push({ role: 'user', content: finalPrompt })
-          response = await createMittwaldAgentResponse({
-            client,
-            model,
-            messages: mittwaldMessages,
-            tools: providerTools,
-            reasoningEffort: settings.defaultReasoningEffort,
-            toolChoice: 'none'
-          })
-        } else {
-          response = await client.responses.create({
-            ...baseRequest,
-            tool_choice: 'none',
-            previous_response_id: response.id,
-            input: [...unfinishedCalls, { role: 'user', content: [{ type: 'input_text', text: finalPrompt }] }]
-          } as any)
-        }
+        response = await respond({
+          ...baseRequest,
+          tool_choice: 'none',
+          previous_response_id: response.id,
+          input: [...unfinishedCalls, { role: 'user', content: [{ type: 'input_text', text: finalPrompt }] }]
+        } as any)
         usage = mergeUsage(usage, normalizeUsage(response, model))
       } catch {
         // A concise fallback below is preferable to dropping a completed tool result.

@@ -1,6 +1,7 @@
 const mockChatCreate = jest.fn()
 const mockResponsesCreate = jest.fn()
 const mockModelsList = jest.fn()
+const mockNetworkFetch = jest.fn()
 
 jest.mock('openai', () => ({
   __esModule: true,
@@ -12,12 +13,12 @@ jest.mock('openai', () => ({
 }))
 jest.mock('electron', () => ({
   safeStorage: {},
-  session: { fromPartition: () => ({ setProxy: async () => {}, resolveProxy: async () => 'DIRECT' }) }
+  session: { fromPartition: () => ({ setProxy: async () => {}, resolveProxy: async () => 'DIRECT', fetch: mockNetworkFetch }) }
 }))
 jest.mock('../../electron/main/services/settings', () => ({ getSetting: jest.fn(), setSetting: jest.fn() }))
 
 import { getSetting, setSetting } from '../../electron/main/services/settings'
-import { createAiResponse, generateAiText, getAiSettings, setAiSettings, reviewBankImportTransactions, testAiConnection } from '../../electron/main/services/ai'
+import { createAiResponse, generateAiText, getAiSettings, setAiSettings, normalizeUsage, reviewBankImportTransactions, testAiConnection } from '../../electron/main/services/ai'
 import { AI_BOOKING_COMMENTS_SETTING } from '../../shared/aiBookingPolicy'
 import { AI_MASTER_DATA_SETTING } from '../../shared/aiMasterDataPolicy'
 
@@ -168,12 +169,76 @@ it('sends another bank review with newly available unused tags and preserves the
 })
 
 it('checks structured JSON during the Mittwald connection test', async () => {
-  mockModelsList.mockResolvedValue({ data: [{ id: 'Qwen3.6-35B-A3B-FP8' }] })
+  mockModelsList.mockResolvedValue({ data: [{ id: 'Qwen3.6-35B-A3B-FP8' }, { id: 'GLM-OCR' }] })
   mockChatCreate.mockResolvedValue(completion('{"ok":true}'))
   expect(await testAiConnection()).toMatchObject({ ok: true })
   expect(mockChatCreate.mock.calls[0][0].messages[0].content).toContain('JSON')
   mockChatCreate.mockResolvedValue(completion('{"ok":false}'))
   expect(await testAiConnection()).toMatchObject({ ok: false })
+})
+
+it('keeps legacy keys and explicit model choices with their provider across switches', () => {
+  const store = new Map<string, unknown>([
+    ['ai.openai.apiKey', 'legacy-key'], ['ai.openai.model', 'gpt-5.4'], ['ai.openai.textModel', 'gpt-5.4-mini']
+  ])
+  jest.mocked(getSetting).mockImplementation(((key: string) => store.get(key)) as any)
+  jest.mocked(setSetting).mockImplementation((key, value) => { store.set(key, value) })
+  expect(getAiSettings()).toMatchObject({ model: 'gpt-5.4', invoiceProfile: 'custom', textModel: 'gpt-6-luna', textProfile: 'auto' })
+  expect(getAiSettings('anthropic').hasApiKey).toBe(false)
+  expect(setAiSettings({ provider: 'anthropic' })).toMatchObject({ hasApiKey: false, textModel: 'claude-haiku-5-5' })
+  setAiSettings({ apiKey: 'claude-key', textProfile: 'quality' })
+  expect(setAiSettings({ provider: 'openai' })).toMatchObject({ hasApiKey: true, model: 'gpt-5.4' })
+  expect(setAiSettings({ provider: 'anthropic' })).toMatchObject({ hasApiKey: true, textModel: 'claude-opus-5-5' })
+  expect(store.get('ai.providers.openai.apiKey')).toBe('legacy-key')
+  expect(store.get('ai.providers.anthropic.apiKey')).toMatchObject({ value: 'claude-key' })
+})
+
+it('tests the available OpenAI profile models and excludes inapplicable catalog entries', async () => {
+  const store = new Map<string, unknown>([['ai.openai.apiKey', 'key']])
+  jest.mocked(getSetting).mockImplementation(((key: string) => store.get(key)) as any)
+  jest.mocked(setSetting).mockImplementation((key, value) => { store.set(key, value) })
+  mockModelsList.mockResolvedValue({ data: ['gpt-6-luna', 'text-embedding-3-small'].map(id => ({ id })) })
+  mockResponsesCreate.mockResolvedValue({ output_text: '{"ok":true}' })
+  expect(await testAiConnection()).toMatchObject({ ok: true, availableModels: ['gpt-6-luna'] })
+  expect(mockResponsesCreate.mock.calls.map(([request]) => request.model)).toEqual(['gpt-6-luna'])
+  expect(getAiSettings().model).toBe('gpt-6-luna')
+  setAiSettings({ model: 'gpt-6.2-sol', invoiceProfile: 'custom' })
+  expect(await testAiConnection()).toMatchObject({ ok: false, error: expect.stringContaining('gpt-6.2-sol') })
+})
+
+it('estimates Luna cache writes and the long-context Haiku rate from provider usage', () => {
+  expect(normalizeUsage({ usage: { input_tokens: 12000, output_tokens: 2000, input_tokens_details: {
+    cached_tokens: 4000, cache_write_tokens: 7000, cache_write_tokens_details: { ttl_30m_tokens: 5000, ttl_12h_tokens: 2000 }
+  } } }, 'gpt-6-luna')).toMatchObject({ totalTokens: 14000, estimatedCostUsd: 0.002265 })
+  expect(normalizeUsage({ usage: { input_tokens: 90000, cache_read_input_tokens: 20000, output_tokens: 1000 } }, 'claude-haiku-5-5'))
+    .toMatchObject({ inputTokens: 110000, totalTokens: 111000, cachedInputTokens: 20000, estimatedCostUsd: 0.0485 })
+})
+
+it('uses the native Anthropic SDK through the Electron network session for discovery and structured requests', async () => {
+  const store = new Map<string, unknown>([['ai.openai.provider', 'anthropic'], ['ai.providers.anthropic.apiKey', 'claude-test']])
+  jest.mocked(getSetting).mockImplementation(((key: string) => store.get(key)) as any)
+  jest.mocked(setSetting).mockImplementation((key, value) => { store.set(key, value) })
+  const models = ['claude-sonnet-5-5', 'claude-haiku-5-5']
+  const tested: string[] = []
+  mockNetworkFetch.mockImplementation(async (url, init) => {
+    const request = new Request(url, init)
+    expect(request.headers.get('authorization')).toBe('Bearer claude-test')
+    expect(new Headers(request.headers).has('anthropic-version')).toBe(true)
+    if (request.method === 'GET') {
+      expect(new URL(request.url).pathname).toBe('/v1/models')
+      return Response.json({ data: models.map(id => ({ id })), has_more: false })
+    }
+    expect(request.url).toBe('https://api.anthropic.com/v1/messages')
+    const body = await request.json()
+    tested.push(body.model)
+    return Response.json({ id: 'msg-test', type: 'message', stop_reason: 'tool_use', usage: {},
+      content: [{ type: 'tool_use', id: 'call-test', name: body.tools[0].name, input: { ok: true } }] })
+  })
+  const result = await testAiConnection()
+  if (!result.ok) throw new Error(result.error)
+  expect(result.availableModels).toEqual(models)
+  expect(tested).toEqual(models)
+  expect(mockResponsesCreate).not.toHaveBeenCalled()
 })
 
 it('completes the bank review when one provider suggestion contains a null required string', async () => {

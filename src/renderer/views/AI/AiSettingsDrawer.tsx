@@ -1,6 +1,6 @@
 import { forwardRef } from 'react'
 import ModalHeader from '../../components/ModalHeader'
-import { AI_TASK_PROFILE_OPTIONS } from '../../../../shared/aiModelProfiles'
+import { AI_TASK_PROFILE_OPTIONS, resolveAiTaskModel } from '../../../../shared/aiModelProfiles'
 import type { TAiSettingsGetOutput } from '../../../../electron/main/ipc/schemas'
 
 type ModelOption = { value: string; label: string; hint: string }
@@ -14,6 +14,7 @@ type Props = {
   providerOptions: ProviderOption[]
   connectionTest: ConnectionTest
   busy: boolean
+  connectionNeedsSave: boolean
   onClose: () => void
   onApiKeyChange: (value: string) => void
   onSettingsChange: (settings: TAiSettingsGetOutput) => void
@@ -29,6 +30,7 @@ export const AiSettingsDrawer = forwardRef<HTMLElement, Props>(function AiSettin
   modelOptions,
   providerOptions,
   connectionTest,
+  connectionNeedsSave,
   busy,
   onClose,
   onApiKeyChange,
@@ -38,15 +40,25 @@ export const AiSettingsDrawer = forwardRef<HTMLElement, Props>(function AiSettin
   onSave,
   onTestConnection
 }, ref) {
-  const update = <K extends keyof TAiSettingsGetOutput>(key: K, value: TAiSettingsGetOutput[K]) =>
+  const usesProfiles = settings.provider !== 'minimax'
+  const update = <K extends keyof TAiSettingsGetOutput>(key: K, value: TAiSettingsGetOutput[K]) => {
+    onInvalidateConnection()
     onSettingsChange({ ...settings, [key]: value })
+  }
+  const modelLabel = (task: 'invoice' | 'text') => {
+    const id = resolveAiTaskModel({ provider: settings.provider, task,
+      profile: task === 'invoice' ? settings.invoiceProfile : settings.textProfile,
+      configuredModel: task === 'invoice' ? settings.model : settings.textModel,
+      availableModels: settings.availableModels })
+    return modelOptions.find(option => option.value === id)?.label || id
+  }
 
   return <section ref={ref} className="card ai-settings-card ai-settings-drawer">
     <ModalHeader title="Einstellungen" onClose={onClose} closeOnEscape={false} />
-    <div className="ai-form-grid">
+    <fieldset className="ai-form-grid" disabled={busy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <label className="field ai-field-wide">
         <span>API-Key</span>
-        <input className="input" type="password" value={apiKey} onChange={(event) => onApiKeyChange(event.target.value)} placeholder={settings.hasApiKey ? 'Gespeichert - leer lassen zum Beibehalten' : 'sk-...'} />
+        <input className="input" type="password" value={apiKey} onChange={(event) => onApiKeyChange(event.target.value)} placeholder={settings.hasApiKey ? 'Gespeichert - leer lassen zum Beibehalten' : 'API-Key für diesen Anbieter eingeben'} />
       </label>
       <label className="field">
         <span>Anbieter</span>
@@ -55,42 +67,42 @@ export const AiSettingsDrawer = forwardRef<HTMLElement, Props>(function AiSettin
         </select>
       </label>
       <label className="field">
-        <span>{settings.provider === 'mittwald' ? 'Beleganalyse' : 'Beleganalyse-Modell'}</span>
-        {settings.provider === 'mittwald' ? <select className="input" value={settings.invoiceProfile} onChange={(event) => update('invoiceProfile', event.target.value as TAiSettingsGetOutput['invoiceProfile'])}>
-          {AI_TASK_PROFILE_OPTIONS.invoice.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        <span>{usesProfiles ? 'Beleganalyse' : 'Beleganalyse-Modell'}</span>
+        {usesProfiles ? <select className="input" value={settings.invoiceProfile} onChange={(event) => update('invoiceProfile', event.target.value as TAiSettingsGetOutput['invoiceProfile'])}>
+          {AI_TASK_PROFILE_OPTIONS.invoice.map((option) => <option key={option.value} value={option.value} title={option.description}>{option.label}</option>)}
         </select> : <select className="input" value={settings.model} onChange={(event) => update('model', event.target.value)}>
           {modelOptions.map((option) => <option key={option.value} value={option.value}>{option.label} - {option.hint}</option>)}
         </select>}
       </label>
       <label className="field">
-        <span>{settings.provider === 'mittwald' ? 'Text & KI-Agent' : 'Textmodell'}</span>
-        {settings.provider === 'mittwald' ? <select className="input" value={settings.textProfile} onChange={(event) => update('textProfile', event.target.value as TAiSettingsGetOutput['textProfile'])}>
-          {AI_TASK_PROFILE_OPTIONS.text.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        <span>{usesProfiles ? 'Text & KI-Agent' : 'Textmodell'}</span>
+        {usesProfiles ? <select className="input" value={settings.textProfile} onChange={(event) => update('textProfile', event.target.value as TAiSettingsGetOutput['textProfile'])}>
+          {AI_TASK_PROFILE_OPTIONS.text.map((option) => <option key={option.value} value={option.value} title={option.description}>{option.label}</option>)}
         </select> : <select className="input" value={settings.textModel} onChange={(event) => update('textModel', event.target.value)}>
           {modelOptions.map((option) => <option key={option.value} value={option.value}>{option.label} - {option.hint}</option>)}
         </select>}
       </label>
       <label className="field">
-        <span>{settings.provider === 'mittwald' ? 'Reasoning für Text & KI-Agent' : 'Reasoning'}</span>
+        <span>{usesProfiles ? 'Reasoning für Text & KI-Agent' : 'Reasoning'}</span>
         <select className="input" value={settings.defaultReasoningEffort} onChange={(event) => update('defaultReasoningEffort', event.target.value as TAiSettingsGetOutput['defaultReasoningEffort'])}>
           <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
         </select>
       </label>
-      {settings.provider === 'mittwald' && settings.invoiceProfile === 'custom' && <label className="field">
+      {usesProfiles && settings.invoiceProfile === 'custom' && <label className="field">
         <span>Eigenes Beleganalyse-Modell</span>
         <select className="input" value={settings.model} onChange={(event) => update('model', event.target.value)}>
           {modelOptions.map((option) => <option key={option.value} value={option.value}>{option.label} - {option.hint}</option>)}
         </select>
       </label>}
-      {settings.provider === 'mittwald' && settings.textProfile === 'custom' && <label className="field">
+      {usesProfiles && settings.textProfile === 'custom' && <label className="field">
         <span>Eigenes Text- &amp; Agentenmodell</span>
         <select className="input" value={settings.textModel} onChange={(event) => update('textModel', event.target.value)}>
-          {modelOptions.map((option) => <option key={option.value} value={option.value}>{option.label} - {option.hint}</option>)}
+          {modelOptions.filter(option => option.value !== 'GLM-OCR').map((option) => <option key={option.value} value={option.value}>{option.label} - {option.hint}</option>)}
         </select>
       </label>}
-      {settings.provider === 'mittwald' && <p className="helper ai-model-profile-note ai-field-wide">
-        <span>Beleganalyse: {AI_TASK_PROFILE_OPTIONS.invoice.find((option) => option.value === settings.invoiceProfile)?.description}</span>
-        <span>Text &amp; KI-Agent: {AI_TASK_PROFILE_OPTIONS.text.find((option) => option.value === settings.textProfile)?.description}</span>
+      {usesProfiles && <p className="helper ai-model-profile-note ai-field-wide">
+        <span>Beleganalyse: {settings.provider === 'mittwald' && modelLabel('invoice') !== 'GLM-OCR' ? 'GLM-OCR → ' : ''}{modelLabel('invoice')}</span>
+        <span>Text &amp; KI-Agent: {modelLabel('text')}</span>
       </p>}
       <div className="ai-settings-divider ai-field-wide"><strong>Buchungsentwürfe</strong></div>
       <label className="ai-field-wide" style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -103,25 +115,26 @@ export const AiSettingsDrawer = forwardRef<HTMLElement, Props>(function AiSettin
       <div className="ai-settings-divider ai-field-wide"><strong>Netzwerk &amp; Proxy</strong><span>Gilt nur für KI-Anfragen.</span></div>
       <label className="field">
         <span>Verbindungsmodus</span>
-        <select className="input" value={settings.proxyMode} onChange={(event) => { onInvalidateConnection(); update('proxyMode', event.target.value as TAiSettingsGetOutput['proxyMode']) }}>
+        <select className="input" value={settings.proxyMode} onChange={(event) => update('proxyMode', event.target.value as TAiSettingsGetOutput['proxyMode'])}>
           <option value="system">Systemproxy (empfohlen)</option><option value="direct">Direkt, ohne Proxy</option><option value="manual">Manueller Proxy</option>
         </select>
       </label>
       <p className="helper ai-network-help">Der Systemmodus übernimmt Betriebssystem, PAC und Firmenrichtlinien. Zugangsdaten bleiben in der Systemanmeldung und werden nicht in VereinO gespeichert.</p>
       {settings.proxyMode === 'manual' && <>
-        <label className="field ai-field-wide"><span>Proxy-Adresse</span><input className="input" value={settings.proxyUrl} onChange={(event) => { onInvalidateConnection(); update('proxyUrl', event.target.value) }} placeholder="http://proxy.firma.local:8080" spellCheck={false} /></label>
-        <label className="field ai-field-wide"><span>Proxy-Ausnahmen</span><input className="input" value={settings.proxyBypassRules} onChange={(event) => { onInvalidateConnection(); update('proxyBypassRules', event.target.value) }} placeholder="<local>;localhost;*.firma.local" spellCheck={false} /></label>
+        <label className="field ai-field-wide"><span>Proxy-Adresse</span><input className="input" value={settings.proxyUrl} onChange={(event) => update('proxyUrl', event.target.value)} placeholder="http://proxy.firma.local:8080" spellCheck={false} /></label>
+        <label className="field ai-field-wide"><span>Proxy-Ausnahmen</span><input className="input" value={settings.proxyBypassRules} onChange={(event) => update('proxyBypassRules', event.target.value)} placeholder="<local>;localhost;*.firma.local" spellCheck={false} /></label>
       </>}
       {connectionTest && <div className={`ai-network-result ai-field-wide ${connectionTest.ok ? 'is-success' : 'is-error'}`} role="status">
         <strong>{connectionTest.ok ? 'Verbindung erfolgreich' : 'Verbindung fehlgeschlagen'}</strong>
         {!connectionTest.ok && <span>{connectionTest.error}</span>}
-        {connectionTest.ok && connectionTest.availableModels && <span>{connectionTest.availableModels.length} Mitwald-Modelle geladen.</span>}
+        {connectionTest.ok && connectionTest.availableModels && <span>{connectionTest.availableModels.length} passende Modelle geladen.</span>}
         <small>Ziel: {connectionTest.targetUrl || settings.apiBaseUrl} · Route: {connectionTest.resolvedProxy || 'nicht ermittelt'}{connectionTest.errorCode ? ` · ${connectionTest.errorCode}` : ''}</small>
       </div>}
-    </div>
+      {connectionNeedsSave && <small className="helper ai-field-wide">Für den Verbindungstest zuerst die Einstellungen speichern.</small>}
+    </fieldset>
     <div className="ai-settings-actions">
       <button className="btn primary" disabled={busy} onClick={onSave}>Speichern</button>
-      <button className="btn" disabled={busy || !settings.hasApiKey} onClick={onTestConnection}>Verbindung testen</button>
+      <button className="btn" disabled={busy || !settings.hasApiKey || connectionNeedsSave} onClick={onTestConnection}>Verbindung testen</button>
     </div>
   </section>
 })

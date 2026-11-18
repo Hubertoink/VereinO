@@ -1,3 +1,4 @@
+import { AI_PROVIDER_CONFIG } from '../../../../shared/aiProviders'
 import CategoryIcon from '../common/CategoryIcon'
 import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import { useInvoicePaste } from '../../hooks/useInvoicePaste'
@@ -425,13 +426,7 @@ export default function LocalInvoiceScanModal({
       .then((settings) => {
         if (cancelled) return
         setAiAvailable(settings.hasApiKey)
-        setAiProvider(
-          settings.provider === 'openai'
-            ? 'OpenAI'
-            : settings.provider === 'mittwald'
-              ? 'Mittwald AI'
-              : 'KI'
-        )
+        setAiProvider(AI_PROVIDER_CONFIG[settings.provider].label)
       })
       .catch(() => {
         if (!cancelled) setAiAvailable(false)

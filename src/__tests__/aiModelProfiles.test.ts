@@ -5,6 +5,23 @@ import {
 } from '../../shared/aiModelProfiles'
 
 describe('AI model profiles', () => {
+  it.each([
+    ['openai', 'gpt-6-luna', 'gpt-6.1-terra', 'gpt-6.2-sol'],
+    ['anthropic', 'claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5']
+  ] as const)('resolves economical, document and quality models for %s', (provider, fast, balanced, quality) => {
+    const input = { provider, configuredModel: 'old-id' }
+    expect(resolveAiTaskModel({ ...input, task: 'invoice', profile: 'auto' })).toBe(balanced)
+    expect(resolveAiTaskModel({ ...input, task: 'text', profile: 'auto' })).toBe(fast)
+    expect(resolveAiTaskModel({ ...input, task: 'invoice', profile: 'fast' })).toBe(fast)
+    expect(resolveAiTaskModel({ ...input, task: 'text', profile: 'quality' })).toBe(quality)
+    expect(resolveAiTaskModel({ ...input, task: 'invoice', profile: 'quality', availableModels: [balanced] })).toBe(balanced)
+  })
+
+  it('selects Qwen 3.8 for demanding documents even if the retiring 122B model is still listed', () => {
+    expect(resolveAiTaskModel({ provider: 'mittwald', task: 'invoice', profile: 'quality',
+      configuredModel: 'Qwen3.5-122B-A10B-FP8', availableModels: ['Qwen3.8-27B-NVFP4', 'Qwen3.5-122B-A10B-FP8']
+    })).toBe('Qwen3.8-27B-NVFP4')
+  })
   it('uses Qwen 3.6 for the automatic invoice profile', () => {
     expect(
       resolveAiTaskModel({
