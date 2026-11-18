@@ -1,4 +1,6 @@
+import { OpeningMarker, OpeningTooltipLines } from '../../components/booking/AccountOpeningChart'
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { openingsByPeriod, sumOpeningCents } from '../../../../shared/accountOpening'
 import type { BalanceAreaChartProps } from './types'
 import { addDataChangedListener } from '../../utils/refresh'
 
@@ -33,7 +35,7 @@ function dayKeys(from: string, to: string): string[] {
   return out
 }
 
-export default function BalanceAreaChart({ from, to, baseSaldo }: BalanceAreaChartProps) {
+export default function BalanceAreaChart({ from, to, baseSaldo, openings }: BalanceAreaChartProps) {
   const [rows, setRows] = useState<Bucket[]>([])
   const [loading, setLoading] = useState(false)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
@@ -47,7 +49,7 @@ export default function BalanceAreaChart({ from, to, baseSaldo }: BalanceAreaCha
   useEffect(() => {
     let alive = true
     setLoading(true)
-    ;(async () => {
+    const load = async () => {
       try {
         const sameMonth = from?.slice(0,7) === to?.slice(0,7)
         if (sameMonth) {
@@ -89,19 +91,9 @@ export default function BalanceAreaChart({ from, to, baseSaldo }: BalanceAreaCha
       } catch {
         if (alive) setRows([])
       } finally { if (alive) setLoading(false) }
-    })()
-    const onChanged = () => {
-      // refresh when data changes globally
-      try { (window as any).api?.reports?.monthly?.({ from, to }).then((res: any) => {
-        const buckets: Bucket[] = (res?.buckets || res || []) as Bucket[]
-        const keys = monthKeys(from, to)
-        const map = new Map<string, Bucket>()
-        for (const b of buckets) map.set(String((b as any).month), { month: String((b as any).month), net: Number((b as any).net)||0, vat: Number((b as any).vat)||0, gross: Number((b as any).gross)||0 })
-        const filled = keys.map((k) => map.get(k) || { month: k, net: 0, vat: 0, gross: 0 })
-        setRows(filled)
-      }) } catch { }
     }
-    const removeDataChangedListener = addDataChangedListener(['vouchers'], onChanged)
+    void load()
+    const removeDataChangedListener = addDataChangedListener(['vouchers'], load)
     return () => { alive = false; removeDataChangedListener() }
   }, [from, to])
 
@@ -114,7 +106,8 @@ export default function BalanceAreaChart({ from, to, baseSaldo }: BalanceAreaCha
   const isMultiYear = yearSpan > 2
   
   // Convert signed values (IN positive, OUT negative) into a cumulative saldo over time
-  const baseSeries = rows.map(r => Number(r.gross) || 0)
+  const openingEntries = openingsByPeriod(openings ?? [], !!isDaily)
+  const baseSeries = rows.map(r => (Number(r.gross) || 0) + sumOpeningCents(openingEntries.get(r.month) ?? []) / 100)
   const series = (() => {
     let run = Number(baseSaldo || 0)
     return baseSeries.map(v => { run += v; return Math.round(run * 100) / 100 })
@@ -254,6 +247,7 @@ export default function BalanceAreaChart({ from, to, baseSaldo }: BalanceAreaCha
           {/* Dither Kit-style line glow, then a crisp foreground stroke. */}
           <polyline points={points} fill="none" stroke="var(--accent)" strokeWidth={7} opacity="0.2" filter={`url(#${auraId})`} />
           <polyline points={points} fill="none" stroke="var(--accent)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+          {labels.map((key, i) => <OpeningMarker key={key} entries={openingEntries.get(key)} x={xs(i, labels.length)} y={ys(series[i])} />)}
           {/* Ticks and labels */}
           {labels.map((m, i) => {
             if (i % tickEvery !== 0 && i !== labels.length - 1) return null
@@ -311,6 +305,7 @@ export default function BalanceAreaChart({ from, to, baseSaldo }: BalanceAreaCha
                   <div className="chart-tooltip-header">{labelText}</div>
                   <div className="helper" style={{ fontSize: 'var(--type-caption)', marginBottom: '2px' }}>Saldo kumuliert</div>
                   <div style={{ fontWeight: 700, color }}>{eur.format(val)}</div>
+                  <OpeningTooltipLines entries={openingEntries.get(key)} />
                 </>
               )
             })()}

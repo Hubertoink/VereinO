@@ -1,3 +1,5 @@
+import { openingCentsByPeriod, type AccountOpening } from '../../../../shared/accountOpening'
+
 export type MonthBucket = { month: string; gross: number }
 export type MonthRow = { month: string; income: number; expense: number; net: number; balance: number }
 
@@ -9,15 +11,16 @@ export function dashboardMonths(today: string, count: number): string[] {
   })
 }
 
-export function buildDashboardMonths(keys: string[], income: MonthBucket[], expense: MonthBucket[], opening: number): MonthRow[] {
+export function buildDashboardMonths(keys: string[], income: MonthBucket[], expense: MonthBucket[], opening: number, openings: AccountOpening[] = []): MonthRow[] {
   const ins = new Map(income.map(row => [row.month, row.gross]))
   const outs = new Map(expense.map(row => [row.month, -row.gross]))
+  const openingCents = openingCentsByPeriod(openings, false)
   let balance = opening
   return keys.map(month => {
     const incoming = ins.get(month) || 0
     const outgoing = outs.get(month) || 0
     const net = Math.round((incoming - outgoing) * 100) / 100
-    balance = Math.round((balance + net) * 100) / 100
+    balance = (Math.round((balance + net) * 100) + (openingCents.get(month) ?? 0)) / 100
     return { month, income: incoming, expense: outgoing, net, balance }
   })
 }

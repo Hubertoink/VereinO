@@ -4,6 +4,7 @@ export function buildFilterTotalsPayload(params: {
     paymentMethod?: 'BAR' | 'BANK'
     paymentAccountId?: number | null
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
+    primaryClassificationValueId?: number
     type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
     earmarkId?: number
     q?: string
@@ -15,6 +16,7 @@ export function buildFilterTotalsPayload(params: {
         paymentMethod: params.paymentMethod,
         paymentAccountId: params.paymentAccountId ?? undefined,
         sphere: params.sphere,
+        primaryClassificationValueId: params.primaryClassificationValueId,
         type: params.type,
         earmarkId: params.earmarkId,
         q: params.q,

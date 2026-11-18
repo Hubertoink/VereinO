@@ -360,8 +360,12 @@ import {
 } from '../services/taxExemption'
 import { getWeeklyQuote } from '../services/quotes'
 
+import { storeAccountOpening, previewOpeningVoucher } from '../repositories/accountOpenings'
 import { DbExportInput, DbExportOutput, DbImportInput, DbImportFromPathInput, DbImportFromPathOutput } from './schemas';
 import {
+  AccountOpeningChanges,
+  SetupAccountsInput,
+  OpeningVoucherInput,
   PaymentAccountsListInput,
   PaymentAccountsListOutput,
   PaymentAccountUpsertInput,
@@ -457,6 +461,7 @@ import {
 import {
   deletePaymentAccount,
   listPaymentAccounts,
+  configureSetupAccounts,
   upsertPaymentAccount
 } from '../repositories/paymentAccounts'
 import { archiveParty, getParty, listParties, upsertParty } from '../repositories/parties'
@@ -1457,6 +1462,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       paymentMethod: parsed.paymentMethod as any,
       paymentAccountId: parsed.paymentAccountId ?? undefined,
       sphere: parsed.sphere as any,
+      primaryClassificationValueId: parsed.primaryClassificationValueId,
       type: parsed.type as any,
       from: parsed.from,
       to: parsed.to,
@@ -1500,6 +1506,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   ipcMain.handle('reports.cashBalance', async (_e, payload) => {
     const parsed = ReportsCashBalanceInput.parse(payload)
     const res = cashBalance({
+      includeOpenings: parsed.includeOpenings,
       from: parsed.from,
       to: parsed.to,
       sphere: parsed.sphere as any,
@@ -1669,10 +1676,29 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const parsed = PaymentAccountsListInput.parse(payload)
     return PaymentAccountsListOutput.parse({ rows: listPaymentAccounts(parsed ?? undefined) })
   })
+  ipcMain.handle('paymentAccounts.previewOpeningVoucher', (_event, payload) => {
+    const { accountId, voucherNo } = OpeningVoucherInput.parse(payload)
+    return previewOpeningVoucher(accountId, voucherNo)
+  })
+  ipcMain.handle('paymentAccounts.configureSetup', (_event, payload) => {
+    const rows = configureSetupAccounts(SetupAccountsInput.parse(payload))
+    notifyDataChanged(['settings', 'vouchers'])
+    return PaymentAccountsListOutput.parse({ rows })
+  })
+  ipcMain.handle('paymentAccounts.setOpenings', (_event, payload) => {
+    const changes = AccountOpeningChanges.parse(payload)
+    const db = getDb()
+    db.transaction(() => {
+      for (const change of changes) {
+        storeAccountOpening(db, change.accountId, change.opening, undefined, change.previous)
+      }
+    })()
+    notifyDataChanged(['settings', 'vouchers'])
+  })
   ipcMain.handle('paymentAccounts.upsert', async (_e, payload) => {
     const parsed = PaymentAccountUpsertInput.parse(payload)
     const result = PaymentAccountUpsertOutput.parse(upsertPaymentAccount(parsed))
-    notifyDataChanged(['settings'])
+    notifyDataChanged(parsed.opening !== undefined ? ['settings', 'vouchers'] : ['settings'])
     return result
   })
   ipcMain.handle('paymentAccounts.delete', async (_e, payload) => {

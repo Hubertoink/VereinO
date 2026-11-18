@@ -30,7 +30,9 @@ test.beforeAll(async () => {
             row = { ...row, ...payload, budgets: payload.budgets.map(item => ({ ...item, label: budgets.find(b => b.id === item.budgetId).label })), earmarksAssigned: payload.earmarks.map(item => ({ ...item, code: 'SP' })) }
           }
         },
-        reports: { summary: async () => ({ byType: [{ key: 'OUT', gross: 500 }] }) }
+        reports: { cashBalance: async ({ to }) => ({ BAR: -1400, BANK: 1276.13, accounts: [
+          { id: 1, name: 'Bank', balance: to < '2026-01-01' ? 0 : 1276.13 }, { id: 2, name: 'Bar', balance: -1400 }
+        ] }), summary: async () => ({ byType: [{ key: 'OUT', gross: 500 }] }) }
       }
       function Harness() {
         const [calendar, setCalendar] = useState({ month: '2026-10', from: '', to: '' })

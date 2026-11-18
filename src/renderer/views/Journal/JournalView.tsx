@@ -1,3 +1,5 @@
+import { localIsoDate } from '../../../../shared/recurrence'
+import { openingLabel } from '../../utils/accountOpening'
 import ResponsiveSearch, { type ResponsiveSearchHandle } from '../../components/common/ResponsiveSearch'
 import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -21,7 +23,7 @@ import {
     normalizeVoucherBudgetAssignments,
     normalizeVoucherEarmarkAssignments
 } from '../../utils/voucherAssignmentFallbacks'
-import { LABEL_FOR_COL, type BookingEditTab as SharedBookingEditTab, type BudgetAssignment, type ColKey as SharedColKey, type EarmarkAssignment, type EditVoucherRow as SharedEditVoucherRow, type VoucherRow } from './types';
+import { LABEL_FOR_COL, type JournalSortKey, type BookingEditTab as SharedBookingEditTab, type BudgetAssignment, type ColKey as SharedColKey, type EarmarkAssignment, type EditVoucherRow as SharedEditVoucherRow, type VoucherRow } from './types';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { dispatchDataChanged } from '../../utils/refresh'
 import { encodeFileForUpload } from '../../utils/fileEncoding'
@@ -61,7 +63,7 @@ interface JournalViewProps {
     budgets: Array<{ id: number; year: number; name?: string | null; categoryName?: string | null; projectName?: string | null; color?: string | null }>
     // Shared global state
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
-    paymentAccounts: Array<{ id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder: number; isActive: number }>
+    paymentAccounts: Array<{ openingDate?: string | null; openingCents?: number | null; id: number; name: string; kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'; iban?: string | null; color?: string | null; sortOrder: number; isActive: number }>
     tagDefs: Array<{ id: number; name: string; color?: string | null; usage?: number }>
     budgetsForEdit: Array<{ id: number; label: string; year?: number; startDate?: string | null; endDate?: string | null; enforceTimeRange?: number; isArchived?: number; color?: string | null }>
     budgetNames: Map<number, string>
@@ -181,18 +183,6 @@ export default function JournalView({
         () => (paymentAccounts || []).filter((account) => account.isActive !== 0),
         [paymentAccounts]
     )
-    const defaultCashAccount = useMemo(
-        () => activePaymentAccounts.find((account) => account.kind === 'CASH') ?? activePaymentAccounts[0] ?? null,
-        [activePaymentAccounts]
-    )
-    const defaultBankAccount = useMemo(
-        () => activePaymentAccounts.find((account) => account.kind === 'BANK')
-            ?? activePaymentAccounts.find((account) => account.id !== defaultCashAccount?.id)
-            ?? activePaymentAccounts[0]
-            ?? null,
-        [activePaymentAccounts, defaultCashAccount]
-    )
-
     // ==================== STATE ====================
     // Pagination & Sorting
     const [rows, setRows] = useState<VoucherRow[]>([])
@@ -208,7 +198,7 @@ export default function JournalView({
         try { return (localStorage.getItem('journal.sortDir') as any) || 'DESC' }
         catch { return 'DESC' }
     })
-    const [sortBy, setSortBy] = useState<'date' | 'gross' | 'net' | 'budget' | 'earmark' | 'payment' | 'sphere'>(() => {
+    const [sortBy, setSortBy] = useState<JournalSortKey>(() => {
         try { return (localStorage.getItem('journal.sortBy') as any) || 'date' }
         catch { return 'date' }
     })
@@ -241,6 +231,8 @@ export default function JournalView({
     const activeFilterBudgetId = filterBudgetIdProp !== undefined ? filterBudgetIdProp : filterBudgetId
     const activeFilterTag = filterTagProp !== undefined ? filterTagProp : filterTag
     const activeQ = qProp !== undefined ? qProp : q
+    const openingAccount = activeFilterPaymentAccountId ? paymentAccountsById.get(activeFilterPaymentAccountId) : undefined
+    const journalOpening = openingAccount?.openingDate && openingAccount.openingDate <= (activeTo || localIsoDate()) ? openingAccount : undefined
     const debouncedQ = useDebouncedValue(activeQ, 250)
     const activePage = pageProp !== undefined ? pageProp : page
     const loadRequestIdRef = useRef(0)
@@ -320,6 +312,9 @@ export default function JournalView({
     const journalCols = useMemo(() => getEffectiveJournalCols(cols, allowVoucherDeletion), [allowVoucherDeletion, cols])
 
     const journalOrder = useMemo(() => getEffectiveJournalOrder(order, allowVoucherDeletion), [allowVoucherDeletion, order])
+    const setColumnVisibility = (key: ColKey, visible: boolean) => setCols({ ...cols, [key]: visible })
+    const visibleColumnCount = journalOrder.filter(key => journalCols[key]).length
+
 
     const setEditRow = useCallback((next: React.SetStateAction<EditVoucherRow | null>) => {
         setEditRowState((prev) => {
@@ -358,8 +353,8 @@ export default function JournalView({
     }, [])
 
     const hasActiveFilters = useMemo(() => {
-        return Boolean(stornoPairIds || activeFilterType || activeFilterPM || activeFilterPaymentAccountId || activeFilterTag || activeFilterSphere || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim())
-    }, [activeFilterBudgetId, activeFilterEarmark, activeFilterPM, activeFilterPaymentAccountId, activeFilterSphere, activeFilterTag, activeFilterType, activeFrom, activeQ, activeTo, stornoPairIds])
+        return Boolean(stornoPairIds || activeFilterType || activeFilterPM || activeFilterPaymentAccountId || activeFilterTag || activeFilterSphere || activeFilterPrimaryClassificationValueId || activeFilterEarmark || activeFilterBudgetId || activeFrom || activeTo || activeQ.trim())
+    }, [activeFilterBudgetId, activeFilterEarmark, activeFilterPM, activeFilterPaymentAccountId, activeFilterSphere, activeFilterPrimaryClassificationValueId, activeFilterTag, activeFilterType, activeFrom, activeQ, activeTo, stornoPairIds])
 
     const resetAllFilters = useCallback(() => {
         activeSetFilterType(null)
@@ -367,6 +362,7 @@ export default function JournalView({
         activeSetFilterPaymentAccountId(null)
         activeSetFilterTag(null)
         activeSetFilterSphere(null)
+        setFilterPrimaryClassificationValueId(null)
         activeSetFilterEarmark(null)
         activeSetFilterBudgetId(null)
         activeSetFrom('')
@@ -753,7 +749,7 @@ export default function JournalView({
             if (requestId === loadRequestIdRef.current) setRowsLoading(false)
         }
     // Include refreshKey so external data changes (QuickAdd, imports, etc.) trigger a reload
-    }, [journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterPaymentAccountId, activeFilterSphere, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, debouncedQ, activeFilterTag, stornoPairIds, notify, refreshKey])
+    }, [journalLimit, activePage, sortDir, sortBy, activeFilterPM, activeFilterPaymentAccountId, activeFilterSphere, activeFilterPrimaryClassificationValueId, activeFilterType, activeFrom, activeTo, activeFilterEarmark, activeFilterBudgetId, debouncedQ, activeFilterTag, stornoPairIds, notify, refreshKey])
 
     const getVoucherById = useCallback(async (id: number) => {
         const cached = voucherTooltipCache.current.get(id)
@@ -1045,10 +1041,11 @@ export default function JournalView({
                                             <label className="filter-dropdown__col-label">
                                                 <input
                                                     type="checkbox"
-                                                    checked={!!journalCols[k as ColKey]}
+                                                    checked={!!journalCols[k]}
+                                                    disabled={journalCols[k] && visibleColumnCount === 1}
                                                     onChange={(e) => {
                                                         e.stopPropagation()
-                                                        setCols({ ...journalCols, [k]: e.target.checked } as Record<ColKey, boolean>)
+                                                        setColumnVisibility(k, e.target.checked)
                                                     }}
                                                 />
                                                 <span>{LABEL_FOR_COL[k as ColKey] || k}</span>
@@ -1098,6 +1095,9 @@ export default function JournalView({
 
             {/* Filter Totals */}
             <FilterTotals
+                paymentAccounts={paymentAccounts}
+                primaryClassificationValueId={activeFilterPrimaryClassificationValueId ?? undefined}
+                stornoPairIds={stornoPairIds}
                 refreshKey={refreshKey}
                 from={activeFrom || undefined}
                 to={activeTo || undefined}
@@ -1118,6 +1118,7 @@ export default function JournalView({
                     {/* Pagination controls */}
                     <div className="pagination-bar">
                         <div className="pagination-bar__info">
+                            {journalOpening && <span className="helper">{openingLabel(journalOpening)}</span>}
                             <div className="pagination-bar__stat">
                                 <span>Gesamt:</span>
                                 <span className="pagination-bar__stat-value">{totalRows}</span>
@@ -1165,7 +1166,7 @@ export default function JournalView({
                         rows={rows}
                         order={journalOrder}
                         cols={journalCols}
-                        onSetColumnVisibility={(columnKey, visible) => setCols({ ...journalCols, [columnKey]: visible } as Record<ColKey, boolean>)}
+                        onSetColumnVisibility={setColumnVisibility}
                         onReorder={(o: any) => setOrder(o as any)}
                         earmarks={earmarks}
                         tagDefs={tagDefs}
@@ -1201,8 +1202,8 @@ export default function JournalView({
                             openEditRow(nextEdit)
                         }}
                         onDelete={(r) => setDeleteRow(r)}
-                        onToggleSort={(col: 'date' | 'net' | 'gross' | 'budget' | 'earmark' | 'payment' | 'sphere') => {
-                            setPage(1)
+                        onToggleSort={col => {
+                            activeSetPage(1)
                             setSortBy(col)
                             setSortDir(prev => (col === sortBy ? (prev === 'DESC' ? 'ASC' : 'DESC') : 'DESC'))
                         }}
@@ -1405,28 +1406,22 @@ export default function JournalView({
                                                     {(['IN','OUT','TRANSFER','INTERNAL'] as const).map(t => (
                                                         <button key={t} type="button" className={`btn ${editRow.type === t ? 'btn-toggle-active' : ''} ${t==='IN' ? 'btn-type-in' : t==='OUT' ? 'btn-type-out' : ''}`} onClick={() => {
                                                             const newRow = { ...editRow, type: t }
-                                                            if (t === 'TRANSFER' && (!newRow.transferFromAccountId || !newRow.transferToAccountId)) {
-                                                                newRow.transferFromAccountId = defaultCashAccount?.id ?? null
-                                                                newRow.transferFromAccountName = defaultCashAccount?.name ?? null
-                                                                newRow.transferFrom = defaultCashAccount?.kind === 'CASH' ? 'BAR' : 'BANK'
-                                                                newRow.transferToAccountId = defaultBankAccount?.id ?? null
-                                                                newRow.transferToAccountName = defaultBankAccount?.name ?? null
-                                                                newRow.transferTo = defaultBankAccount?.kind === 'CASH' ? 'BAR' : 'BANK'
-                                                                newRow.paymentAccountId = null
-                                                                newRow.paymentAccountName = null
-                                                            } else if (t === 'INTERNAL') {
+                                                            if (t === 'TRANSFER' || t === 'INTERNAL') {
                                                                 newRow.paymentAccountId = null
                                                                 newRow.paymentAccountName = null
                                                                 newRow.paymentMethod = null
+                                                            }
+                                                            if (t !== 'TRANSFER') {
                                                                 newRow.transferFromAccountId = null
+                                                                newRow.transferFromAccountName = null
+                                                                newRow.transferFrom = null
                                                                 newRow.transferToAccountId = null
+                                                                newRow.transferToAccountName = null
+                                                                newRow.transferTo = null
+                                                            }
+                                                            if (t === 'INTERNAL') {
                                                                 newRow.vatRate = 0
                                                                 ;(newRow as any).mode = 'GROSS'
-                                                            } else if (t !== 'TRANSFER' && !newRow.paymentAccountId) {
-                                                                const fallback = defaultCashAccount ?? defaultBankAccount
-                                                                newRow.paymentAccountId = fallback?.id ?? null
-                                                                newRow.paymentAccountName = fallback?.name ?? null
-                                                                newRow.paymentMethod = fallback?.kind === 'CASH' ? 'BAR' : 'BANK'
                                                             }
                                                             setEditRow(newRow)
                                                         }}>{t === 'IN' ? 'IN' : t === 'OUT' ? 'OUT' : t === 'TRANSFER' ? 'TRAN' : 'INT'}</button>

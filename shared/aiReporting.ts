@@ -1,3 +1,5 @@
+import { openingCentsByPeriod, type AccountOpening } from './accountOpening'
+
 /** Declarative report blocks. Values always come from a locally calculated dataset. */
 export type ReportScope = { from: string; to: string }
 export type ReportBookingSource = ReportScope & { type?: 'IN' | 'OUT' }
@@ -56,8 +58,10 @@ export function buildReportFinance(
   income: Array<{ month: string; gross: number }>,
   expense: Array<{ month: string; gross: number }>,
   opening: number,
-  generatedAt = new Date().toISOString()
+  generatedAt = new Date().toISOString(),
+  openings: AccountOpening[] = []
 ): ReportFinanceData {
+  const openingCents = openingCentsByPeriod(openings, false)
   const incoming = new Map(income.map((row) => [row.month, cents(row.gross)]))
   const outgoing = new Map(expense.map((row) => [row.month, -cents(row.gross)]))
   let balance = cents(opening),
@@ -72,7 +76,7 @@ export function buildReportFinance(
     const end = previousReportDay(date.toISOString().slice(0, 10))
     const ins = incoming.get(month) || 0,
       outs = outgoing.get(month) || 0
-    balance += ins - outs
+    balance += ins - outs + (openingCents.get(month) ?? 0)
     totalIn += ins
     totalOut += outs
     months.push({

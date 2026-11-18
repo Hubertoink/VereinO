@@ -1,6 +1,6 @@
 import CategoryIcon from '../../../components/common/CategoryIcon'
 ﻿import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import CompactPopover from '../../../components/CompactPopover'
 import { IconLock, IconPencil, IconRotateClockwise } from '@tabler/icons-react'
 import AppIcon from '../../../components/common/AppIcon'
 import { ICONS, IconBank, IconCash, IconPayPal, IconAttachment } from '../../../utils/icons';
@@ -12,7 +12,7 @@ import {
     normalizeVoucherEarmarkAssignments
 } from '../../../utils/voucherAssignmentFallbacks'
 import { getTransferTooltipTitle, truncateJournalDescription } from '../utils/journalDisplayHelpers'
-import { LABEL_FOR_COL, type BudgetAssignment, type EarmarkAssignment, type VoucherRow } from '../types'
+import { LABEL_FOR_COL, type ColKey, type JournalSortKey, type BudgetAssignment, type EarmarkAssignment, type VoucherRow } from '../types'
 
 type BudgetUsage = { inflow: number; spent: number; planned?: number; balance?: number; remaining?: number }
 type EarmarkUsage = { allocated: number; released: number; budget: number; balance: number; remaining: number }
@@ -347,9 +347,9 @@ function paymentAccountIcon(kind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'
 
 interface JournalTableProps {
     rows: VoucherRow[]
-    order: string[]
+    order: ColKey[]
     cols: Record<string, boolean>
-    onSetColumnVisibility?: (columnKey: string, visible: boolean) => void
+    onSetColumnVisibility?: (columnKey: ColKey, visible: boolean) => void
     onReorder: (o: string[]) => void
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
     tagDefs: Array<{ id: number; name: string; color?: string | null; usage?: number }>
@@ -395,9 +395,9 @@ interface JournalTableProps {
         earmarksAssigned?: EarmarkAssignment[]
     }) => void
     onDelete: (r: { id: number; voucherNo: string; description?: string | null }) => void
-    onToggleSort: (col: 'date' | 'net' | 'gross' | 'budget' | 'earmark' | 'payment' | 'sphere') => void
+    onToggleSort: (col: JournalSortKey) => void
     sortDir: 'ASC' | 'DESC'
-    sortBy: 'date' | 'net' | 'gross' | 'budget' | 'earmark' | 'payment' | 'sphere'
+    sortBy: JournalSortKey
     onTagClick?: (name: string) => void
     onEarmarkClick?: (id: number) => void
     onBudgetClick?: (id: number) => void
@@ -458,8 +458,9 @@ export default function JournalTable({
         observer.observe(element)
         return () => observer.disconnect()
     }, [])
-    const visibleOrder = compact ? ['date', 'description', 'gross'] : order.filter(k => cols[k])
-    const [headerMenu, setHeaderMenu] = useState<{ columnKey: string; x: number; y: number } | null>(null)
+    const configuredColumns = order.filter(key => cols[key])
+    const visibleOrder: ColKey[] = compact ? ['date', 'description', 'gross'] : configuredColumns
+    const [headerMenu, setHeaderMenu] = useState<{ trigger: HTMLElement; x: number; y: number } | null>(null)
 
     const budgetUsageCache = useRef(new Map<number, any>())
     const budgetUsageInFlight = useRef(new Map<number, Promise<any>>())
@@ -598,24 +599,6 @@ export default function JournalTable({
         }
     }, [columnWidths])
 
-    useEffect(() => {
-        if (!headerMenu) return
-        const close = () => setHeaderMenu(null)
-        const closeOnEscape = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') close()
-        }
-        window.addEventListener('mousedown', close)
-        window.addEventListener('scroll', close, true)
-        window.addEventListener('resize', close)
-        window.addEventListener('keydown', closeOnEscape)
-        return () => {
-            window.removeEventListener('mousedown', close)
-            window.removeEventListener('scroll', close, true)
-            window.removeEventListener('resize', close)
-            window.removeEventListener('keydown', closeOnEscape)
-        }
-    }, [headerMenu])
-
     // Handle resize start
     const handleResizeStart = useCallback((e: React.MouseEvent, colKey: string) => {
         e.preventDefault()
@@ -681,27 +664,24 @@ export default function JournalTable({
         next.splice(b, 0, moved)
         onReorder(next)
     }
-    const renderSortIcon = (col: 'date' | 'net' | 'gross' | 'budget' | 'earmark' | 'payment' | 'sphere') => {
+    const renderSortIcon = (col: JournalSortKey) => {
         const active = sortBy === col
         const sym = active ? (sortDir === 'DESC' ? ICONS.ARROW_DOWN : ICONS.ARROW_UP) : ICONS.ARROW_BOTH
         const color = active ? 'var(--warning)' : 'var(--text-dim)'
         return <span className={`sort-icon ${active ? 'active' : 'inactive'}`} aria-hidden="true" style={{ color }}>{sym}</span>
     }
-    const openHeaderMenu = useCallback((event: React.MouseEvent, columnKey: string) => {
+    const openHeaderMenu = (event: React.MouseEvent<HTMLElement>) => {
         event.preventDefault()
         event.stopPropagation()
-        setHeaderMenu({ columnKey, x: event.clientX, y: event.clientY })
-    }, [])
-    const hideColumn = useCallback((columnKey: string) => {
-        if (visibleOrder.length <= 1) return
-        onSetColumnVisibility?.(columnKey, false)
-        setHeaderMenu(null)
-    }, [onSetColumnVisibility, visibleOrder.length])
-    const thFor = (k: string) => (
+        const trigger = event.currentTarget
+        const rect = trigger.getBoundingClientRect()
+        setHeaderMenu({ trigger, x: event.clientX || rect.left, y: event.clientY || rect.bottom })
+    }
+    const thFor = (k: ColKey) => (
         k === 'actions' ? <th key={k} align="center" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Aktionen</th>
             : k === 'date' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('date')} style={{ cursor: 'pointer' }}>Datum {renderSortIcon('date')}</th>
                 : k === 'voucherNo' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Nr.</th>
-                    : k === 'type' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Art</th>
+                    : k === 'type' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} className="sortable" onClick={() => onToggleSort('type')}>Art {renderSortIcon('type')}</th>
                         : k === 'sphere' ? <th key={k} className="sortable" align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))} onClick={() => onToggleSort('sphere')}>{isGeneralProfile ? 'Kategorie' : 'Sphäre'} {renderSortIcon('sphere')}</th>
                             : k === 'description' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Beschreibung</th>
                                 : k === 'note' ? <th key={k} align="left" draggable onDragStart={(e) => onHeaderDragStart(e, visibleOrder.indexOf(k))} onDragOver={onHeaderDragOver} onDrop={(e) => onHeaderDrop(e, visibleOrder.indexOf(k))}>Kommentar</th>
@@ -1075,7 +1055,7 @@ export default function JournalTable({
                                     onDragStart: compact ? undefined : th.props.onDragStart,
                                     onDragOver: compact ? undefined : th.props.onDragOver,
                                     onDrop: compact ? undefined : th.props.onDrop,
-                                    onContextMenu: compact ? undefined : (event: React.MouseEvent) => openHeaderMenu(event, k),
+                                    onContextMenu: onSetColumnVisibility ? openHeaderMenu : undefined,
                                     children: (
                                         <>
                                             {th.props.children}
@@ -1112,36 +1092,19 @@ export default function JournalTable({
                     <span>Ende der Seite</span>
                 </div>
             </div>
-            {headerMenu ? createPortal(
-                <div
-                    className="journal-header-menu flyout-popover"
-                    style={{
-                        position: 'fixed',
-                        left: Math.min(headerMenu.x, window.innerWidth - 240),
-                        top: Math.min(headerMenu.y, window.innerHeight - 120),
-                        zIndex: 1200,
-                        padding: '8px',
-                        minWidth: 220
-                    }}
-                    onMouseDown={(event) => event.stopPropagation()}
-                >
-                    <div className="journal-header-menu__title">
-                        {LABEL_FOR_COL[headerMenu.columnKey as keyof typeof LABEL_FOR_COL] || headerMenu.columnKey}
-                    </div>
-                    <button
-                        className="btn journal-header-menu__item"
-                        type="button"
-                        disabled={visibleOrder.length <= 1}
-                        onClick={() => hideColumn(headerMenu.columnKey)}
-                    >
-                        Spalte ausblenden
-                    </button>
-                    {visibleOrder.length <= 1 ? (
-                        <div className="helper journal-header-menu__hint">Mindestens eine Spalte muss sichtbar bleiben.</div>
-                    ) : null}
-                </div>,
-                document.body
-            ) : null}
+            {headerMenu && onSetColumnVisibility && <CompactPopover label="Spalten anzeigen" anchor={headerMenu} onClose={() => setHeaderMenu(null)}>
+                {order.map(key => {
+                    const locked = !!cols[key] && configuredColumns.length === 1
+                    return <label key={key} className="compact-popover-choice" title={locked ? 'Mindestens eine Spalte muss sichtbar bleiben.' : undefined}>
+                        <span>{key === 'sphere' && isGeneralProfile ? 'Kategorie' : LABEL_FOR_COL[key]}</span>
+                        <input type="checkbox" checked={!!cols[key]} disabled={locked} onChange={event => {
+                            onSetColumnVisibility(key, event.target.checked)
+                            if (compact) setShowFullTable(true)
+                        }} />
+                    </label>
+                })}
+                {compact && <p className="compact-popover__hint">Eine Änderung öffnet die Ansicht mit deinen gewählten Spalten.</p>}
+            </CompactPopover>}
         </>
     )
 }

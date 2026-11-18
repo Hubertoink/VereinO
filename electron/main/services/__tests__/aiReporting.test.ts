@@ -1,3 +1,4 @@
+jest.mock('../../repositories/accountOpenings', () => ({ listAccountOpenings: jest.fn(() => []) }))
 jest.mock('../../repositories/vouchers', () => ({ monthlyVouchers: jest.fn() }))
 jest.mock('../dashboardSnapshot', () => ({ getDashboardSnapshot: jest.fn(() => ({ members: {}, invoices: {} })) }))
 jest.mock('../../repositories/budgets', () => ({ listBudgets: jest.fn(() => []) }))

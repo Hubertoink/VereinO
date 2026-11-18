@@ -113,7 +113,7 @@ describe('advanced voucher queries', () => {
   })
 
   test.each([
-    ['date', [2, 3]], ['description', [2, 4]], ['gross', [2, 3]], ['net', [2, 3]],
+    ['date', [2, 3]], ['type', [2, 4]], ['description', [2, 4]], ['gross', [2, 3]], ['net', [2, 3]],
     ['attachments', [4, 2]], ['budget', [3, 4]], ['earmark', [3, 4]], ['payment', [1, 4]], ['sphere', [2, 3]]
   ] as const)(
     'keeps sorting and pagination equivalent for %s', (sortBy, expected) => {

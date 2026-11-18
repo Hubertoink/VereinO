@@ -1,3 +1,5 @@
+import { sumOpeningCents } from '../../../shared/accountOpening'
+import { listAccountOpenings } from '../repositories/accountOpenings'
 import { zodTextFormat } from 'openai/helpers/zod'
 import {
   buildReportFinance,
@@ -18,6 +20,7 @@ export function getDefaultReportScope() {
   const budgets = listBudgets({ includeArchived: true })
   return defaultReportScope(today, [
     ...months,
+    ...listAccountOpenings(today).map(row => row.date.slice(0, 7)),
     ...budgets.map((row) => (row.startDate || `${row.year}-01-01`).slice(0, 7))
   ])
 }
@@ -32,6 +35,7 @@ export async function generateReportAnswer(raw: ReportQuestion, aiRules: AiConte
   const input = AiReportQuestionInput.parse(raw)
   const scope = { from: input.from, to: input.to }
   // Read every source before awaiting the model, so an organization switch cannot mix datasets.
+  const accountOpenings = listAccountOpenings(scope.to)
   const opening =
     monthlyVouchers({ to: previousReportDay(scope.from) }).reduce(
       (sum, row) => sum + Math.round(row.gross * 100),
@@ -41,7 +45,9 @@ export async function generateReportAnswer(raw: ReportQuestion, aiRules: AiConte
     scope,
     monthlyVouchers({ ...scope, type: 'IN' }),
     monthlyVouchers({ ...scope, type: 'OUT' }),
-    opening
+    opening + sumOpeningCents(accountOpenings.filter(row => row.date < scope.from)) / 100,
+    undefined,
+    accountOpenings.filter(row => row.date >= scope.from)
   )
   const today = new Intl.DateTimeFormat('sv-SE').format(new Date())
   const snapshot = getDashboardSnapshot({ ...scope, today })
@@ -57,7 +63,7 @@ export async function generateReportAnswer(raw: ReportQuestion, aiRules: AiConte
       'Für reine Zahlenfragen kann metrics genügen. Bei Entwicklungen nutze balance, gegebenenfalls mit metrics. Für andere Fragen oder wenn die verlangte Auswertung nicht aus den Daten beantwortbar ist, lasse blocks leer. Erfinde keine Einzelbuchungen, Konten- oder Kategorienwerte.',
       'Die Daten gelten exakt für scope. Wenn die Frage einen anderen Zeitraum, einzelne Konten oder Kategorien verlangt, die nicht abgedeckt sind, lasse blocks leer und benenne die fehlende Auswertung. Schlage dann eine passende Detailabfrage vor.',
       'summary: höchstens drei kurze Sätze, keine Listen, keine Wiederholung aller Kennzahlen. notes: nur hilfreiche Einschränkungen, keine Wiederholung der Zusammenfassung.',
-      'change ist die Veränderung im Zeitraum. closing ist der gebuchte Gesamtbestand einschließlich opening, kein bestätigter Bankkontostand. Beträge sind brutto in EUR. Transfers und interne Buchungen verändern den Gesamtbestand nicht.',
+      'change ist Einnahmen minus Ausgaben im Zeitraum. Hinterlegte Kontoanfangsbestände erhöhen oder vermindern den Bestand zusätzlich ab ihrem Stichtag. closing ist der gebuchte Gesamtbestand einschließlich opening, kein bestätigter Bankkontostand. Beträge sind brutto in EUR. Transfers und interne Buchungen verändern den Gesamtbestand nicht.',
       'Monate ohne Bewegung bedeuten nicht, dass keine Buchungen existieren. hasBookings=false bedeutet keine Einnahmen-/Ausgabenbuchungen im gewählten Zeitraum.',
       'Offene Posten und Mitglieder sind Stichtagswerte von heute; sie gehören nicht zum gebuchten Bestand. Ein negativer Buchbestand belegt alleine keinen tatsächlichen Liquiditätsengpass.',
       'Bei vereinsfremden Fragen erkläre kurz den Reporting-Fokus und lasse blocks leer.',

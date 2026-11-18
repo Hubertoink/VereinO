@@ -1,8 +1,10 @@
+import { OpeningCaption } from '../../components/booking/AccountOpeningChart'
 import AssignmentOverview from '../../components/finance/AssignmentOverview'
 import EarmarkUsageCards from '../../components/tiles/EarmarkUsageCards'
 import { IconPlus, IconPencil, IconTrash, IconRotateClockwise, IconCalendarRepeat, IconLink, IconCheck, IconHistory, IconReceipt2, IconChevronRight } from '@tabler/icons-react'
 import { activityAction, activityFallback, bookingKindLabel, paymentKindLabel, sphereLabel } from './activityPresentation'
 import React, { useEffect, useMemo, useState } from 'react'
+import { sumOpeningCents, type AccountOpening } from '../../../../shared/accountOpening'
 import BalanceAreaChart from './BalanceAreaChart'
 import IncomeExpenseBars from './IncomeExpenseBars'
 import ReportsMonthlyChart from './charts/ReportsMonthlyChart'
@@ -149,6 +151,7 @@ export default function DashboardView({
   }, [yearsAvail, period])
 
   const [sum, setSum] = useState<null | { inGross: number; outGross: number; diff: number }>(null)
+  const [openings, setOpenings] = useState<AccountOpening[]>([])
   const [openingSaldo, setOpeningSaldo] = useState<number>(0)
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
 
@@ -219,6 +222,7 @@ export default function DashboardView({
         })
         if (cancelled) return
         setSum(snapshot.financial)
+        setOpenings(snapshot.openings ?? [])
         setOpeningSaldo(snapshot.openingSaldo)
         setYearsAvail((current) => (
           current.length === snapshot.years.length && current.every((year, index) => year === snapshot.years[index])
@@ -324,9 +328,10 @@ export default function DashboardView({
           <div className="helper">Saldo ({period === 'MONAT' ? 'Monat' : period === 'JAHR' ? 'Jahr' : period === 'DREI_JAHRE' ? '3 Jahre' : 'Gesamt'}{(includePrevSaldo && period !== 'GESAMT') ? ' inkl. Anfangsbestand' : ''})</div>
             {(() => {
               const base = (includePrevSaldo && period !== 'GESAMT') ? (openingSaldo || 0) : 0
-              const val = Math.round(((sum?.diff || 0) + base) * 100) / 100
+              const val = Math.round(((sum?.diff || 0) + base + (period === 'GESAMT' || includePrevSaldo ? sumOpeningCents(openings) / 100 : 0)) * 100) / 100
               return <div className={`summary-value ${val >= 0 ? 'dashboard-value-positive' : 'dashboard-value-negative'}`}>{eur.format(val)}</div>
             })()}
+          {(period === 'GESAMT' || includePrevSaldo) && <OpeningCaption entries={openings} />}
         </div>
       </div>
       <div className="dashboard-operational-grid">
@@ -448,8 +453,8 @@ export default function DashboardView({
           <>
             <div className="dashboard-chart-stack">
               <div className="dashboard-chart-pair">
-                <BalanceAreaChart {...balanceFilters} baseSaldo={baseSaldo} />
-                <ReportsMonthlyChart from={balanceFilters.from} to={balanceFilters.to} baseSaldo={baseSaldo} />
+                <BalanceAreaChart {...balanceFilters} baseSaldo={baseSaldo} openings={period === 'GESAMT' || includePrevSaldo ? openings : undefined} />
+                <ReportsMonthlyChart from={balanceFilters.from} to={balanceFilters.to} baseSaldo={baseSaldo} openings={period === 'GESAMT' || includePrevSaldo ? openings : undefined} />
               </div>
               {/* Removed Offene Aufgaben and legacy Sphären‑Anteile/Usage tiles */}
               {/* Two-column layout: Budgets (max 2) left, Zweckbindungen (max 2) right */}
@@ -462,7 +467,7 @@ export default function DashboardView({
                 </div>
               </div>
               <div className="dashboard-chart-secondary-grid">
-                <ReportsCashBars from={balanceFilters.from} to={balanceFilters.to} />
+                <ReportsCashBars openings={openings} from={balanceFilters.from} to={balanceFilters.to} />
                 <SphereShareCard from={balanceFilters.from} to={balanceFilters.to} />
               </div>
               <IncomeExpenseBars {...balanceFilters} />
@@ -569,6 +574,11 @@ export function DashboardRecentActivity({
     const a = String(row.action || '').toUpperCase()
     const e = String(row.entity || '').toUpperCase()
     const d = row.diff || {}
+    if (a === 'OPENING_BALANCE') {
+      const entry = d.after ?? d.before
+      return { title: d.after ? 'Anfangsbestand gespeichert' : 'Anfangsbestand entfernt', details: `Konto #${row.entityId} · ${entry.date} · ${eur.format(entry.amountCents / 100)}` }
+    }
+    if (a === 'CONVERT_TO_OPENING') return { title: 'Buchung als Anfangsbestand übernommen', details: d.voucher?.voucher_no }
     const voucherLabel = row.voucherNo ? `#${row.voucherNo}` : (row.voucherId ? `#${row.voucherId}` : '')
     const voucherText = row.voucherDescription ? ` · ${String(row.voucherDescription).trim()}` : ''
     const bankLine = [row.bankCounterparty, row.bankPurpose].map((value: any) => String(value || '').trim()).filter(Boolean).join(' · ')

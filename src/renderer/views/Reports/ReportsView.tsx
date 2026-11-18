@@ -1,3 +1,5 @@
+import ReportCurrentBalances from '../../components/reports/ReportCurrentBalances'
+import type { BalanceAccount } from '../../utils/accountBalance'
 import React from 'react'
 import '../DashboardPlus/dashboardPlus.css'
 import './reports.css'
@@ -14,6 +16,7 @@ import ExportOptionsModal from '../../components/modals/ExportOptionsModal'
 import ActivityReportEditorModal from './ActivityReportEditorModal'
 
 export default function ReportsView(props: {
+  paymentAccounts: BalanceAccount[]
   from: string
   to: string
   setFrom: (v: string) => void
@@ -177,7 +180,7 @@ export default function ReportsView(props: {
       <header className="dp-page-heading">
         <div>
           <h1>Report</h1>
-          <p className="helper">Auswertungen für den gewählten Zeitraum und die Filter.</p>
+          <p className="helper">Aktuelle Kontostände und Buchungen im gewählten Zeitraum.</p>
         </div>
 
         <div className="flex gap-8 items-center report-toolbar-actions">
@@ -306,7 +309,8 @@ export default function ReportsView(props: {
       )}
 
       {/* KPIs and charts */}
-      <ReportsSummary refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
+      <ReportCurrentBalances refreshKey={refreshKey} paymentAccounts={props.paymentAccounts} />
+      <ReportsSummary monthly={monthly.loading || monthly.error ? undefined : monthly.model} refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
       <div className="reports-chart-grid">
         <ReportsSphereDonut refreshKey={refreshKey} from={from || undefined} to={to || undefined} type={filterType || undefined} paymentMethod={filterPM || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />
         <ReportsPaymentMethodBars refreshKey={refreshKey} from={from || undefined} to={to || undefined} sphere={filterSphere || undefined} type={filterType || undefined} earmarkId={filterEarmark || undefined} budgetId={filterBudgetId || undefined} />

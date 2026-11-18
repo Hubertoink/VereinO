@@ -3,6 +3,8 @@
  * Generates annual financial reports with sphere separation for German non-profit organizations
  */
 
+import { sumOpeningCents } from '../../../shared/accountOpening'
+import { listAccountOpenings } from '../repositories/accountOpenings'
 import { writeReportPdf } from './reportPdf'
 import { escapeReportHtml as esc, voucherDescriptionHtml } from './reportHtml'
 import { summarizeVouchers, listVouchersAdvanced, cashBalance } from '../repositories/vouchers'
@@ -76,6 +78,10 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
     // If previous year data doesn't exist, opening balance is 0
     openingBalance = 0
   }
+
+  const openings = listAccountOpenings(to, from)
+  openingBalance += sumOpeningCents(openings.filter(row => row.date === from)) / 100
+  const addedOpenings = sumOpeningCents(openings.filter(row => row.date > from)) / 100
 
   // 2. Get overall summary for the fiscal year (used to compute movement)
   const summary = summarizeVouchers({ from, to, includeInternalVouchers } as any)
@@ -188,7 +194,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
 
   // 3. Derive balances: Endbestand = Anfangsbestand + (IN - OUT)
   const yearMovement = (Number(totalInGross) || 0) - (Number(totalOutGross) || 0)
-  const closingBalance = (Number(openingBalance) || 0) + yearMovement
+  const closingBalance = (Number(openingBalance) || 0) + yearMovement + addedOpenings
   // All-time total balance equals end-of-year closing balance when reporting for a fiscal year
   const totalBalance = closingBalance
   const activityOffset = activityReport ? 1 : 0
@@ -407,6 +413,7 @@ export async function generateFiscalReportPDF(options: FiscalReportOptions): Pro
       <span class="summary-label">Anfangsbestand (01.01.${fiscalYear}):</span>
       <span class="summary-value">${euro(openingBalance)}</span>
     </div>
+    ${addedOpenings ? `<div class="summary-row"><span class="summary-label">Im Jahresverlauf übernommene Kontobestände:</span><span class="summary-value">${euro(addedOpenings)}</span></div>` : ''}
     <div class="summary-row">
       <span class="summary-label">Einnahmen gesamt (Brutto):</span>
       <span class="summary-value positive">+ ${euro(totalInGross)}</span>

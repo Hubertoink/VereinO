@@ -1,3 +1,7 @@
+import type { TSetupAccountsInput } from '../ipc/schemas'
+import type { AccountOpening } from '../../../shared/accountOpening'
+import { ensurePeriodOpen } from '../services/settings'
+import { storeAccountOpening } from './accountOpenings'
 import Database from 'better-sqlite3'
 import { getDb } from '../db/database'
 
@@ -33,14 +37,15 @@ export function listPaymentAccounts(opts?: { activeOnly?: boolean }) {
       color,
       sort_order as sortOrder,
       is_active as isActive,
+      o.amount_cents AS openingCents, o.effective_date AS openingDate,
       (SELECT COUNT(*) FROM vouchers v
        WHERE v.payment_account_id = payment_accounts.id
           OR v.transfer_from_account_id = payment_accounts.id
           OR v.transfer_to_account_id = payment_accounts.id) as bookingCount
-    FROM payment_accounts
+    FROM payment_accounts LEFT JOIN payment_account_openings o ON o.account_id = payment_accounts.id
     ${whereSql}
     ORDER BY is_active DESC, sort_order ASC, name COLLATE NOCASE ASC, id ASC
-  `).all() as (PaymentAccountRow & { bookingCount: number })[]
+  `).all() as (PaymentAccountRow & { bookingCount: number; openingCents: number | null; openingDate: string | null })[]
 }
 
 export function getPaymentAccountById(id: number, d: DB = getDb()) {
@@ -78,6 +83,9 @@ export function upsertPaymentAccount(input: {
   color?: string | null
   sortOrder?: number
   isActive?: boolean
+  opening?: AccountOpening | null
+  previousOpening?: AccountOpening | null
+  openingVoucherNo?: string
 }) {
   const d = getDb()
   const name = String(input.name || '').trim()
@@ -88,19 +96,59 @@ export function upsertPaymentAccount(input: {
     const row = d.prepare('SELECT COALESCE(MAX(sort_order), 0) as maxSortOrder FROM payment_accounts').get() as { maxSortOrder?: number } | undefined
     return Math.max(1, Number(row?.maxSortOrder || 0) + 1)
   })()
-  if (input.id) {
-    d.prepare(`
-      UPDATE payment_accounts
-      SET name = ?, kind = ?, iban = ?, color = ?, sort_order = ?, is_active = ?
-      WHERE id = ?
-    `).run(name, input.kind, input.iban ?? null, input.color ?? null, resolvedSortOrder, input.isActive === false ? 0 : 1, input.id)
-    return { id: input.id }
+  const saveAccount = () => {
+    if (input.id) {
+      const reclassified = d.prepare(`SELECT o.effective_date AS date FROM payment_accounts a
+        JOIN payment_account_openings o ON o.account_id = a.id
+        WHERE a.id = ? AND (a.kind = 'CASH') <> (? = 'CASH')`).get(input.id, input.kind) as { date: string } | undefined
+      if (reclassified) ensurePeriodOpen(reclassified.date, d)
+      const result = d.prepare(`
+        UPDATE payment_accounts
+        SET name = ?, kind = ?, iban = ?, color = ?, sort_order = ?, is_active = ?
+        WHERE id = ?
+      `).run(name, input.kind, input.iban ?? null, input.color ?? null, resolvedSortOrder, input.isActive === false ? 0 : 1, input.id)
+      if (!result.changes) throw new Error('Zahlungskonto wurde nicht gefunden.')
+      return { id: input.id }
+    }
+    const info = d.prepare(`
+      INSERT INTO payment_accounts(name, kind, iban, color, sort_order, is_active)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(name, input.kind, input.iban ?? null, input.color ?? null, resolvedSortOrder, input.isActive === false ? 0 : 1)
+    return { id: Number(info.lastInsertRowid) }
   }
-  const info = d.prepare(`
-    INSERT INTO payment_accounts(name, kind, iban, color, sort_order, is_active)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(name, input.kind, input.iban ?? null, input.color ?? null, resolvedSortOrder, input.isActive === false ? 0 : 1)
-  return { id: Number(info.lastInsertRowid) }
+  if (input.opening === undefined && !input.openingVoucherNo) return saveAccount()
+  return d.transaction(() => {
+    const result = saveAccount()
+    storeAccountOpening(d, result.id, input.opening ?? null, input.openingVoucherNo, input.previousOpening)
+    return result
+  })()
+}
+
+export function configureSetupAccounts(input: TSetupAccountsInput): ReturnType<typeof listPaymentAccounts> {
+  const db = getDb()
+  return db.transaction(() => {
+    const existing = listPaymentAccounts()
+    const names = new Set(existing.map(account => account.name.trim().toLocaleLowerCase('de')))
+    for (const entry of input.create) {
+      const name = entry.name.trim().toLocaleLowerCase('de')
+      if (names.has(name)) throw new Error(`Ein Konto namens „${entry.name}“ ist bereits vorhanden.`)
+      const { id } = upsertPaymentAccount({ name: entry.name, kind: entry.kind })
+      if (entry.opening) storeAccountOpening(db, id, entry.opening)
+      names.add(name)
+    }
+    for (const { accountId, active } of input.activation) {
+      const account = existing.find(row => row.id === accountId)
+      if (!account) throw new Error('Dieses Konto existiert nicht mehr.')
+      if (!active && (account.bookingCount || account.openingCents)) {
+        throw new Error(`„${account.name}“ hat bereits Buchungen oder einen Anfangsbestand. Du kannst es in den Einstellungen archivieren.`)
+      }
+      db.prepare('UPDATE payment_accounts SET is_active = ? WHERE id = ?').run(Number(active), accountId)
+    }
+    for (const change of input.openings) {
+      storeAccountOpening(db, change.accountId, change.opening, undefined, change.previous)
+    }
+    return listPaymentAccounts()
+  })()
 }
 
 export function deletePaymentAccount(id: number) {
@@ -114,6 +162,9 @@ export function deletePaymentAccount(id: number) {
   `).get(id, id, id) as { inUse?: number } | undefined
   if (usage?.inUse) {
     throw new Error('Dieses Konto wird bereits in Buchungen verwendet und kann nicht gelöscht werden.')
+  }
+  if (d.prepare('SELECT 1 FROM payment_account_openings WHERE account_id = ?').get(id)) {
+    throw new Error('Dieses Konto hat einen Anfangsbestand. Du kannst es archivieren.')
   }
   d.prepare('DELETE FROM payment_accounts WHERE id = ?').run(id)
   return { id }

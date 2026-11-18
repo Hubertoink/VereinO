@@ -1,3 +1,7 @@
+import BookingBalanceStat from '../../components/booking/BookingBalanceStat'
+import YearRangeSelect from '../../components/common/YearRangeSelect'
+import { accountPositionAt, type CashBalance } from '../../utils/accountBalance'
+import { openingLabel } from '../../utils/accountOpening'
 import CategoryIcon from '../../components/common/CategoryIcon'
 import ResponsiveSearch from '../../components/common/ResponsiveSearch'
 import ModalHeader from '../../components/ModalHeader'
@@ -20,6 +24,7 @@ import { calendarDays, isoDate, kinds, monthRange, mutationBlock, paymentLabel, 
 import './bookingsPlus.css'
 
 type Props = {
+    yearsAvail?: number[]
     onResetFilters: () => void
     calendarSelection: { month: string; from: string; to: string }
     onCalendarSelectionChange: (selection: { month: string; from: string; to: string }) => void
@@ -39,7 +44,7 @@ type Props = {
     onNewInvoice: React.ComponentProps<typeof InvoiceBatchControl>['onNewInvoice']
     onReviewInvoice: (id: number) => void
     notify: (type: 'info' | 'success' | 'error', message: string) => void
-    paymentAccounts: Array<{ id: number; name: string; kind?: BookingPlusRow['paymentAccountKind']; color?: string | null }>
+    paymentAccounts: Array<{ openingDate?: string | null; openingCents?: number | null; id: number; name: string; kind?: BookingPlusRow['paymentAccountKind']; color?: string | null }>
     budgets: Array<{ id: number; label: string; color?: string | null }>
     earmarks: Array<{ id: number; code: string; name: string; color?: string | null }>
     tagDefs: Array<{ id: number; name: string; color?: string | null }>
@@ -56,7 +61,7 @@ const signedMoney = new Intl.NumberFormat('de-DE', { style: 'currency', currency
 const prettyDate = (date: string) => new Date(`${date.slice(0, 10)}T12:00:00`).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })
 const limit = 20
 
-export default function BookingsPlusView({ showCreationActions = true, onFilterChange, calendarSelection, onCalendarSelectionChange, externalFilters, jumpRevision, flashId, showBookingDraftTabs, bookingDraftTabs = [], onOpenBookingDraft, onCloseBookingDraft, fmtDate, onNewBooking, onEditBooking, bookingEntryPresentation, onNewInvoice, onReviewInvoice, notify, paymentAccounts, budgets, earmarks, tagDefs, allowVoucherDeletion, closedUntil, generalProfile }: Props) {
+export default function BookingsPlusView({ yearsAvail = [], showCreationActions = true, onFilterChange, calendarSelection, onCalendarSelectionChange, externalFilters, jumpRevision, flashId, showBookingDraftTabs, bookingDraftTabs = [], onOpenBookingDraft, onCloseBookingDraft, fmtDate, onNewBooking, onEditBooking, bookingEntryPresentation, onNewInvoice, onReviewInvoice, notify, paymentAccounts, budgets, earmarks, tagDefs, allowVoucherDeletion, closedUntil, generalProfile }: Props) {
     const draftTabsRef = useRef<HTMLDivElement>(null)
     const activeDraftId = bookingDraftTabs.find(draft => draft.isActive)?.id
     useEffect(() => {
@@ -99,7 +104,8 @@ export default function BookingsPlusView({ showCreationActions = true, onFilterC
         return () => { active = false; unsubscribe() }
     }, [])
     const [total, setTotal] = useState(0)
-    const [summary, setSummary] = useState<{ byType: Array<{ key: string; gross: number }> } | null>(null)
+    const [summary, setSummary] = useState<{ byType: Array<{ key: string; gross: number }>; accounts?: { accountId: number | null; key: string; bookingNet?: number; color?: string | null }[]; cutoff?: string; accountId?: number } | null>(null)
+    const [position, setPosition] = useState<{ cutoff: string; balances: CashBalance } | null>(null)
     const [selected, setSelected] = useState<BookingPlusRow | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
@@ -152,7 +158,7 @@ export default function BookingsPlusView({ showCreationActions = true, onFilterC
     useEffect(() => addDataChangedListener(['vouchers'], refresh), [refresh])
     useEffect(() => window.api.organizations.onSwitched(() => {
         setStornoPairIds(null)
-        setFilters(emptyFilters); setMonth(isoDate(new Date()).slice(0, 7)); setPage(1); setRows([]); setSummary(null); setTotal(0); setSelected(null); setDetailOpen(false)
+        setFilters(emptyFilters); setMonth(isoDate(new Date()).slice(0, 7)); setPage(1); setRows([]); setSummary(null); setPosition(null); setTotal(0); setSelected(null); setDetailOpen(false)
         setInfoOpen(false); setMetaEditing(false); setAttachments(null); setConfirm(null); setSimilarTo(null); refresh()
     }), [refresh])
     useEffect(() => {
@@ -188,6 +194,18 @@ export default function BookingsPlusView({ showCreationActions = true, onFilterC
         tag: filters.tag || undefined
     }), [stornoPairIds, q, filters.from, filters.to, filters.type, filters.sphere, filters.account, filters.budget, filters.earmark, filters.tag, filters.classification, generalProfile])
     const invalidRange = !!(filters.from && filters.to && filters.from > filters.to)
+    const today = isoDate(new Date())
+    const balanceCutoff = !stornoPairIds && !payload.q && !payload.type && !payload.sphere && !payload.primaryClassificationValueId &&
+        !payload.budgetId && !payload.earmarkId && !payload.tag && !invalidRange ? filters.to || today : undefined
+    useEffect(() => {
+        let alive = true
+        if (balanceCutoff) {
+            void window.api.reports.cashBalance({ to: balanceCutoff }).then(balances => {
+                if (alive) setPosition({ cutoff: balanceCutoff, balances })
+            }).catch((cause: unknown) => { if (alive) { setPosition(null); console.error('Kontostand konnte nicht geladen werden.', cause) } })
+        }
+        return () => { alive = false }
+    }, [balanceCutoff, revision])
     useEffect(() => {
         let alive = true
         if (invalidRange) { setLoading(false); return }
@@ -202,11 +220,15 @@ export default function BookingsPlusView({ showCreationActions = true, onFilterC
             setRows(result.rows); setTotal(result.total)
             // A pair contains at most two rows, so its totals can use the exact
             // filtered result without requesting an unfiltered report summary.
-            setSummary(totals || { byType: ['IN', 'OUT'].map(key => ({ key, gross: result.rows.filter(row => row.type === key).reduce((sum, row) => sum + row.grossAmount, 0) })) })
+            setSummary({
+                byType: totals?.byType ?? ['IN', 'OUT'].map(key => ({ key, gross: result.rows.filter(row => row.type === key).reduce((sum, row) => sum + row.grossAmount, 0) })),
+                accounts: totals?.byPaymentAccount?.filter(a => !payload.paymentAccountId || a.accountId === payload.paymentAccountId || a.bookingNet),
+                cutoff: balanceCutoff, accountId: payload.paymentAccountId
+            })
             setSelected(current => metaEditingRef.current && current ? current : result.rows.find(row => row.id === current?.id) || result.rows[0] || null)
         }).catch((cause: unknown) => { if (alive) { console.error('Buchungen Plus: Laden fehlgeschlagen', cause); setError(String(cause).includes('sortBy') ? 'Die laufende App unterstützt diese Sortierung noch nicht. Bitte VereinO vollständig neu starten.' : 'Buchungen konnten nicht geladen werden. Bitte erneut versuchen.') } }).finally(() => { if (alive) setLoading(false) })
         return () => { alive = false }
-    }, [payload, page, sort, sortBy, revision, invalidRange, stornoPairIds])
+    }, [payload, page, sort, sortBy, revision, invalidRange, stornoPairIds, balanceCutoff])
     useEffect(() => {
         if (!similarTo) return
         let alive = true
@@ -304,7 +326,10 @@ export default function BookingsPlusView({ showCreationActions = true, onFilterC
         } catch (error) { notify('error', error instanceof Error ? error.message : String(error)) } finally { setBusy(false) }
     }
     const income = summary?.byType.find(item => item.key === 'IN')?.gross || 0
-    const expense = Math.abs(summary?.byType.find(item => item.key === 'OUT')?.gross || 0)
+    const expense = summary?.byType.find(item => item.key === 'OUT')?.gross || 0
+    const accountPosition = summary?.cutoff && position?.cutoff === summary.cutoff
+        ? accountPositionAt(position.balances, paymentAccounts, { to: summary.cutoff, paymentAccountId: summary.accountId })
+        : undefined
     const hasActiveFilters = !!stornoPairIds || Object.values(filters).some(value => value.trim())
     const classificationLabel = (row: BookingPlusRow) => generalProfile ? row.primaryClassificationName || '—' : spheres[row.sphere]
     const paymentBadge = (row: BookingPlusRow) => {
@@ -424,6 +449,14 @@ export default function BookingsPlusView({ showCreationActions = true, onFilterC
                     {tagDefs.length > 0 && <div>{chipFilter('tag', 'Tags', tagDefs.filter((tag, index) => allTagsOpen || index < 6 || tag.name === filters.tag).map(item => ({ value: item.name, label: item.name, color: resolveTagDisplayColor(item.name, tagDefs) })))}{tagDefs.length > 6 && <button className="btn ghost bp-more-tags" onClick={() => setAllTagsOpen(value => !value)} aria-expanded={allTagsOpen}>{allTagsOpen ? 'Weniger Tags' : `Alle ${tagDefs.length} Tags`}</button>}</div>}
                     <details className="bp-more-filters" open={moreFiltersOpen} onToggle={event => setMoreFiltersOpen(event.currentTarget.open)}><summary>Weitere Filter{(filters.from || filters.to || filters.budget || filters.earmark) && <span className="bp-active-filter-count">{[filters.from || filters.to, filters.budget, filters.earmark].filter(Boolean).length} aktiv</span>}</summary>
                         <div className="bp-date-range"><label className="bp-field">Von<DateFilterInput label="Von" value={filters.from} onChange={value => update('from', value)} /></label><label className="bp-field">Bis<DateFilterInput label="Bis" value={filters.to} onChange={value => update('to', value)} /></label></div>
+                        <YearRangeSelect years={yearsAvail} from={filters.from} to={filters.to} onChange={range => {
+                            setStornoPairIds(null)
+                            setFilters(current => ({ ...current, ...range }))
+                            onFilterChange?.('from', range.from)
+                            onFilterChange?.('to', range.to)
+                            setPage(1)
+                            if (range.from) setMonth(range.from.slice(0, 7))
+                        }} />
                         {selectFilter('budget', 'Budget', budgets.map(item => ({ value: String(item.id), label: item.label })))}
                         {selectFilter('earmark', 'Zweckbindung', earmarks.map(item => ({ value: String(item.id), label: `${item.code} · ${item.name}` })))}
                     </details>
@@ -431,7 +464,8 @@ export default function BookingsPlusView({ showCreationActions = true, onFilterC
     )
     return <div className="bookings-plus bookings-plus--dense" data-tutorial="plus">
         <section className="bp-workspace">
-            <header className="bp-heading"><div><h1>Buchungen Plus</h1></div><div className="bp-heading-workspace"><ResponsiveSearch type="search" value={filters.q} onChange={value => update('q', value)} placeholder="Suche: #ID, Text, Datum …" title="Suche wie im Journal: #ID, Beschreibung, Partner oder Datum, z. B. Juni 2026" label="Buchungen suchen" />{showBookingDraftTabs && bookingDraftTabs.length > 0 && <div ref={draftTabsRef} className="booking-draft-tabs bp-draft-tabs" aria-label="Offene Buchungstabs">{bookingDraftTabs.map(draft => <div key={draft.id} className={`booking-draft-tab booking-draft-tab--type-${draft.type.toLowerCase()}${draft.isActive ? ' booking-draft-tab--active' : ''}${draft.isDetached ? ' booking-draft-tab--detached' : ''}`}><button type="button" className="booking-draft-tab__open" title={draft.title} onClick={() => onOpenBookingDraft?.(draft.id)}><span className="booking-draft-tab__label">{draft.label}</span>{draft.isDetached && <span className="booking-draft-tab__badge">abgedockt</span>}</button><button type="button" className="booking-draft-tab__close" aria-label={`${draft.label} schließen`} onClick={() => onCloseBookingDraft?.(draft.id)}><IconX size={14} /></button></div>)}</div>}</div><div className="bp-totals" aria-busy={loading} aria-label="Summen aller gefilterten Buchungen"><RecentBookingsDropdown kind="IN" amount={!summary || error || invalidRange ? '—' : money.format(income)} payload={payload} revision={revision} invalidRange={invalidRange} fmtDate={fmtDate} onOpenVoucher={row => selectRow(row)} /><RecentBookingsDropdown kind="OUT" amount={!summary || error || invalidRange ? '—' : money.format(expense)} payload={payload} revision={revision} invalidRange={invalidRange} fmtDate={fmtDate} onOpenVoucher={row => selectRow(row)} /><div><span>Saldo</span><strong className={income - expense < 0 ? 'bp-negative' : 'bp-positive'}>{!summary || error || invalidRange ? '—' : money.format(income - expense)}</strong></div></div></header>
+            <header className="bp-heading"><div><h1>Buchungen Plus</h1></div><div className="bp-heading-workspace"><ResponsiveSearch type="search" value={filters.q} onChange={value => update('q', value)} placeholder="Suche: #ID, Text, Datum …" title="Suche wie im Journal: #ID, Beschreibung, Partner oder Datum, z. B. Juni 2026" label="Buchungen suchen" />{showBookingDraftTabs && bookingDraftTabs.length > 0 && <div ref={draftTabsRef} className="booking-draft-tabs bp-draft-tabs" aria-label="Offene Buchungstabs">{bookingDraftTabs.map(draft => <div key={draft.id} className={`booking-draft-tab booking-draft-tab--type-${draft.type.toLowerCase()}${draft.isActive ? ' booking-draft-tab--active' : ''}${draft.isDetached ? ' booking-draft-tab--detached' : ''}`}><button type="button" className="booking-draft-tab__open" title={draft.title} onClick={() => onOpenBookingDraft?.(draft.id)}><span className="booking-draft-tab__label">{draft.label}</span>{draft.isDetached && <span className="booking-draft-tab__badge">abgedockt</span>}</button><button type="button" className="booking-draft-tab__close" aria-label={`${draft.label} schließen`} onClick={() => onCloseBookingDraft?.(draft.id)}><IconX size={14} /></button></div>)}</div>}</div><div className="bp-totals" aria-busy={loading} aria-label="Buchungssummen und Saldo"><RecentBookingsDropdown kind="IN" amount={!summary || error || invalidRange ? '—' : money.format(income)} payload={payload} revision={revision} invalidRange={invalidRange} fmtDate={fmtDate} onOpenVoucher={row => selectRow(row)} /><RecentBookingsDropdown kind="OUT" amount={!summary || error || invalidRange ? '—' : money.format(expense)} payload={payload} revision={revision} invalidRange={invalidRange} fmtDate={fmtDate} onOpenVoucher={row => selectRow(row)} /><BookingBalanceStat layout="plus" kind="period" income={income} expense={expense} accounts={summary?.accounts} filtered={!summary?.cutoff} pending={!summary || !!error || invalidRange} />
+                {summary?.cutoff && <BookingBalanceStat layout="plus" kind="position" label={summary.accountId ? 'Kontostand' : 'Gesamtbestand'} date={fmtDate(summary.cutoff)} position={error || invalidRange ? undefined : accountPosition} />}</div></header>
             <div className="bp-toolbar">
                 <div className="bp-browse-tools">
                     <div className="bp-month-navigation" role="group" aria-label="Monatsnavigation">
@@ -452,7 +486,7 @@ export default function BookingsPlusView({ showCreationActions = true, onFilterC
                     {similarTo && <section className="bp-similar"><div className="bp-section-heading"><h3>Ähnliche Buchungen</h3><button className="btn ghost" aria-label="Ähnliche Buchungen schließen" onClick={() => setSimilarTo(null)}><IconX size={16} /></button></div><p className="bp-dim">Bis zu 5 Treffer · gleiche Art · Suche nach „{similarQuery(similarTo)}“ · alle Zeiträume</p>{similarLoading ? <p role="status">Suche läuft …</p> : similarError ? <p role="alert">{similarError}</p> : !similarRows.length ? <p>Keine ähnlichen Buchungen gefunden.</p> : similarRows.map(row => <button className="btn" key={row.id} onClick={() => selectRow(row)}><span>{row.description || row.voucherNo}<small>{prettyDate(row.date)}</small></span><strong>{signedMoney.format(signedAmount(row))}</strong></button>)}</section>}
                     <div className="bp-list-scroll">
                     <header className="bp-list-header">
-                        <div className="bp-list-toolbar"><strong>{total} Buchungen</strong>{loading && <span className="bp-load-status" role="status">Wird aktualisiert …</span>}</div>
+                        <div className="bp-list-toolbar"><strong>{total} Buchungen</strong>{activePaymentAccount?.openingDate && activePaymentAccount.openingDate <= (filters.to || today) && <span className="helper">{openingLabel(activePaymentAccount)}</span>}{loading && <span className="bp-load-status" role="status">Wird aktualisiert …</span>}</div>
                         <div className="bp-column-labels">{sortColumn('date', 'Datum')}{sortColumn('description', 'Buchung')}{sortColumn('payment', 'Zahlweg')}{sortColumn('gross', 'Betrag')}</div>
                     </header>
                     <div className="bp-results">{invalidRange ? <p role="alert" className="bp-empty">„Von“ darf nicht nach „Bis“ liegen.</p> : error ? <div role="alert" className="bp-empty">{error}<button className="btn" onClick={refresh}>Erneut versuchen</button></div> : loading && !summary ? <p className="bp-empty" role="status">Buchungen werden geladen …</p> : rows.length === 0 ? <div className="bp-empty"><IconReceipt2 size={36} /><h2>Keine Buchungen gefunden</h2><p>Wähle einen anderen Zeitraum oder setze die Filter zurück.</p></div> : <div className="bp-rows">{rows.map(row => <div key={row.id} data-voucher-id={row.id} role="button" tabIndex={loading ? -1 : 0} className={`bp-row${row.originalId ? ' bp-row--storno' : row.reversedById ? ' bp-row--storniert' : ''}${selected?.id === row.id ? ' is-selected' : ''}`} aria-pressed={selected?.id === row.id} aria-disabled={loading} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); if (!loading) selectRow(row, event.currentTarget) } }} onClick={event => { if (!loading) selectRow(row, event.currentTarget) }} onDoubleClick={event => { if (!loading) selectRow(row, event.currentTarget, true) }} title="Doppelklick für vollständige Buchungsdetails">

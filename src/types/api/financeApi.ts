@@ -38,6 +38,9 @@ import type {
     TCashChecksListOutput,
     TCashChecksSetInspectorsInput,
     TCashChecksSetInspectorsOutput,
+    TAccountOpeningChanges,
+    TSetupAccountsInput,
+    TOpeningVoucherInput,
     TPaymentAccountDeleteInput,
     TPaymentAccountDeleteOutput,
     TPaymentAccountsListInput,
@@ -117,6 +120,9 @@ export interface FinanceApi {
         clearAll: () => Promise<TVouchersClearAllOutput>
     }
     paymentAccounts: {
+        previewOpeningVoucher: (payload: TOpeningVoucherInput) => Promise<{ date: string; amountCents: number; description: string }>
+        configureSetup: (payload: TSetupAccountsInput) => Promise<TPaymentAccountsListOutput>
+        setOpenings: (payload: TAccountOpeningChanges) => Promise<void>
         list: (payload?: TPaymentAccountsListInput) => Promise<TPaymentAccountsListOutput>
         upsert: (payload: TPaymentAccountUpsertInput) => Promise<TPaymentAccountUpsertOutput>
         delete: (payload: TPaymentAccountDeleteInput) => Promise<TPaymentAccountDeleteOutput>

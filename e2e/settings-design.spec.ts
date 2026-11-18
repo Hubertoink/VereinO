@@ -36,7 +36,11 @@ test.beforeAll(async () => {
         settings:{get:async({key})=>({value:stored[key]??null}),set:async({key,value})=>{stored[key]=value;window.saved.push({key,value});return {ok:true}}},
         organizations:{active:async()=>({organization:{id:'demo',name:'Beispielverein',dbRoot:'C:/VereinO'}})},
         classifications:{primary:{list:async()=>({profile,canChangeProfile:false,values:[{id:1,name:'Material',color:'#1976D2',icon:null,isActive:true},{id:2,name:'Sonstiges',color:'#A949EF',icon:null,isActive:true}]})}},
-        tags:{list:async()=>({rows:tags})},paymentAccounts:{list:async()=>({rows:accounts})},
+        tags:{list:async()=>({rows:tags})},paymentAccounts:{list:async()=>({rows:accounts}),
+          previewOpeningVoucher:async({accountId,voucherNo})=>{
+            if(accountId!==1 || voucherNo!=='2026-08-03_00013') throw new Error("Error invoking remote method 'paymentAccounts.previewOpeningVoucher': Error: Keine Buchung mit dieser Belegnummer auf diesem Konto gefunden.")
+            return {date:'2026-08-03',amountCents:-13025,description:'Übernommener Bankbestand'}
+          },upsert:async value=>{window.saved.push(value);return {id:value.id}}},
         parties:{list:async()=>({rows:[{id:1,name:'Beispielhandel',role:'SUPPLIER',city:'Musterstadt',isActive:1,voucherCount:12,invoiceCount:0,submissionCount:0,email:'kontakt@example.test'}]})},
         receiptWidget:{getAutostart:async()=>({enabled:false,available:true})},
         budgets:{list:async()=>({rows:[]})},bindings:{list:async()=>({rows:[]})},
@@ -103,6 +107,32 @@ async function selectPane(page: Page, tile: string) {
     tile
   )
 }
+
+test('opening voucher number alone previews the signed amount and actual date before conversion', async ({ page }) => {
+  await openSettings(page)
+  await selectPane(page, 'paymentAccounts')
+  await page.getByRole('button', { name: 'Vereinskonto bearbeiten' }).click()
+  const modal = page.getByRole('dialog', { name: 'Konto bearbeiten' })
+  await modal.getByLabel('Stichtag').fill('2025-01-01')
+  await modal.getByText('Bestehende Anfangsbuchung übernehmen').click()
+  const voucherNo = modal.getByLabel('Belegnummer')
+  await voucherNo.fill('fehlt')
+  await modal.getByRole('button', { name: 'Beleg prüfen' }).click()
+  await expect.poll(() => page.evaluate(() => (window as any).notifications.at(-1)?.text)).toBe('Keine Buchung mit dieser Belegnummer auf diesem Konto gefunden.')
+  await voucherNo.fill('2026-08-03_00013')
+  await modal.getByRole('button', { name: 'Beleg prüfen' }).click()
+  await expect(modal.getByLabel('Stichtag')).toHaveValue('2026-08-03')
+  await expect(modal.getByLabel('Anfangsbestand (€)')).toHaveValue('-130,25')
+  await expect(modal.getByRole('status')).toContainText('Übernommener Bankbestand')
+  expect(await page.evaluate(() => (window as any).saved.length)).toBe(0)
+  await voucherNo.fill('')
+  await expect(modal.getByLabel('Anfangsbestand (€)')).toHaveValue('')
+  await voucherNo.fill('2026-08-03_00013')
+  await modal.getByRole('button', { name: 'Beleg prüfen' }).click()
+  await modal.getByRole('button', { name: 'Anfangsbuchung übernehmen' }).click()
+  await expect(modal).toHaveCount(0)
+  expect(await page.evaluate(() => (window as any).saved)).toEqual([expect.objectContaining({ openingVoucherNo: '2026-08-03_00013', opening: { date: '2026-08-03', amountCents: -13025 } })])
+})
 
 const panes = [
   ['general', 'Darstellung'],

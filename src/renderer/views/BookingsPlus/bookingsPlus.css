@@ -163,7 +163,7 @@
  .bp-inspector--open { top: 8px; right: 8px; width: min(420px, calc(100vw - 16px)); }
 }
 @media (max-width: 700px) {
- .bp-totals { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+ .bp-totals { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(110px, 100%), 1fr)); gap: 5px; }
  .bp-totals > div { min-width: 0; padding: 8px; }
  .bp-totals strong { overflow-wrap: anywhere; }
  .bp-list-header { padding-inline: 8px; }

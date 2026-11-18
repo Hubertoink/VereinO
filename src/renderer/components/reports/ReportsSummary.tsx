@@ -1,3 +1,4 @@
+import type { ReportMonthlyData } from './reportMonthlyData'
 import { buildReportMonths } from '../../../../shared/reportAnalytics'
 import React, { useEffect, useMemo, useState } from 'react'
 import { IconCreditCard, IconReceipt2 } from '@tabler/icons-react'
@@ -5,7 +6,7 @@ import AppIcon from '../common/AppIcon'
 import { IconBank, IconBudget, IconCash, IconPayPal } from '../../utils/icons'
 import { Sphere, VoucherType, PaymentMethod } from './types'
 
-export default function ReportsSummary(props: { hideKpis?: boolean; refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
+export default function ReportsSummary(props: { monthly?: ReportMonthlyData; hideKpis?: boolean; refreshKey?: number; from?: string; to?: string; sphere?: Sphere; type?: VoucherType; paymentMethod?: PaymentMethod; earmarkId?: number; budgetId?: number }) {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<null | {
     totals: { net: number; vat: number; gross: number }
@@ -17,7 +18,6 @@ export default function ReportsSummary(props: { hideKpis?: boolean; refreshKey?:
     byPaymentAccount?: Array<{ accountId: number | null; key: string; kind?: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER' | null; color?: string | null; net: number; vat: number; gross: number }>
     byType: Array<{ key: VoucherType; net: number; vat: number; gross: number }>
   }>(null)
-  const [monthsCount, setMonthsCount] = useState<number>(0)
   const [paymentBalances, setPaymentBalances] = useState<Array<{ key: string; label: string; gross: number }>>([])
   const eurFmt = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   useEffect(() => {
@@ -49,26 +49,18 @@ export default function ReportsSummary(props: { hideKpis?: boolean; refreshKey?:
     return () => { cancelled = true }
   }, [props.from, props.to, props.sphere, props.type, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
 
-  useEffect(() => {
-    let cancelled = false
-    Promise.all([
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'IN', paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId }),
-      (window as any).api?.reports.monthly?.({ from: props.from, to: props.to, sphere: props.sphere, type: 'OUT', paymentMethod: props.paymentMethod, earmarkId: props.earmarkId, budgetId: props.budgetId })
-    ]).then(([inRes, outRes]) => {
-      if (cancelled) return
-      setMonthsCount(buildReportMonths(
-        props.type && props.type !== 'IN' ? [] : inRes?.buckets || [],
-        props.type && props.type !== 'OUT' ? [] : outRes?.buckets || [], props.from, props.to
-      ).length)
-    }).catch(() => setMonthsCount(0))
-    return () => { cancelled = true }
-  }, [props.from, props.to, props.sphere, props.type, props.paymentMethod, props.earmarkId, props.budgetId, props.refreshKey])
+  const months = useMemo(() => props.monthly
+    ? buildReportMonths(props.monthly.income, props.monthly.expense, props.from, props.to)
+    : [], [props.monthly, props.from, props.to])
+  const monthsCount = months.length
+  const monthFormat = useMemo(() => new Intl.DateTimeFormat('de-DE', { month: 'short', year: 'numeric' }), [])
+  const formatMonth = (month: string) => monthFormat.format(new Date(month + '-01T12:00:00'))
 
   return (
     <div className="report-summary-card">
       <div className="report-summary-header">
         <div>
-          <h2>Finanzübersicht</h2>
+          <h2>Buchungen im Zeitraum</h2>
           <div className="helper">Für den gewählten Zeitraum und die Filter.</div>
         </div>
       </div>
@@ -105,8 +97,9 @@ export default function ReportsSummary(props: { hideKpis?: boolean; refreshKey?:
                   )}
                 </div>
                 <div className="dp-card report-summary-kpi">
-                  <div className="helper">Ø Saldo/Kalendermonat{monthsCount > 0 ? ` (${monthsCount}m)` : ''}</div>
+                  <div className="helper" title="Buchungssaldo geteilt durch die Anzahl der Kalendermonate im Zeitraum. Monate ohne Buchungen zählen mit.">Durchschnittlicher Monatssaldo</div>
                   <div>{avgPerMonth != null ? eurFmt.format(avgPerMonth) : '—'}</div>
+                  {monthsCount > 0 && <small className="helper">{formatMonth(months[0].month)}{monthsCount > 1 && ` – ${formatMonth(months[monthsCount - 1].month)}`} · {monthsCount} {monthsCount === 1 ? 'Kalendermonat' : 'Kalendermonate'}</small>}
                 </div>
               </div>
             )

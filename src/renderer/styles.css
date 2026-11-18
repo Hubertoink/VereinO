@@ -3729,29 +3729,6 @@ tbody tr:nth-child(even):hover {
   border-right-width: 1px;
 }
 
-.journal-header-menu {
-  display: grid;
-  gap: 6px;
-}
-
-.journal-header-menu__title {
-  font-size: var(--type-caption);
-  font-weight: 700;
-  color: var(--text-dim);
-  padding: 2px 4px 4px;
-}
-
-.journal-header-menu__item {
-  width: 100%;
-  justify-content: flex-start;
-  text-align: left;
-  padding: 8px 10px;
-}
-
-.journal-header-menu__hint {
-  padding: 2px 4px 0;
-}
-
 /* Brutto colorization in journal table */
 td.gross-in {
   color: var(--success-strong);
@@ -9493,6 +9470,37 @@ body:has(.local-invoice-scan) .app-main {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
+
+.account-opening-caption {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: var(--type-caption);
+  line-height: 1.4;
+}
+
+.account-opening-caption b { color: var(--text); font-variant-numeric: tabular-nums; }
+.account-opening-caption i {
+  align-self: center;
+  flex: 0 0 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+}
+
+.account-opening-marker { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+.account-opening-details { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 4px; font-size: var(--type-caption); }
+
+.booking-balance-accounts {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.filter-totals-stat--balance.positive .filter-totals-stat__value { color: var(--success); }
+.filter-totals-stat--balance.negative .filter-totals-stat__value { color: var(--danger); }
 
 .tooltip-modal__title {
   font-weight: 700;

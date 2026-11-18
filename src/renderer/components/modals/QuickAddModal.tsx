@@ -1,3 +1,4 @@
+import { selectDraftBookingType } from '../../utils/bookingType'
 import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import { useBankDraftSourceHighlight } from '../../hooks/useBankDraftSourceHighlight'
 import { useBookingAiSuggestions } from '../../hooks/useBookingAiSuggestions'
@@ -234,17 +235,6 @@ export default function QuickAddModal({
         () => new Map(activePaymentAccounts.map((account) => [account.id, account])),
         [activePaymentAccounts]
     )
-    const defaultCashAccount = React.useMemo(
-        () => activePaymentAccounts.find((account) => account.kind === 'CASH') ?? activePaymentAccounts[0] ?? null,
-        [activePaymentAccounts]
-    )
-    const defaultBankAccount = React.useMemo(
-        () => activePaymentAccounts.find((account) => account.kind === 'BANK')
-            ?? activePaymentAccounts.find((account) => account.id !== defaultCashAccount?.id)
-            ?? activePaymentAccounts[0]
-            ?? null,
-        [activePaymentAccounts, defaultCashAccount]
-    )
     const financeAccountColor = React.useMemo(() => {
         if (qa.type === 'TRANSFER') {
             const fromColor = paymentAccountsById.get(Number((qa as any).transferFromAccountId || 0))?.color
@@ -420,23 +410,7 @@ export default function QuickAddModal({
         }
         if (active.sphere) nextQa.sphere = active.sphere
         if (active.type && active.type !== qa.type) {
-            nextQa.type = active.type
-            if (active.type === 'TRANSFER') {
-                nextQa.transferFromAccountId = nextQa.transferFromAccountId || defaultCashAccount?.id || null
-                nextQa.transferFromAccountName = nextQa.transferFromAccountName || defaultCashAccount?.name || null
-                nextQa.transferFrom = nextQa.transferFrom || accountMethod(defaultCashAccount?.kind) || 'BAR'
-                nextQa.transferToAccountId = nextQa.transferToAccountId || defaultBankAccount?.id || null
-                nextQa.transferToAccountName = nextQa.transferToAccountName || defaultBankAccount?.name || null
-                nextQa.transferTo = nextQa.transferTo || accountMethod(defaultBankAccount?.kind) || 'BANK'
-                nextQa.paymentAccountId = null
-                nextQa.paymentAccountName = null
-                nextQa.paymentMethod = null
-            } else if (active.type !== 'INTERNAL') {
-                const fallback = active.type === 'IN' ? defaultBankAccount : (defaultCashAccount || defaultBankAccount)
-                nextQa.paymentAccountId = nextQa.paymentAccountId || fallback?.id || null
-                nextQa.paymentAccountName = nextQa.paymentAccountName || fallback?.name || null
-                nextQa.paymentMethod = accountMethod(paymentAccountsById.get(Number(nextQa.paymentAccountId || 0))?.kind) || nextQa.paymentMethod
-            }
+            Object.assign(nextQa, selectDraftBookingType(nextQa, active.type))
         }
         if (active.paymentAccountId && nextQa.type !== 'TRANSFER' && nextQa.type !== 'INTERNAL') {
             const account = paymentAccountsById.get(Number(active.paymentAccountId))
@@ -473,7 +447,7 @@ export default function QuickAddModal({
         }
         setQa(nextQa as QA)
         setAiMenuOpen(false)
-    }, [activeSuggestion, budgetsList, defaultBankAccount, defaultCashAccount, earmarksList, grossAmt, paymentAccountsById, qa, rememberCurrentBookingPattern, setQa])
+    }, [activeSuggestion, budgetsList, earmarksList, grossAmt, paymentAccountsById, qa, rememberCurrentBookingPattern, setQa])
 
     const handleSave = React.useCallback(() => {
         if (needsBookingType) return
@@ -500,32 +474,8 @@ export default function QuickAddModal({
     }, [rememberCurrentBookingPattern, saveAndClose, saveBlocked, needsBookingType, requiredFieldHint, notify])
 
     const selectBookingType = React.useCallback((type: QA['type']) => {
-        const nextQa = { ...qa, type, bookingTypeSelected: true } as QA
-        if (type === 'TRANSFER' && (!(nextQa as any).transferFromAccountId || !(nextQa as any).transferToAccountId)) {
-            ;(nextQa as any).transferFromAccountId = defaultCashAccount?.id ?? null
-            ;(nextQa as any).transferFromAccountName = defaultCashAccount?.name ?? null
-            ;(nextQa as any).transferFrom = accountMethod(defaultCashAccount?.kind) ?? 'BAR'
-            ;(nextQa as any).transferToAccountId = defaultBankAccount?.id ?? null
-            ;(nextQa as any).transferToAccountName = defaultBankAccount?.name ?? null
-            ;(nextQa as any).transferTo = accountMethod(defaultBankAccount?.kind) ?? 'BANK'
-            ;(nextQa as any).paymentAccountId = null
-            ;(nextQa as any).paymentAccountName = null
-        } else if (type === 'INTERNAL') {
-            ;(nextQa as any).paymentAccountId = null
-            ;(nextQa as any).paymentAccountName = null
-            ;(nextQa as any).paymentMethod = undefined
-            ;(nextQa as any).transferFromAccountId = null
-            ;(nextQa as any).transferToAccountId = null
-            ;(nextQa as any).vatRate = 0
-            ;(nextQa as any).mode = 'GROSS'
-        } else if (type !== 'TRANSFER' && !(nextQa as any).paymentAccountId) {
-            const fallback = defaultCashAccount ?? defaultBankAccount
-            ;(nextQa as any).paymentAccountId = fallback?.id ?? null
-            ;(nextQa as any).paymentAccountName = fallback?.name ?? null
-            ;(nextQa as any).paymentMethod = accountMethod(fallback?.kind) ?? (nextQa as any).paymentMethod
-        }
-        setQa(nextQa)
-    }, [defaultBankAccount, defaultCashAccount, qa, setQa])
+        setQa(selectDraftBookingType(qa, type))
+    }, [qa, setQa])
 
     const tagByName = React.useMemo(() => new Map(tagDefs.map((tag) => [tag.name.toLowerCase(), tag])), [tagDefs])
     const budgetById = React.useMemo(() => new Map((budgetsForEdit || []).map((budget) => [budget.id, budget])), [budgetsForEdit])
@@ -1043,7 +993,7 @@ export default function QuickAddModal({
                                                 <label htmlFor="quick-add-transfer-from">Von Konto <span className="req-asterisk" aria-hidden="true">*</span></label>
                                             <SelectDropdown
                                                 id="quick-add-transfer-from"
-                                                invalid={hasSameTransferAccount}
+                                                invalid={hasSameTransferAccount || !qa.transferFromAccountId}
                                                 value={String((qa as any).transferFromAccountId ?? '')}
                                                 placeholder="Von Konto wählen"
                                                 style={{ color: paymentAccountsById.get(Number((qa as any).transferFromAccountId || 0))?.color || undefined }}
@@ -1072,7 +1022,7 @@ export default function QuickAddModal({
                                                 <label htmlFor="quick-add-transfer-to">Nach Konto <span className="req-asterisk" aria-hidden="true">*</span></label>
                                             <SelectDropdown
                                                 id="quick-add-transfer-to"
-                                                invalid={hasSameTransferAccount}
+                                                invalid={hasSameTransferAccount || !qa.transferToAccountId}
                                                 value={String((qa as any).transferToAccountId ?? '')}
                                                 placeholder="Nach Konto wählen"
                                                 style={{ color: paymentAccountsById.get(Number((qa as any).transferToAccountId || 0))?.color || undefined }}
@@ -1109,6 +1059,7 @@ export default function QuickAddModal({
                                         <SelectDropdown
                                             id="quick-add-account"
                                             value={String((qa as any).paymentAccountId ?? '')}
+                                            invalid={hasMissingAccount}
                                             placeholder="Konto wählen"
                                             style={{ color: paymentAccountsById.get(Number((qa as any).paymentAccountId || 0))?.color || undefined }}
                                             onChange={(value) => {

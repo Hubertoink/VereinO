@@ -51,35 +51,72 @@ test.beforeAll(async () => {
           if (filter.limit === 20 && filter.type) await new Promise(resolve => window.pendingFilters.push(resolve))
           return { rows: selected, total: selected.length }
         }},
-        reports: { summary: async filter => ({ byType: filter.type ? [{ key: filter.type, gross: filter.type === 'IN' ? 350 : 100 }] : [{ key: 'IN', gross: 350 }, { key: 'OUT', gross: 100 }] }) }
+        reports: { cashBalance: async ({ to }) => ({ BAR: -1400, BANK: 1276.13, accounts: [
+          { id: 1, name: 'Bank', balance: to < '2026-01-01' ? 0 : 1276.13 }, { id: 2, name: 'Bar', balance: -1400 }
+        ] }), summary: async filter => ({ byType: filter.type ? [{ key: filter.type, gross: filter.type === 'IN' ? 350 : 100 }] : [{ key: 'IN', gross: 350 }, { key: 'OUT', gross: 100 }] }) }
       }
       function Harness() {
         const [visible, setVisible] = useState(true)
         const [externalFilters, setExternalFilters] = useState({})
         const [jumpRevision, setJumpRevision] = useState(0)
+        window.filterBy = filters => { setExternalFilters(filters); setJumpRevision(value => value + 1) }
         window.jumpTo = q => { setExternalFilters({ q }); setJumpRevision(value => value + 1) }
         const [drafts, setDrafts] = useState([])
         window.setDrafts = setDrafts
         const [calendarSelection, setCalendarSelection] = useState({ month: '2026-09', from: '', to: '' })
         return <>
           <button id="navigate" onClick={() => setVisible(value => !value)}>{visible ? 'Weg' : 'Zurück'}</button>
-          {visible && <BookingsPlusView showBookingDraftTabs bookingDraftTabs={drafts} onOpenBookingDraft={id => { window.openedDraft = id; setDrafts(current => current.map(draft => ({ ...draft, isActive: draft.id === id }))) }} onCloseBookingDraft={id => setDrafts(current => current.filter(draft => draft.id !== id))} externalFilters={externalFilters} jumpRevision={jumpRevision} onFilterChange={(key, value) => setExternalFilters(current => ({ ...current, [key]: value }))} onResetFilters={() => setExternalFilters({})} calendarSelection={calendarSelection} onCalendarSelectionChange={setCalendarSelection} fmtDate={date => date} onNewBooking={() => {}} onEditBooking={row => { window.editCalls.push(row.id) }} bookingEntryPresentation="flyout" onNewInvoice={() => {}} onReviewInvoice={() => {}} notify={() => {}} paymentAccounts={[]} budgets={[]} earmarks={[]} tagDefs={[]} allowVoucherDeletion={true} generalProfile={false} />}
+          {visible && <BookingsPlusView yearsAvail={[2026, 2025]} showBookingDraftTabs bookingDraftTabs={drafts} onOpenBookingDraft={id => { window.openedDraft = id; setDrafts(current => current.map(draft => ({ ...draft, isActive: draft.id === id }))) }} onCloseBookingDraft={id => setDrafts(current => current.filter(draft => draft.id !== id))} externalFilters={externalFilters} jumpRevision={jumpRevision} onFilterChange={(key, value) => setExternalFilters(current => ({ ...current, [key]: value }))} onResetFilters={() => setExternalFilters({})} calendarSelection={calendarSelection} onCalendarSelectionChange={setCalendarSelection} fmtDate={date => date} onNewBooking={() => {}} onEditBooking={row => { window.editCalls.push(row.id) }} bookingEntryPresentation="flyout" onNewInvoice={() => {}} onReviewInvoice={() => {}} notify={() => {}} paymentAccounts={[{ id: 1, name: 'Bank', kind: 'BANK', openingDate: '2026-01-01', openingCents: 100000 }]} budgets={[]} earmarks={[]} tagDefs={[]} allowVoucherDeletion={true} generalProfile={false} />}
         </>
       }
       createRoot(document.getElementById('root')).render(<Harness />)
     ` }, bundle: true, write: false, platform: 'browser', loader: { '.css': 'empty' },
     define: { 'process.env.NODE_ENV': '"production"' },
     plugins: [{ name: 'unrelated-widgets', setup(build) {
-      build.onResolve({ filter: /\/(AttachmentsModal|VoucherInfoModal|InvoiceBatchControl|ReceiptThumbnail|DateFilterInput|RecentBookingsDropdown)$/ }, args => ({ path: args.path, namespace: 'widget-stub' }))
+      build.onResolve({ filter: /\/(AttachmentsModal|VoucherInfoModal|InvoiceBatchControl|ReceiptThumbnail|RecentBookingsDropdown)$/ }, args => ({ path: args.path, namespace: 'widget-stub' }))
       build.onLoad({ filter: /.*/, namespace: 'widget-stub' }, () => ({ contents: 'export default function Widget() { return null }', loader: 'js' }))
     }}]
   })
   script = result.outputFiles[0].text
   styles = (await Promise.all(['src/renderer/views/BookingsPlus/bookingsPlus.css', 'src/renderer/components/booking/bookingTable.css'].map(file => readFile(file, 'utf8')))).join('\n')
   const sharedStyles = await readFile('src/renderer/styles.css', 'utf8')
-  styles = sharedStyles.slice(sharedStyles.indexOf('.booking-draft-tabs {'), sharedStyles.indexOf('.booking-close-guard-modal {')) + '\n' + styles
+  styles = sharedStyles.slice(0, sharedStyles.indexOf('/* Settings layout */')) + '\n' + sharedStyles.slice(sharedStyles.indexOf('.booking-draft-tabs {'), sharedStyles.indexOf('.booking-close-guard-modal {')) + '\n' + styles
   styles += '\n' + sharedStyles.slice(sharedStyles.indexOf('/* Page searches share'))
   styles += '\n' + sharedStyles.slice(sharedStyles.indexOf('.filter-dropdown {'), sharedStyles.indexOf('.filter-dropdown__grid {'))
+})
+
+test('header reconciles overall and individual account balances and separates search results', async ({ page }) => {
+  await page.setContent('<div id="root"></div>')
+  await page.addScriptTag({ content: script })
+  const totals = page.locator('.bp-totals')
+  await expect(totals).toContainText('Gesamtbestand')
+  await expect(totals).toContainText('-123,87')
+  await page.evaluate(() => (window as any).filterBy({ account: '1', from: '2026-11-01', to: '2026-11-18' }))
+  await expect(totals).toContainText('Kontostand · 2026-11-18')
+  await expect(totals).toContainText('1.276,13')
+  await page.evaluate(() => (window as any).filterBy({ account: '1', to: '2025-12-31' }))
+  await expect(totals).toContainText('Kontostand · 2025-12-31')
+  await expect(totals.locator('strong').last()).toContainText('0,00')
+  await page.evaluate(() => (window as any).filterBy({ account: '1', tag: 'Material' }))
+  await expect(totals).toContainText('Buchungssaldo')
+  await expect(totals).toContainText('250,00')
+})
+
+test('year quick selection updates both date bounds and the two balances', async ({ page }) => {
+  await page.setContent('<div id="root"></div>')
+  await page.addScriptTag({ content: script })
+  await page.getByRole('button', { name: 'Buchungsfilter', exact: true }).click()
+  await page.getByText('Weitere Filter', { exact: false }).first().click()
+  const years = page.getByRole('combobox', { name: 'Schnellauswahl Jahr' })
+  await years.selectOption('2026')
+  await expect(page.getByLabel('Von', { exact: true })).toHaveValue('2026-01-01')
+  await expect(page.getByLabel('Bis', { exact: true })).toHaveValue('2026-12-31')
+  const totals = page.locator('.bp-totals')
+  await expect(totals).toContainText('Gesamtbestand · 2026-12-31')
+  await expect(totals).toContainText(/Saldo250,00/)
+  await years.selectOption('')
+  await expect(page.getByLabel('Von', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Bis', { exact: true })).toHaveValue('')
 })
 
 test('filter refresh keeps rows, totals and panel geometry until results arrive', async ({ page }) => {

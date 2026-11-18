@@ -55,8 +55,8 @@ beforeEach(() => {
     isActive: true, isSystem: false, description: 'Private description', sortOrder: 1
   }])
   jest.mocked(listPaymentAccounts).mockReturnValue([
-    { id: 1, name: 'Bank', kind: 'BANK', iban: accountIban, color: '#abc', sortOrder: 2, isActive: 1, bookingCount: 99 },
-    { id: 2, name: 'Cash', kind: 'CASH', iban: null, sortOrder: 3, isActive: 1, bookingCount: 0 }
+    { id: 1, name: 'Bank', kind: 'BANK', iban: accountIban, color: '#abc', sortOrder: 2, isActive: 1, openingCents: null, openingDate: null, bookingCount: 99 },
+    { id: 2, name: 'Cash', kind: 'CASH', iban: null, sortOrder: 3, isActive: 1, openingCents: null, openingDate: null, bookingCount: 0 }
   ])
   jest.mocked(listBudgets).mockReturnValue([
     { id: 1, label: 'Explicit', name: 'Ignored', year: 2026, sphere: 'IDEELL', categoryName: 'Category', projectName: 'Project', amountPlanned: 250, isArchived: 0 },

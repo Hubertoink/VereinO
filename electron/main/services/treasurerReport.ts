@@ -1,3 +1,5 @@
+import { sumOpeningCents } from '../../../shared/accountOpening'
+import { listAccountOpenings } from '../repositories/accountOpenings'
 /**
  * Treasurer Report (Kassierbericht) Generator
  * Creates a readable PDF overview for club members / Mitgliederversammlung
@@ -84,6 +86,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
   const cashBalanceAsOf = cashBalanceDate || new Date().toISOString().slice(0, 10)
 
   // 1. Cash balance as of the selected cut-off date
+  const openings = listAccountOpenings(cashBalanceAsOf)
   const currentBalance = cashBalance({ to: cashBalanceAsOf })
   const currentAccountBalances = Array.isArray((currentBalance as any).accounts) && (currentBalance as any).accounts.length
     ? (currentBalance as any).accounts
@@ -534,6 +537,7 @@ export async function generateTreasurerReportPDF(options: TreasurerReportOptions
     <div class="kpi-box" style="border-color: #1565c0; border-width: 2px;">
       <div class="kpi-label">Gesamt</div>
       <div class="kpi-value kpi-big ${totalBalance >= 0 ? 'positive' : 'negative'}">${esc(euro(totalBalance))}</div>
+      ${openings.length ? `<div class="kpi-label">inkl. ${openings.length === 1 ? `Anfangsbestand am ${esc(fmtDate(openings[0].date))}` : `Anfangsbestände (${openings.length})`} · ${esc(euro(sumOpeningCents(openings) / 100))}</div>` : ''}
     </div>
   </div>
   </div>

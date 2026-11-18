@@ -1,3 +1,5 @@
+import { sumOpeningCents } from '../../../shared/accountOpening'
+import { listAccountOpenings } from '../repositories/accountOpenings'
 import type { DataChangeScope } from '../../../shared/dataChange'
 import type {
   DashboardSnapshot,
@@ -210,10 +212,13 @@ export function getDashboardSnapshot(input: DashboardSnapshotInput): DashboardSn
   if (cached && cached.expiresAt > now) return cached.value
 
   const financial = financialSummaries(input)
+  const openings = listAccountOpenings()
   const cards = activeCards(input.today)
   const value: DashboardSnapshot = {
     ...financial,
-    years: listVoucherYears(),
+    openings: openings.filter(row => row.date >= input.from && row.date <= input.to),
+    openingSaldo: financial.openingSaldo + (input.openingTo ? sumOpeningCents(openings.filter(row => row.date <= input.openingTo!)) / 100 : 0),
+    years: [...new Set([...listVoucherYears(), ...openings.map(row => Number(row.date.slice(0, 4)))])].sort((a, b) => b - a),
     organization: organizationSettings(),
     members: memberStats(),
     invoices: invoiceStats(input.today),

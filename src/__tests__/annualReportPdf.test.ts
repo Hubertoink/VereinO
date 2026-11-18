@@ -1,5 +1,7 @@
+import { listAccountOpenings } from '../../electron/main/repositories/accountOpenings'
 import path from 'node:path'
 
+jest.mock('../../electron/main/repositories/accountOpenings', () => ({ listAccountOpenings: jest.fn(() => []) }))
 jest.mock('../../electron/main/services/reportPdf', () => ({ writeReportPdf: jest.fn() }))
 jest.mock('../../electron/main/services/exportPaths', () => ({ createExportPath: jest.fn(), createExportStamp: jest.fn() }))
 jest.mock('../../electron/main/services/settings', () => ({ getSetting: jest.fn() }))
@@ -41,6 +43,7 @@ const compactHtml = () => reportHtml().replace(/\s+/g, ' ')
 
 beforeEach(() => {
   jest.resetAllMocks()
+  jest.mocked(listAccountOpenings).mockReturnValue([])
   jest.mocked(writeReportPdf).mockResolvedValue(undefined)
   jest.mocked(createExportStamp).mockReturnValue('fixed-stamp')
   jest.mocked(createExportPath).mockImplementation(name => path.join('mock-exports', name))
@@ -119,11 +122,22 @@ it('fiscal PDF keeps opening/year/closing balances and dated section labels', as
   expect(html).toContain('Insgesamt 2 Beleg(e)')
 })
 
+it('separates openings on January 1 and later openings from annual income and expense', async () => {
+  jest.mocked(listAccountOpenings).mockReturnValue([{ accountId: 1, date: period.from, amountCents: 5000 }, { accountId: 2, date: '2026-06-01', amountCents: -2500 }])
+  await generateFiscalReportPDF(options)
+  const html = compactHtml()
+  expect(html).toContain('Anfangsbestand (01.01.2026):</span> <span class="summary-value">350,00 €')
+  expect(html).toContain('Im Jahresverlauf übernommene Kontobestände:</span><span class="summary-value">-25,00 €')
+  expect(html).toContain('Endbestand (31.12.2026):</span> <span class="summary-value positive">1.075,00 €')
+})
+
 it('treasurer PDF keeps account totals, cash cutoff, annual KPIs and optional tag columns', async () => {
+  jest.mocked(listAccountOpenings).mockReturnValue([{ accountId: 1, date: '2026-08-01', amountCents: 10000 }])
   await generateTreasurerReportPDF({ ...options, includeTags: true })
   expect(cashBalance).toHaveBeenCalledWith({ to: '2026-12-31' })
   const html = compactHtml()
   expect(html).toContain('Berichtszeitraum: 01.01.2026 – 31.12.2026 (Geschäftsjahr 2026)')
+  expect(html).toContain('inkl. Anfangsbestand am 01.08.2026 · 100,00 €')
   expect(html).toContain('Kassenstand zum Stichtag: 31.12.2026')
   expect(html).toContain('Kassier: Anna &amp; Bea')
   expect(html).toContain('Gesamt</div> <div class="kpi-value kpi-big positive">700,00 €')

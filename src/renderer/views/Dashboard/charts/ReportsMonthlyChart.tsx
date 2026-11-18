@@ -1,3 +1,5 @@
+import { OpeningMarker, OpeningTooltipLines } from '../../../components/booking/AccountOpeningChart'
+import { openingsByPeriod, sumOpeningCents, type AccountOpening } from '../../../../../shared/accountOpening'
 import { niceStep } from '../../../../../shared/chartScale'
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { addDataChangedListener } from '../../../utils/refresh'
@@ -16,7 +18,7 @@ function monthKeys(from: string, to: string): string[] {
   return out
 }
 
-export default function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; baseSaldo?: number; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; paymentMethod?: 'BAR' | 'BANK' }) {
+export default function ReportsMonthlyChart(props: { activateKey?: number; refreshKey?: number; from?: string; to?: string; baseSaldo?: number; openings?: AccountOpening[]; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'; paymentMethod?: 'BAR' | 'BANK' }) {
   const { from: fromProp, to: toProp } = props
   const eur = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }), [])
   const eurShort = useMemo(() => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }), [])
@@ -111,10 +113,11 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
   }, [from, to, isDaily, props.activateKey, props.refreshKey])
 
   const labels = rowsAll.map(r => r.month)
+  const openingEntries = openingsByPeriod(props.openings ?? [], isDaily)
   const cumSeries = (() => {
     const arr: number[] = []
     let s = Number(props.baseSaldo || 0)
-    for (const b of rowsAll) { s += b.gross; arr.push(s) }
+    for (const b of rowsAll) { s += b.gross + sumOpeningCents(openingEntries.get(b.month) ?? []) / 100; arr.push(s) }
     return arr
   })()
 
@@ -262,6 +265,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
           {/* Cumulative line: aura underlay + crisp foreground. */}
           <polyline points={cumSeries.map((v,i)=>`${xs(i, labels.length)},${yLine(v)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={6} opacity="0.2" filter={`url(#${auraId})`} />
           <polyline points={cumSeries.map((v,i)=>`${xs(i, labels.length)},${yLine(v)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+          {labels.map((key, i) => <OpeningMarker key={key} entries={openingEntries.get(key)} x={xs(i, labels.length)} y={yLine(cumSeries[i])} />)}
           {/* X labels */}
           {labels.map((m,i)=>{
             if (!visibleTickIndexes.has(i)) return null
@@ -313,6 +317,7 @@ export default function ReportsMonthlyChart(props: { activateKey?: number; refre
               <div style={{ fontWeight: 600, marginBottom: 4 }}>{mLabel}</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--success)' }}>Einnahmen</span> <strong style={{ color: 'var(--success)' }}>{eur.format(inVal)}</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: 'var(--danger)' }}>Ausgaben</span> <strong style={{ color: 'var(--danger)' }}>{eur.format(outVal)}</strong></div>
+              <OpeningTooltipLines entries={openingEntries.get(label)} />
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--border)' }}><span style={{ color: 'var(--accent)' }}>Saldo kumuliert</span> <strong style={{ color: 'var(--accent)' }}>{eur.format(saldo)}</strong></div>
             </div>
           )

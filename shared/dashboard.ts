@@ -1,3 +1,5 @@
+import type { AccountOpening } from './accountOpening'
+
 export type DashboardSnapshotInput = {
   from: string
   to: string
@@ -13,6 +15,7 @@ export type DashboardFinancialSummary = {
 
 export type DashboardSnapshot = {
   financial: DashboardFinancialSummary
+  openings: AccountOpening[]
   openingSaldo: number
   years: number[]
   organization: {

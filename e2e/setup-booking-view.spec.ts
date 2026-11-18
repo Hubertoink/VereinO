@@ -12,7 +12,9 @@ test.beforeAll(async () => {
     window.writes = []; window.preferences = []; window.tagsSaved = []; window.folderChanges = []
     window.failKey = ''; window.failLoad = false; window.cancelPicker = false
     const settings = { 'org.name': 'Testverein', 'org.cashier': 'Alex', 'backup.auto': 'OFF', 'backup.intervalDays': 14 }
+    window.accountWrites = []
     window.api = {
+      paymentAccounts: { list: async () => ({ rows: [{ id: 1, name: 'Bank', kind: 'BANK', sortOrder: 1, isActive: 1, openingDate: null, openingCents: null }] }), configureSetup: async changes => { window.accountWrites.push(changes); return { rows: [] } } },
       settings: { get: async ({key}) => { if (window.failLoad) throw new Error('Laden fehlgeschlagen'); return { value: settings[key] } }, set: async value => { if (value.key === window.failKey) throw new Error('Speichern fehlgeschlagen'); window.writes.push(value); settings[value.key] = value.value; return { ok: true } } },
       organizations: { active: async () => ({ organization: { id: 'org1', name: 'Testverein', profile: window.profile || 'NONPROFIT' } }), setAppearance: async value => { window.preferences.push(value); return { success: true } } },
       backup: { getDir: async () => ({ ok: true, dir: 'C:\\\\Backups' }), pickDir: async () => window.cancelPicker ? ({ ok: false, canceled: true }) : ({ ok: true, dir: 'D:\\\\VereinO' }), setDir: async ({dir}) => { window.folderChanges.push(dir); return { ok: true, dir, moved: 0 } } },
@@ -41,7 +43,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 for (const view of ['plus', 'classic'] as const) {
-  test(`four-step setup applies ${view} only at completion and preserves workflow and columns`, async ({ page }) => {
+  test(`five-step setup applies ${view} only at completion and preserves workflow and columns`, async ({ page }) => {
     await page.getByLabel(/Name der Organisation/).fill('Neuer Vereinsname')
     await page.getByRole('button', { name: 'Weiter', exact: true }).click()
     await page.getByRole('radio', { name: view === 'plus' ? 'Buchungen Plus' : 'Buchungen klassisch' }).check()
@@ -56,6 +58,7 @@ for (const view of ['plus', 'classic'] as const) {
     await page.getByRole('button', { name: 'Ordner wählen…' }).click()
     await expect(page.getByLabel('Sicherungsordner', { exact: true })).toHaveValue('D:\\VereinO')
     await expect.poll(() => page.evaluate(() => (window as any).folderChanges.length)).toBe(0)
+    await page.getByRole('button', { name: 'Weiter', exact: true }).click()
     await page.getByRole('button', { name: 'Weiter', exact: true }).click()
     await expect(page.locator('.setup-review')).toContainText('Neuer Vereinsname')
     await expect.poll(() => page.evaluate(() => (window as any).writes.length)).toBe(0)
@@ -75,6 +78,23 @@ for (const view of ['plus', 'classic'] as const) {
     expect(await page.evaluate(() => [localStorage.getItem('journalCols'),localStorage.getItem('journalColsOrder'),localStorage.getItem('ui.quickAddAfterSave')])).toEqual(['existing-columns','existing-order','new'])
   })
 }
+
+test('optional signed account openings need a date and are written only at completion', async ({ page }) => {
+  for (let step = 0; step < 3; step++) await page.getByRole('button', { name: 'Weiter', exact: true }).click()
+  await page.getByLabel('Anfangsbestand (€)').fill('-145,50')
+  await page.getByRole('button', { name: 'Weiter', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('Stichtag')
+  await page.getByLabel('Stichtag').fill('2026-01-01')
+  await page.getByRole('checkbox', {name:'Bar',exact:true}).check()
+  await page.getByLabel('Eigenes Konto').fill('Sommerkasse')
+  await page.getByLabel('Kontotyp').selectOption('CASH')
+  await page.getByRole('button', {name:'Hinzufügen',exact:true}).click()
+  await page.getByRole('button', { name: 'Weiter', exact: true }).click()
+  expect(await page.evaluate(() => (window as any).accountWrites)).toEqual([])
+  await page.getByRole('button', { name: 'VereinO starten', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(await page.evaluate(() => (window as any).accountWrites)).toEqual([{ create: [{name:'Bar', kind:'CASH', opening:null}, {name:'Sommerkasse', kind:'CASH', opening:null}], activation: [], openings: [{ accountId: 1, previous: null, opening: { date: '2026-01-01', amountCents: -14550 } }] }])
+})
 
 test('postponing discards drafts, folder picking is non-mutating and back navigation preserves choices', async ({ page }) => {
   await page.getByLabel(/Name der Organisation/).fill('Unbestätigt')
@@ -96,7 +116,7 @@ test('postponing discards drafts, folder picking is non-mutating and back naviga
 })
 
 test('save failure stays open, never marks completion, and supports retry', async ({ page }) => {
-  for (let step = 0; step < 3; step++) await page.getByRole('button', { name: 'Weiter', exact: true }).click()
+  for (let step = 0; step < 4; step++) await page.getByRole('button', { name: 'Weiter', exact: true }).click()
   await page.getByText('Starter-Tags hinzufügen').click()
   await page.getByRole('checkbox', { name: 'Spende', exact: true }).check()
   await page.evaluate(() => { (window as any).failKey = 'setup.completed' })
@@ -132,17 +152,17 @@ test('load failure blocks overwriting settings; empty name and canceled picker a
   await expect(page.getByRole('button', { name: 'Weiter', exact: true })).toBeEnabled()
 })
 
-for (const theme of ['light','dark']) test(`all four steps fit small and large windows in ${theme}`, async ({page}) => {
+for (const theme of ['light','dark']) test(`all five steps fit small and large windows in ${theme}`, async ({page}) => {
   await page.evaluate(theme => { document.documentElement.dataset.theme = theme; document.documentElement.dataset.colorTheme = theme === 'light' ? 'professional-light' : 'earthy-tones' },theme)
   for (const width of [1200,390]) {
     await page.setViewportSize({width,height:width === 1200 ? 850 : 650})
-    for(let step=0;step<4;step++) {
+    for(let step=0;step<5;step++) {
       const modal=page.locator('.setup-wizard')
       await expect.poll(() => modal.evaluate(el => {const r=el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight+1 && r.right <= innerWidth+1 && el.scrollWidth <= el.clientWidth+1})).toBe(true)
       await expect(page.locator('.setup-wizard-footer')).toBeInViewport()
       await expect(page.getByRole('button', {name: /Später einrichten/})).toBeInViewport()
       if(process.env.CAPTURE_SETUP) { await mkdir('release/design/setup-new',{recursive:true}); await modal.screenshot({path:`release/design/setup-new/${theme}-${width}-${step}.png`}) }
-      if(step<3) await page.getByRole('button',{name:'Weiter',exact:true}).click()
+      if(step<4) await page.getByRole('button',{name:'Weiter',exact:true}).click()
     }
     await page.getByRole('button',{name:/Willkommen/}).click()
   }

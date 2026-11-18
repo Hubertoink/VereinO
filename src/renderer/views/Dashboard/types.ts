@@ -1,3 +1,4 @@
+import type { AccountOpening } from '../../../../shared/accountOpening'
 import type { Sphere } from '../../../../shared/financePrimitives'
 export type { Sphere } from '../../../../shared/financePrimitives'
 
@@ -10,7 +11,7 @@ export type CommonFilters = {
 export type Money = number // EUR as number; format with Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })
 
 // Props contracts for the dashboard components; data fetching can be injected later.
-export type BalanceAreaChartProps = CommonFilters & { activateKey?: number; refreshKey?: number; baseSaldo?: number }
+export type BalanceAreaChartProps = CommonFilters & { activateKey?: number; refreshKey?: number; baseSaldo?: number; openings?: AccountOpening[] }
 export type IncomeExpenseBarsProps = CommonFilters & { refreshKey?: number }
 export type EarmarksUsageBarsProps = CommonFilters & { limit?: number }
 export type BudgetDeviationListProps = CommonFilters & { limit?: number }

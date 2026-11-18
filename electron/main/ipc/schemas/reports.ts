@@ -302,6 +302,7 @@ export const ReportsSummaryOutput = z.object({
   byPaymentAccount: z
     .array(
       z.object({
+        bookingNet: z.number().optional(),
         accountId: z.number().nullable(),
         key: z.string(),
         kind: PaymentAccountKind.nullable(),
@@ -347,6 +348,7 @@ export type TReportsMonthlyOutput = z.infer<typeof ReportsMonthlyOutput>
 
 // Cash balance as of a date (cumulative inflow-outflow; defaults to all-time when 'from' is omitted)
 export const ReportsCashBalanceInput = z.object({
+  includeOpenings: z.boolean().optional(),
   from: z.string().optional(),
   to: z.string().optional(),
   sphere: Sphere.optional(),

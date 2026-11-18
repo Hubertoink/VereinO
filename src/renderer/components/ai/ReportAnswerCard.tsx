@@ -359,6 +359,10 @@ export default function ReportAnswerCard({
                 <dt>Anfangsbestand vor {dateLabel(data.scope.from)}</dt>
                 <dd>{money.format(data.opening)}</dd>
               </div>
+              {Math.abs(data.closing - data.opening - data.change) >= 0.005 && <div>
+                <dt>Im Zeitraum übernommene Kontobestände</dt>
+                <dd>{money.format(data.closing - data.opening - data.change)}</dd>
+              </div>}
               <div>
                 <dt>Gebuchter Bestand am {dateLabel(data.scope.to)}</dt>
                 <dd>{money.format(data.closing)}</dd>

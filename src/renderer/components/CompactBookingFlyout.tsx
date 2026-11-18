@@ -1,3 +1,4 @@
+import { selectDraftBookingType } from '../utils/bookingType'
 import { canPreviewAttachment, type AttachmentPreviewRequest } from '../utils/attachmentPreview'
 import BookingAttachmentPreview from './booking/BookingAttachmentPreview'
 import CategoryIcon from './common/CategoryIcon'
@@ -212,11 +213,6 @@ export default function CompactBookingFlyout({
     () => new Map(activeAccounts.map((account) => [account.id, account])),
     [activeAccounts]
   )
-  const defaultCash = activeAccounts.find((account) => account.kind === 'CASH') ?? activeAccounts[0]
-  const defaultBank = activeAccounts.find((account) => account.kind === 'BANK')
-    ?? activeAccounts.find((account) => account.id !== defaultCash?.id)
-    ?? activeAccounts[0]
-
   const { aiAssistRef, aiMenuOpen, setAiMenuOpen, aiSuggestions } = useBookingAiSuggestions({
     draft: qa,
     grossAmount: gross,
@@ -326,73 +322,11 @@ export default function CompactBookingFlyout({
 
   const selectType = (type: QA['type']) => {
     if (needsBookingType) setSelectedHeight(editorRef.current?.getBoundingClientRect().height)
-    const next = { ...qa, type, bookingTypeSelected: true } as QA
-    if (type === 'TRANSFER') {
-      next.mode = 'GROSS'
-      next.vatRate = 0
-      next.transferFromAccountId = next.transferFromAccountId ?? defaultCash?.id ?? null
-      next.transferFromAccountName = accountsById.get(Number(next.transferFromAccountId || 0))?.name ?? defaultCash?.name ?? null
-      next.transferFrom = accountMethod(accountsById.get(Number(next.transferFromAccountId || 0))?.kind ?? defaultCash?.kind)
-      next.transferToAccountId = next.transferToAccountId ?? defaultBank?.id ?? null
-      next.transferToAccountName = accountsById.get(Number(next.transferToAccountId || 0))?.name ?? defaultBank?.name ?? null
-      next.transferTo = accountMethod(accountsById.get(Number(next.transferToAccountId || 0))?.kind ?? defaultBank?.kind)
-      next.paymentAccountId = null
-      next.paymentAccountName = null
-    } else if (type === 'INTERNAL') {
-      next.mode = 'GROSS'
-      next.vatRate = 0
-      next.paymentAccountId = null
-      next.paymentAccountName = null
-      next.paymentMethod = undefined
-      next.transferFromAccountId = null
-      next.transferToAccountId = null
-    } else {
-      next.transferFromAccountId = null
-      next.transferToAccountId = null
-      if (!next.paymentAccountId) {
-        const fallback = next.paymentMethod === 'BANK' ? defaultBank : defaultCash ?? defaultBank
-        next.paymentAccountId = fallback?.id ?? null
-        next.paymentAccountName = fallback?.name ?? null
-        next.paymentMethod = accountMethod(fallback?.kind)
-      }
-    }
-    setQa(next)
+    setQa(selectDraftBookingType(qa, type))
   }
 
   const applyAISuggestion = (suggestion: BookingAISuggestion) => {
-    const next = { ...qa } as QA
-    if (suggestion.type && suggestion.type !== next.type) {
-      next.type = suggestion.type
-      if (suggestion.type === 'TRANSFER') {
-        next.mode = 'GROSS'
-        next.vatRate = 0
-        next.transferFromAccountId = next.transferFromAccountId ?? defaultCash?.id ?? null
-        next.transferFromAccountName = accountsById.get(Number(next.transferFromAccountId || 0))?.name ?? defaultCash?.name ?? null
-        next.transferFrom = accountMethod(accountsById.get(Number(next.transferFromAccountId || 0))?.kind ?? defaultCash?.kind)
-        next.transferToAccountId = next.transferToAccountId ?? defaultBank?.id ?? null
-        next.transferToAccountName = accountsById.get(Number(next.transferToAccountId || 0))?.name ?? defaultBank?.name ?? null
-        next.transferTo = accountMethod(accountsById.get(Number(next.transferToAccountId || 0))?.kind ?? defaultBank?.kind)
-        next.paymentAccountId = null
-        next.paymentAccountName = null
-      } else if (suggestion.type === 'INTERNAL') {
-        next.mode = 'GROSS'
-        next.vatRate = 0
-        next.paymentAccountId = null
-        next.paymentAccountName = null
-        next.paymentMethod = undefined
-        next.transferFromAccountId = null
-        next.transferToAccountId = null
-      } else {
-        next.transferFromAccountId = null
-        next.transferToAccountId = null
-        if (!next.paymentAccountId) {
-          const fallback = suggestion.type === 'IN' ? defaultBank : (defaultCash || defaultBank)
-          next.paymentAccountId = fallback?.id ?? null
-          next.paymentAccountName = fallback?.name ?? null
-          next.paymentMethod = accountMethod(fallback?.kind)
-        }
-      }
-    }
+    const next = suggestion.type && suggestion.type !== qa.type ? selectDraftBookingType(qa, suggestion.type) : { ...qa }
     if (suggestion.sphere) next.sphere = suggestion.sphere
     if (suggestion.paymentAccountId && next.type !== 'TRANSFER' && next.type !== 'INTERNAL') {
       const account = accountsById.get(Number(suggestion.paymentAccountId))
@@ -638,7 +572,7 @@ export default function CompactBookingFlyout({
               <>
                 <label className="compact-booking-field">
                   <span>Von Konto *</span>
-                  <SelectDropdown invalid={hasSameTransferAccount} placeholder="Konto wählen" style={{ color: accountsById.get(Number(qa.transferFromAccountId || 0))?.color || undefined }} value={String(qa.transferFromAccountId ?? '')} onChange={(value) => {
+                  <SelectDropdown invalid={hasSameTransferAccount || !qa.transferFromAccountId} placeholder="Konto wählen" style={{ color: accountsById.get(Number(qa.transferFromAccountId || 0))?.color || undefined }} value={String(qa.transferFromAccountId ?? '')} onChange={(value) => {
                     const id = value ? Number(value) : null
                     const account = accountsById.get(Number(id || 0))
                     patchQa({ transferFromAccountId: id, transferFromAccountName: account?.name ?? null, transferFrom: accountMethod(account?.kind) })
@@ -646,7 +580,7 @@ export default function CompactBookingFlyout({
                 </label>
                 <label className="compact-booking-field">
                   <span>Nach Konto *</span>
-                  <SelectDropdown invalid={hasSameTransferAccount} placeholder="Konto wählen" style={{ color: accountsById.get(Number(qa.transferToAccountId || 0))?.color || undefined }} value={String(qa.transferToAccountId ?? '')} onChange={(value) => {
+                  <SelectDropdown invalid={hasSameTransferAccount || !qa.transferToAccountId} placeholder="Konto wählen" style={{ color: accountsById.get(Number(qa.transferToAccountId || 0))?.color || undefined }} value={String(qa.transferToAccountId ?? '')} onChange={(value) => {
                     const id = value ? Number(value) : null
                     const account = accountsById.get(Number(id || 0))
                     patchQa({ transferToAccountId: id, transferToAccountName: account?.name ?? null, transferTo: accountMethod(account?.kind) })
@@ -656,7 +590,7 @@ export default function CompactBookingFlyout({
             ) : qa.type !== 'INTERNAL' ? (
               <label className="compact-booking-field" {...bankSource.fieldProps('account')}>
                 <span>Konto *</span>
-                <SelectDropdown placeholder="Konto wählen" style={{ color: accountsById.get(Number(qa.paymentAccountId || 0))?.color || undefined }} value={String(qa.paymentAccountId ?? '')} onChange={(value) => {
+                <SelectDropdown invalid={hasMissingAccount} placeholder="Konto wählen" style={{ color: accountsById.get(Number(qa.paymentAccountId || 0))?.color || undefined }} value={String(qa.paymentAccountId ?? '')} onChange={(value) => {
                   const id = value ? Number(value) : null
                   const account = accountsById.get(Number(id || 0))
                   patchQa({ paymentAccountId: id, paymentAccountName: account?.name ?? null, paymentMethod: accountMethod(account?.kind) })

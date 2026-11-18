@@ -107,7 +107,7 @@ export const VouchersListInput = z
     sort: z.enum(['ASC', 'DESC']).optional(),
     // New sortable columns for Buchungen
     sortBy: z
-      .enum(['date', 'description', 'gross', 'net', 'attachments', 'budget', 'earmark', 'payment', 'sphere'])
+      .enum(['date', 'type', 'description', 'gross', 'net', 'attachments', 'budget', 'earmark', 'payment', 'sphere'])
       .optional(),
     paymentMethod: PaymentMethod.optional(),
     paymentAccountId: z.number().nullable().optional(),
@@ -309,11 +309,27 @@ const PaymentAccountShape = z.object({
   color: z.string().nullable().optional(),
   sortOrder: z.number(),
   isActive: z.number(),
+  openingDate: z.string().nullable(),
+  openingCents: z.number().int().nullable(),
   bookingCount: z.number().int().nonnegative()
 })
 export const PaymentAccountsListInput = z.object({ activeOnly: z.boolean().optional() }).optional()
 export const PaymentAccountsListOutput = z.object({ rows: z.array(PaymentAccountShape) })
+const AccountOpeningValue = z.object({ date: z.string(), amountCents: z.number().int().safe() }).nullable()
+export const OpeningVoucherInput = z.object({ accountId: z.number().int().positive(), voucherNo: z.string().trim().min(1) })
+export type TOpeningVoucherInput = z.infer<typeof OpeningVoucherInput>
+export const AccountOpeningChanges = z.array(z.object({ accountId: z.number().int().positive(), opening: AccountOpeningValue, previous: AccountOpeningValue }))
+export type TAccountOpeningChanges = z.infer<typeof AccountOpeningChanges>
+export const SetupAccountsInput = z.object({
+  create: z.array(z.object({ name: z.string().trim().min(1), kind: PaymentAccountKind, opening: AccountOpeningValue })),
+  activation: z.array(z.object({ accountId: z.number().int().positive(), active: z.boolean() })),
+  openings: AccountOpeningChanges
+})
+export type TSetupAccountsInput = z.infer<typeof SetupAccountsInput>
 export const PaymentAccountUpsertInput = z.object({
+  opening: AccountOpeningValue.optional(),
+  previousOpening: AccountOpeningValue.optional(),
+  openingVoucherNo: z.string().trim().min(1).optional(),
   id: z.number().optional(),
   name: z.string(),
   kind: PaymentAccountKind,

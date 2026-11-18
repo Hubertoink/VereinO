@@ -1,6 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom'
-import { IconArrowLeft, IconArrowRight, IconCheck, IconBuildingCommunity, IconLayoutDashboard, IconShieldCheck, IconRocket, IconFolder, IconTags, IconInfoCircle } from '@tabler/icons-react'
+import { IconArrowLeft, IconArrowRight, IconCheck, IconBuildingCommunity, IconLayoutDashboard, IconShieldCheck, IconRocket, IconFolder, IconTags, IconInfoCircle, IconWallet } from '@tabler/icons-react'
+import SetupAccountStep from './SetupAccountStep'
+import { setupAccountChanges, setupAccountChoices, type SetupAccount } from './setupAccounts'
 import ModalHeader from '../ModalHeader'
 import appLogo from '../../../../build/Icon.ico'
 import { COLOR_THEME_OPTIONS } from '../../utils/appearanceOptions'
@@ -13,6 +15,7 @@ const STEPS = [
   { label: 'Willkommen', title: 'Willkommen bei VereinO', description: 'Dein Verein. Deine Finanzen. In wenigen Schritten startklar.', icon: IconBuildingCommunity },
   { label: 'Deine Ansicht', title: 'So behältst du den Überblick', description: 'Wähle die Ansicht, mit der du dich wohlfühlst. Du kannst sie jederzeit ändern.', icon: IconLayoutDashboard },
   { label: 'Datensicherung', title: 'Deine Daten gut gesichert', description: 'Bestimme, wie VereinO dich beim Sichern deiner Daten unterstützt.', icon: IconShieldCheck },
+  { label: 'Konten', title: 'Welche Konten nutzt du?', description: 'Wähle deine Kassen und Zahlungskonten. Für jedes Konto kannst du einen Anfangsbestand mit Stichtag eintragen.', icon: IconWallet },
   { label: 'Startklar', title: 'Bereit für deine erste Buchung', description: 'Prüfe deine Auswahl. Danach kannst du direkt loslegen.', icon: IconRocket },
 ]
 const BACKUP_MODES = [
@@ -36,6 +39,7 @@ type Props = {
 export default function SetupWizardModal({ onClose, bookingView, setBookingView, colorTheme, setColorTheme, existingTags, notify }: Props) {
   const id = useId()
   const [step, setStep] = useState(0)
+  const [accounts, setAccounts] = useState<SetupAccount[]>([])
   const [orgName, setOrgName] = useState('')
   const [cashier, setCashier] = useState('')
   const [orgId, setOrgId] = useState<string | null>(null)
@@ -71,10 +75,11 @@ export default function SetupWizardModal({ onClose, bookingView, setBookingView,
     Promise.all([
       window.api.settings.get({ key: 'org.name' }), window.api.settings.get({ key: 'org.cashier' }),
       window.api.settings.get({ key: 'backup.auto' }), window.api.settings.get({ key: 'backup.intervalDays' }),
-      window.api.backup.getDir(), window.api.organizations.active(),
-    ]).then(([name, person, mode, interval, dir, active]) => {
+      window.api.backup.getDir(), window.api.organizations.active(), window.api.paymentAccounts.list(),
+    ]).then(([name, person, mode, interval, dir, active, result]) => {
       if (!alive) return
       if (!dir.ok) throw new Error(dir.error || 'Sicherungsordner konnte nicht geladen werden.')
+      setAccounts(setupAccountChoices(result.rows))
       setOrgName(String(name.value || active.organization?.name || ''))
       setCashier(String(person.value || ''))
       setOrgId(active.organization?.id || null)
@@ -122,6 +127,7 @@ export default function SetupWizardModal({ onClose, bookingView, setBookingView,
     try {
       const active = await window.api.organizations.active()
       if (active.organization?.id !== orgId) throw new Error('Die Organisation wurde gewechselt. Bitte öffne das Setup erneut.')
+      const changes = setupAccountChanges(accounts)
       if (chosenDir) {
         const result = await window.api.backup.setDir({ dir: chosenDir })
         if (!result.ok) throw new Error(result.error || 'Sicherungsordner konnte nicht übernommen werden.')
@@ -146,10 +152,14 @@ export default function SetupWizardModal({ onClose, bookingView, setBookingView,
         const result = await window.api.organizations.setAppearance({ orgId, colorTheme: draftTheme, bookingView: draftView })
         if (!result.success) throw new Error('Die Ansicht konnte nicht gespeichert werden.')
       }
+      if (changes.create.length || changes.activation.length || changes.openings.length) {
+        const result = await window.api.paymentAccounts.configureSetup(changes)
+        setAccounts(setupAccountChoices(result.rows))
+      }
       const completed = await window.api.settings.set({ key: 'setup.completed', value: true })
       if (!completed.ok) throw new Error('Die Einrichtung konnte nicht abgeschlossen werden.')
       setBookingView(draftView); setColorTheme(draftTheme)
-      dispatchDataChanged(['settings', 'organizations', 'tags'])
+      dispatchDataChanged(['settings', 'organizations', 'tags', 'vouchers'])
       notify('success', 'VereinO ist eingerichtet. Viel Freude beim Start!')
       onClose()
     } catch (e: any) { setError(e?.message || String(e)) }
@@ -159,6 +169,10 @@ export default function SetupWizardModal({ onClose, bookingView, setBookingView,
   function changeStep(next: number) {
     if (saving || loading || loadError) return
     if (!orgName.trim() && next > 0) { setError('Bitte gib einen Namen für die Organisation an.'); return }
+    if (step === 3 && next > step) {
+      try { setupAccountChanges(accounts) }
+      catch (e) { setError((e as Error).message); return }
+    }
     setError(''); setStep(next)
   }
   function addCustomTag() {
@@ -222,8 +236,9 @@ export default function SetupWizardModal({ onClose, bookingView, setBookingView,
             </div>
             <p className="setup-note"><IconInfoCircle size={16} aria-hidden="true" />Ein anderes Laufwerk oder ein synchronisierter Ordner schützt zusätzlich bei einem Geräteausfall.</p>
           </>}
-          {step === 3 && <>
-            <dl className="setup-review"><div><dt>Organisation</dt><dd>{orgName}</dd></div><div><dt>Buchungsansicht</dt><dd>{draftView === 'plus' ? 'Buchungen Plus' : 'Buchungen klassisch'}</dd></div><div><dt>Farbschema</dt><dd>{COLOR_THEME_OPTIONS.find(theme => theme.id === draftTheme)?.name}</dd></div><div><dt>Datensicherung</dt><dd>{BACKUP_MODES.find(mode => mode.value === backupMode)?.title}{backupMode !== 'OFF' && ` · ${intervalDays === 1 ? 'täglich' : `alle ${intervalDays} Tage`}`}</dd></div><div className="setup-review-wide"><dt>Sicherungsordner</dt><dd>{chosenDir || backupDir}</dd></div></dl>
+          {step === 3 && <SetupAccountStep accounts={accounts} onChange={setAccounts} />}
+          {step === 4 && <>
+            <dl className="setup-review"><div><dt>Organisation</dt><dd>{orgName}</dd></div><div><dt>Zahlungskonten</dt><dd>{accounts.filter(account => account.selected).map(account => account.name).join(', ') || 'Keine ausgewählt'}</dd></div><div><dt>Buchungsansicht</dt><dd>{draftView === 'plus' ? 'Buchungen Plus' : 'Buchungen klassisch'}</dd></div><div><dt>Farbschema</dt><dd>{COLOR_THEME_OPTIONS.find(theme => theme.id === draftTheme)?.name}</dd></div><div><dt>Datensicherung</dt><dd>{BACKUP_MODES.find(mode => mode.value === backupMode)?.title}{backupMode !== 'OFF' && ` · ${intervalDays === 1 ? 'täglich' : `alle ${intervalDays} Tage`}`}</dd></div><div className="setup-review-wide"><dt>Sicherungsordner</dt><dd>{chosenDir || backupDir}</dd></div></dl>
             <details className="setup-optional-section"><summary><IconTags size={17} aria-hidden="true" />Starter-Tags hinzufügen <span>{tagNames.length ? `${tagNames.length} ausgewählt` : 'Optional'}</span></summary><p className="setup-note">Tags helfen dir, Buchungen später wiederzufinden. Wähle nur, was du brauchst.</p><div className="setup-tag-options">{suggestions.map(tag => <label key={tag.name}><input type="checkbox" disabled={existingSet.has(tag.name.toLocaleLowerCase('de'))} checked={existingSet.has(tag.name.toLocaleLowerCase('de')) || selectedTags.includes(tag.name)} onChange={e => setSelectedTags(names => e.target.checked ? [...names, tag.name] : names.filter(name => name !== tag.name))} /><span>{tag.name}{existingSet.has(tag.name.toLocaleLowerCase('de')) && ' (vorhanden)'}</span></label>)}</div><div className="setup-custom-tag"><label htmlFor={`${id}-tag`}>Eigener Tag</label><div><input id={`${id}-tag`} className="input" value={customTag} onChange={e => setCustomTag(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomTag() } }} placeholder="z. B. Sommerfest" /><button type="button" className="btn" disabled={!customTag.trim()} onClick={addCustomTag}>Hinzufügen</button></div></div>{customTags.length > 0 && <div className="setup-tag-options">{customTags.map(name => <button type="button" key={name} className="btn" aria-label={`Tag ${name} entfernen`} onClick={() => setCustomTags(tags => tags.filter(tag => tag !== name))}>{name} ×</button>)}</div>}</details>
             <p className="setup-note">Weitere Optionen für Darstellung und Arbeitsweise findest du jederzeit in den Einstellungen.</p>
           </>}

@@ -3125,6 +3125,7 @@ function AppInner() {
         <Suspense fallback={<LoadingState message="Bereich wird geladen…" />}>
           {activePage === 'Reports' && (
             <ReportsView
+              paymentAccounts={paymentAccounts}
               from={reportsFrom}
               to={reportsTo}
               setFrom={setReportsFrom}
@@ -3341,7 +3342,7 @@ function AppInner() {
             />
           )}
           {isPlusBookings && (
-            <BookingsPlusView showCreationActions={!useSidebarActions} onFilterChange={updateBookingLinkFilter} onResetFilters={resetBookingLinkFilters} calendarSelection={plusCalendarSelection} onCalendarSelectionChange={setPlusCalendarSelection} jumpRevision={bookingJumpRevision} externalFilters={bookingLinkFilters} flashId={flashId} fmtDate={fmtDate} showBookingDraftTabs={showBookingDraftTabs} bookingDraftTabs={bookingDraftTabs} onOpenBookingDraft={openBookingDraftTab} onCloseBookingDraft={closeBookingDraftTab} onNewBooking={openBookingEntry} onEditBooking={openPlusEdit} bookingEntryPresentation={bookingEntryPresentation} onNewInvoice={openJournalInvoiceScan} onReviewInvoice={(id) => void reviewBatchInvoice(id)} notify={notify} paymentAccounts={paymentAccounts} budgets={budgetsForEdit} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} closedUntil={periodLock?.closedUntil} generalProfile={organizationProfile === 'GENERAL'} />
+            <BookingsPlusView yearsAvail={yearsAvail} showCreationActions={!useSidebarActions} onFilterChange={updateBookingLinkFilter} onResetFilters={resetBookingLinkFilters} calendarSelection={plusCalendarSelection} onCalendarSelectionChange={setPlusCalendarSelection} jumpRevision={bookingJumpRevision} externalFilters={bookingLinkFilters} flashId={flashId} fmtDate={fmtDate} showBookingDraftTabs={showBookingDraftTabs} bookingDraftTabs={bookingDraftTabs} onOpenBookingDraft={openBookingDraftTab} onCloseBookingDraft={closeBookingDraftTab} onNewBooking={openBookingEntry} onEditBooking={openPlusEdit} bookingEntryPresentation={bookingEntryPresentation} onNewInvoice={openJournalInvoiceScan} onReviewInvoice={(id) => void reviewBatchInvoice(id)} notify={notify} paymentAccounts={paymentAccounts} budgets={budgetsForEdit} earmarks={earmarks} tagDefs={tagDefs} allowVoucherDeletion={allowVoucherDeletion} closedUntil={periodLock?.closedUntil} generalProfile={organizationProfile === 'GENERAL'} />
           )}
           {activePage === 'Dauerbuchungen' && (
             <RecurringBookingsView notify={notify} initialTask={dashboardTaskTarget} />

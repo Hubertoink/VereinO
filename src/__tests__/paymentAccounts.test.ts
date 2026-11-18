@@ -10,6 +10,7 @@ let db: any
 beforeEach(() => {
   db = new Sqlite(':memory:')
   db.exec(`
+    CREATE TABLE payment_account_openings (account_id INTEGER PRIMARY KEY, effective_date TEXT, amount_cents INTEGER);
     CREATE TABLE payment_accounts (id INTEGER PRIMARY KEY, name TEXT, kind TEXT, iban TEXT,
       color TEXT, sort_order INTEGER, is_active INTEGER);
     CREATE TABLE vouchers (id INTEGER PRIMARY KEY, payment_account_id INTEGER,

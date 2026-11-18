@@ -27,6 +27,7 @@ beforeEach(() => {
     INSERT INTO classification_schemes VALUES (1, 'general-categories', 'Kategorie', 'Kategorien', NULL, 1, 0, 1), (2, 'nonprofit-spheres', 'Sphäre', 'Sphären', NULL, 1, 1, 1);
     CREATE TABLE classification_values (id INTEGER PRIMARY KEY, scheme_id INTEGER, stable_key TEXT, name TEXT, color TEXT, icon TEXT, description TEXT, sort_order INTEGER, is_system INTEGER, is_active INTEGER);
     INSERT INTO classification_values VALUES (10, 2, 'IDEELL', 'Ideell', NULL, NULL, NULL, 1, 1, 1);
+    CREATE TABLE payment_account_openings (account_id INTEGER PRIMARY KEY, effective_date TEXT, amount_cents INTEGER);
     CREATE TABLE payment_accounts (id INTEGER PRIMARY KEY, name TEXT, kind TEXT, iban TEXT, color TEXT, sort_order INTEGER, is_active INTEGER);
     CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT UNIQUE, color TEXT);
     CREATE TABLE budgets (id INTEGER PRIMARY KEY, year INTEGER, sphere TEXT, primary_classification_value_id INTEGER, category_id INTEGER, project_id INTEGER, earmark_id INTEGER, amount_planned REAL, name TEXT, category_name TEXT, project_name TEXT, start_date TEXT, end_date TEXT, color TEXT, is_archived INTEGER, enforce_time_range INTEGER);

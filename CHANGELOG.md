@@ -7,6 +7,20 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-11-18
+
+### Hinzugefügt
+
+- Zahlungskonten haben einen optionalen Anfangsbestand mit Stichtag. Eine bereits als Buchung erfasste Eröffnung lässt sich beim Bearbeiten des Kontos übernehmen. Bestehende Datenbanken starten ohne hinterlegten Anfangsbestand bei 0 €.
+- Der Setup-Guide fragt nach den genutzten Konten. Bar und Bank stehen zur Auswahl, eigene Konten lassen sich mit Anfangsbestand und Stichtag ergänzen.
+- Die Finanzübersicht im Report zeigt den aktuellen Gesamtbestand und die einzelnen Kontostände über den Einnahmen, Ausgaben und dem Saldo des gewählten Zeitraums. Im Dashboard lässt sich der Anfangsbestand am Bestandsverlauf nachvollziehen.
+- In den klassischen Buchungen öffnet ein Rechtsklick auf den Tabellenkopf die Spaltenauswahl. Mehrere Spalten lassen sich direkt ein- oder ausblenden. Die Spalte „Art“ lässt sich auch über mehrere Ergebnisseiten hinweg sortieren.
+- Buchungen Plus bietet im Filter eine Jahresauswahl. Beide Buchungsansichten zeigen den Saldo der Buchungen im gewählten Zeitraum und den Kontostand einschließlich Anfangsbestand.
+
+### Geändert
+
+- Neue manuelle Buchungen starten mit leerer Kontowahl, auch nach „Speichern & neu“. Bei Umbuchungen werden Quell- und Zielkonto ausdrücklich gewählt. Entwürfe behalten ihre Auswahl.
+
 ## [5.3.1] - 2026-11-18
 
 ### Hinzugefügt

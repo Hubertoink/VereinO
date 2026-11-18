@@ -63,8 +63,8 @@ function createDraftId() {
 }
 
 /** Read user booking habits from localStorage */
-function getBookingHabits(): { type: QA['type']; paymentMethod: 'BAR' | 'BANK'; mode: 'NET' | 'GROSS' } {
-    const defaults = { type: 'IN' as const, paymentMethod: 'BAR' as const, mode: 'GROSS' as const }
+function getBookingHabits(): { type: QA['type']; mode: 'NET' | 'GROSS' } {
+    const defaults = { type: 'IN' as const, mode: 'GROSS' as const }
     try {
         const raw = localStorage.getItem('bookingHabits')
         if (!raw) return defaults
@@ -73,9 +73,8 @@ function getBookingHabits(): { type: QA['type']; paymentMethod: 'BAR' | 'BANK'; 
         const topType: QA['type'] = ['IN', 'OUT', 'TRANSFER', 'INTERNAL'].includes(h.lastType)
             ? h.lastType
             : (getMostFrequent(h.types, ['IN', 'OUT']) as 'IN' | 'OUT' || defaults.type)
-        const topPM = getMostFrequent(h.paymentMethods, ['BAR', 'BANK']) as 'BAR' | 'BANK' || defaults.paymentMethod
         const topMode = getMostFrequent(h.modes, ['NET', 'GROSS']) as 'NET' | 'GROSS' || defaults.mode
-        return { type: topType, paymentMethod: topPM, mode: topMode }
+        return { type: topType, mode: topMode }
     } catch {
         return defaults
     }
@@ -93,19 +92,15 @@ function getMostFrequent(counts: Record<string, number> | undefined, validKeys: 
 }
 
 /** Track a booking habit in localStorage */
-function trackBookingHabit(type: string, paymentMethod: string | undefined, mode: string | undefined) {
+function trackBookingHabit(type: string, mode: string | undefined) {
     try {
         const raw = localStorage.getItem('bookingHabits')
-        const h = raw ? JSON.parse(raw) : { types: {}, paymentMethods: {}, modes: {} }
+        const h = raw ? JSON.parse(raw) : { types: {}, modes: {} }
         if (['IN', 'OUT', 'TRANSFER', 'INTERNAL'].includes(type)) h.lastType = type
         if (!h.types) h.types = {}
-        if (!h.paymentMethods) h.paymentMethods = {}
         if (!h.modes) h.modes = {}
         if (type === 'IN' || type === 'OUT') {
             h.types[type] = (Number(h.types[type]) || 0) + 1
-        }
-        if (paymentMethod === 'BAR' || paymentMethod === 'BANK') {
-            h.paymentMethods[paymentMethod] = (Number(h.paymentMethods[paymentMethod]) || 0) + 1
         }
         if (mode === 'NET' || mode === 'GROSS') {
             h.modes[mode] = (Number(h.modes[mode]) || 0) + 1
@@ -160,8 +155,7 @@ export function useQuickAdd(
             netAmount: undefined,
             vatRate: 0,
             description: '',
-            note: '',
-            paymentMethod: habits.type === 'TRANSFER' || habits.type === 'INTERNAL' ? undefined : habits.paymentMethod
+            note: ''
         }
     }, [])
 
@@ -177,22 +171,6 @@ export function useQuickAdd(
             description: '',
             note: '',
             tags: []
-        }
-
-        if (previous.type === 'TRANSFER') {
-            next.transferFrom = (previous as any).transferFrom || 'BAR'
-            next.transferTo = (previous as any).transferTo || 'BANK'
-            next.transferFromAccountId = (previous as any).transferFromAccountId ?? null
-            next.transferFromAccountName = (previous as any).transferFromAccountName ?? null
-            next.transferToAccountId = (previous as any).transferToAccountId ?? null
-            next.transferToAccountName = (previous as any).transferToAccountName ?? null
-            next.grossAmount = undefined
-        } else if (previous.type !== 'INTERNAL') {
-            next.paymentMethod = previous.paymentMethod || getBookingHabits().paymentMethod
-            next.paymentAccountId = (previous as any).paymentAccountId ?? null
-            next.paymentAccountName = (previous as any).paymentAccountName ?? null
-            if (mode === 'NET') next.netAmount = undefined
-            else next.grossAmount = undefined
         }
 
         return next
@@ -484,7 +462,7 @@ export function useQuickAdd(
                 }
             }
             // Track user habits for smart defaults
-            trackBookingHabit(activeDraft.qa.type, activeDraft.qa.paymentMethod, (activeDraft.qa as any).mode)
+            trackBookingHabit(activeDraft.qa.type, (activeDraft.qa as any).mode)
             const saveMode: QuickAddAfterSave = mode === 'default' ? afterSaveDefault : mode
             if (saveMode === 'new') {
                 const nextDraft: QuickAddDraft = {

@@ -245,6 +245,9 @@ const rendererApi = {
   },
   paymentAccounts: {
     list: (payload) => invoke('paymentAccounts.list', payload),
+    previewOpeningVoucher: (payload) => cleanInvoke('paymentAccounts.previewOpeningVoucher', payload),
+    configureSetup: (payload) => invoke('paymentAccounts.configureSetup', payload),
+    setOpenings: (payload) => invoke('paymentAccounts.setOpenings', payload),
     upsert: (payload) => invoke('paymentAccounts.upsert', payload),
     delete: (payload) => invoke('paymentAccounts.delete', payload)
   },

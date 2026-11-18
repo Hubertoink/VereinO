@@ -55,7 +55,7 @@ test.beforeAll(async () => {
         window.aiDraft = (type) => hook.openQuickAdd({ qa: selectAiDraftBookingType({ type,
           date: '2026-09-25', grossAmount: 75, mode: 'GROSS', vatRate: 0, sphere: 'IDEELL', description: 'KI-Vorschlag', paymentAccountId: 1 }) })
         React.useEffect(() => { hook.openQuickAdd() }, [])
-        const props = { notify, qa: hook.qa, setQa: hook.setQa, onSave: hook.onQuickSave, onClose: hook.parkQuickAdd,
+        const props = { notify, qa: hook.qa, setQa: hook.setQa, onSave: hook.onQuickSave, onSaveAndNew: () => hook.onQuickSave('new'), onClose: hook.parkQuickAdd,
           files: hook.files, setFiles: hook.setFiles, onDropFiles: hook.onDropFiles, openFilePicker: () => {}, fileInputRef,
           budgetsForEdit: [], earmarks: [], tagDefs: [], descSuggest: [], paymentAccounts: [
             { id: 1, name: 'Bank', kind: 'BANK', isActive: 1 }, { id: 2, name: 'Bar', kind: 'CASH', isActive: 1 }
@@ -90,6 +90,27 @@ test.beforeEach(async ({ page }) => {
 })
 
 for (const presentation of ['flyout', 'modal', 'detached']) {
+  test(`${presentation}: new bookings require explicit accounts and parked drafts retain the choice`, async ({ page }) => {
+    await page.evaluate(value => (window as any).changePresentation(value), presentation)
+    await page.getByRole('button', { name: 'Einnahme', exact: true }).click()
+    const account = page.getByRole('button', { name: 'Buchungskonto wählen' })
+    await expect(account).toHaveText('Konto wählen')
+    await expect(account).toHaveAttribute('aria-invalid', 'true')
+    await account.click()
+    await page.getByRole('option', { name: 'Bar', exact: true }).click()
+    await page.getByRole('button', { name: 'Ausgabe', exact: true }).click()
+    await page.evaluate(() => (window as any).parkDraft())
+    await page.evaluate(() => (window as any).reopenDraft())
+    await expect(account).toHaveText('Bar')
+    await page.getByRole('button', { name: 'Umbuchung', exact: true }).click()
+    for (const name of ['Transfer von Konto', 'Transfer nach Konto']) {
+      await expect(page.getByRole('button', { name })).toHaveAttribute('aria-invalid', 'true')
+    }
+    await page.evaluate(() => (window as any).newDraft())
+    await page.getByRole('button', { name: 'Ausgabe', exact: true }).click()
+    await expect(account).toHaveText('Konto wählen')
+  })
+
   test(`${presentation}: missing date and category show toasts without shifting the form`, async ({ page }, testInfo) => {
     await page.evaluate(value => {
       const fixtureWindow = window as any
@@ -181,6 +202,15 @@ for (const presentation of ['flyout', 'modal', 'detached']) {
     }
   })
 }
+
+test('save and new starts the next booking with an empty account', async ({ page }) => {
+  await page.evaluate(() => { (window as any).changePresentation('modal'); (window as any).prefill(true) })
+  await expect(page.getByRole('button', { name: 'Buchungskonto wählen' })).toHaveText('Bank')
+  await page.getByRole('button', { name: 'Weitere Speicheraktionen' }).click()
+  await page.getByText('Speichern & neu', { exact: true }).click()
+  await page.getByRole('button', { name: 'Einnahme', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Buchungskonto wählen' })).toHaveText('Konto wählen')
+})
 
 test('selection survives switching presentation, parking and reopening', async ({ page }) => {
   await page.getByRole('button', { name: 'Ausgabe', exact: true }).click()
@@ -312,6 +342,11 @@ for (const presentation of ['modal', 'detached']) {
     const menu = page.getByRole('button', { name: 'Weitere Speicheraktionen' })
     await expect(page.getByRole('button', { name: 'Abbrechen', exact: true })).toHaveCount(0)
     await page.getByRole('spinbutton', { name: 'Brutto-Betrag' }).fill('25')
+    await page.locator('#quick-add-date').fill('2026-10-08')
+    await expect(save).toBeDisabled()
+    await page.getByRole('button', { name: 'Buchungskonto wählen' }).click()
+    await page.getByRole('option', { name: 'Bank', exact: true }).click()
+    await page.locator('#quick-add-date').fill('')
     await expect(save).toBeEnabled()
     await expect(menu).toBeEnabled()
     await save.click()

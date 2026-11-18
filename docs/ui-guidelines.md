@@ -290,8 +290,8 @@ export function Card({ title, children, actions }) {
 
 ## Erstes Setup
 
-- Vier Schritte: Willkommen, Deine Ansicht, Datensicherung, Startklar. Ein maximal 900 px breiter Dialog mit beschrifteter Schrittfolge und festem Aktionsbereich; nur der Inhalt scrollt.
-- Organisationsname, verantwortliche Person, Buchungsansicht, optionales Farbschema und Sicherungseinstellungen bilden den Kern. Starter-Tags sind optional und werden bewusst ausgewählt.
+- Die fünf Schritte sind Willkommen, Deine Ansicht, Datensicherung, Konten und Startklar. Ein maximal 900 px breiter Dialog mit beschrifteter Schrittfolge und festem Aktionsbereich; nur der Inhalt scrollt.
+- Organisationsname, verantwortliche Person, Buchungsansicht, optionales Farbschema und Sicherungseinstellungen bilden den Kern. Der Kontenschritt schlägt Bar und Bank vor und erlaubt eigene Konten. Pro Konto sind Anfangsbestand und Stichtag optional. Starter-Tags sind ebenfalls optional.
 - Eingaben bleiben bis „VereinO starten“ lokal im Entwurf. Auch die Ordnerauswahl verändert den Sicherungsort erst beim Abschluss. „Später einrichten“ und Escape verwerfen diesen Entwurf.
 - Bestehende Workflow- und Tabelleneinstellungen bleiben unverändert. Speicherfehler bleiben sichtbar, ein erneuter Versuch erzeugt keine doppelten Tags, und `setup.completed` wird zuletzt gesetzt.
 - Nicht abgeschlossene Einrichtungen werden beim Start einmal pro Organisation und Sitzung angeboten. Der Sicherungshinweis wird währenddessen nicht zusätzlich geöffnet.

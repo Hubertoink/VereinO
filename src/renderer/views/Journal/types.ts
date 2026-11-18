@@ -81,6 +81,8 @@ export type BookingEditTab = {
     detached?: boolean
 }
 
+export type JournalSortKey = 'date' | 'type' | 'net' | 'gross' | 'budget' | 'earmark' | 'payment' | 'sphere'
+
 export type ColKey =
     | 'actions'
     | 'date'

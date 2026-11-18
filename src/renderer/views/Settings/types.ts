@@ -109,6 +109,8 @@ export interface PaymentAccount {
   color?: string | null
   sortOrder: number
   isActive: number
+  openingCents?: number | null
+  openingDate?: string | null
   bookingCount?: number
 }
 

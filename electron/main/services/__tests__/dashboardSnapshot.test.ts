@@ -17,6 +17,7 @@ const mockPrepare = jest.fn((sql: string) => {
   if (sql.includes('FROM settings')) {
     return { all: jest.fn(() => [{ key: 'org.cashier', valueJson: '"Merle"' }]) }
   }
+  if (sql.includes('FROM payment_account_openings')) return { all: jest.fn(() => []) }
   if (sql.includes('FROM budgets')) return { all: jest.fn(() => []) }
   if (sql.includes('FROM earmarks')) return { all: jest.fn(() => []) }
   throw new Error(`Unexpected query: ${sql}`)

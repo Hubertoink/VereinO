@@ -1,8 +1,10 @@
+import type { AccountOpening } from '../../../../../shared/accountOpening'
+import { OpeningCaption } from '../../../components/booking/AccountOpeningChart'
 import React, { useEffect, useMemo, useState } from 'react'
 
 type AccountBalance = { id: number; name: string; kind: string; color?: string | null; balance: number }
 
-export default function ReportsCashBars(props: { refreshKey?: number; from?: string; to?: string }) {
+export default function ReportsCashBars(props: { openings?: AccountOpening[]; refreshKey?: number; from?: string; to?: string }) {
   const [loading, setLoading] = useState(false)
   const [accounts, setAccounts] = useState<AccountBalance[]>([])
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
@@ -32,11 +34,12 @@ export default function ReportsCashBars(props: { refreshKey?: number; from?: str
   return (
     <div className="card dither-chart-card" style={{ padding: 12, overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <strong>Kassenstand nach Zahlungskonto</strong>
+        <strong>{props.from ? 'Saldo nach Zahlungskonto im Zeitraum' : 'Kassenstand nach Zahlungskonto'}</strong>
         <div style={{ fontSize: 'var(--type-body)', fontWeight: 600, color: total >= 0 ? 'var(--success)' : 'var(--danger)' }}>
           {eurFmt.format(total || 0)}
         </div>
       </div>
+      {!loading && <OpeningCaption entries={props.openings ?? []} />}
       {loading && <div className="helper">Laden…</div>}
       {!loading && accounts.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }}>

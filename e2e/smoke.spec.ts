@@ -584,11 +584,11 @@ test('presents the optimized booking workflow', async () => {
   await chooseBookingEntryPresentation('Dialog')
   await page.getByLabel('Buchungen', { exact: true }).click()
   const totalCards = page.locator('.filter-totals-stat')
-  await expect(totalCards).toHaveCount(3)
+  await expect(totalCards).toHaveCount(4)
   const totalCardBackgrounds = await totalCards.evaluateAll((cards) =>
     cards.map((card) => getComputedStyle(card).backgroundColor)
   )
-  expect(totalCardBackgrounds).toHaveLength(3)
+  expect(totalCardBackgrounds).toHaveLength(4)
   expect(totalCardBackgrounds).not.toContain('rgba(0, 0, 0, 0)')
   const totalsStrip = page.locator('.journal-view .filter-totals-stats')
   const totalsStripStyle = await totalsStrip.evaluate((strip) => {
@@ -1467,6 +1467,59 @@ test('Buchungen Plus protects booking data and edits metadata in the inspector',
 })
 
 
+test('reports separate current account balances from a four-month booking result', async () => {
+  await page.evaluate(async () => {
+    const account = (await window.api.paymentAccounts.list()).rows.find(a => a.kind === 'BANK')!
+    await window.api.paymentAccounts.setOpenings([{ accountId: account.id, opening: { date: '2020-01-01', amountCents: 100000 }, previous: null }])
+    await window.api.vouchers.create({ date: '2020-08-01', type: 'IN', sphere: 'IDEELL', description: 'Einnahme', grossAmount: 1250, vatRate: 0, paymentMethod: 'BANK', paymentAccountId: account.id })
+    await window.api.vouchers.create({ date: '2020-11-01', type: 'OUT', sphere: 'IDEELL', description: 'Ausgabe', grossAmount: 973.87, vatRate: 0, paymentMethod: 'BANK', paymentAccountId: account.id })
+    window.api.app.notifyDataChanged(['vouchers', 'settings'])
+  })
+  await page.getByRole('button', { name: 'Reports', exact: true }).click()
+  const current = page.getByRole('region', { name: 'Aktueller Kontostand' })
+  await expect(current.locator('.report-current-total > strong')).toContainText('1.276,13')
+  await expect(current.locator('dl > div').filter({ hasText: 'Bank' })).toContainText('1.276,13')
+  const avg = page.locator('.report-summary-kpi').filter({ hasText: 'Durchschnittlicher Monatssaldo' })
+  await expect(avg).toContainText('4 Kalendermonate')
+  await expect(avg).toContainText('69,03')
+  await current.screenshot({ path: test.info().outputPath('heutiger-kontostand.png') })
+  await page.getByTitle('Zeitraum wählen', { exact: true }).click()
+  await page.getByLabel('Von', { exact: true }).fill('2020-08-01')
+  await page.getByLabel('Bis', { exact: true }).fill('2020-08-31')
+  await page.getByRole('button', { name: 'Übernehmen', exact: true }).click()
+  await expect(avg).toContainText('1 Kalendermonat')
+  await expect(avg).toContainText('1.250,00')
+  await expect(current.locator('.report-current-total > strong')).toContainText('1.276,13')
+  await page.setViewportSize({ width: 540, height: 900 })
+  await expect(current).toBeVisible()
+  expect(await current.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+})
+
+test('Dashboard Plus identifies an opening in its total and on the balance line', async () => {
+  const openingDate = await page.evaluate(async () => {
+    const account = (await window.api.paymentAccounts.list()).rows[0]
+    const today = new Date()
+    const date = new Date(Date.UTC(today.getFullYear(), today.getMonth() - 1, 5)).toISOString().slice(0, 10)
+    await window.api.paymentAccounts.setOpenings([{ accountId: account.id, opening: { date, amountCents: 100000 }, previous: null }])
+    window.api.app.notifyDataChanged(['vouchers'])
+    return date
+  })
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
+  const card = page.locator('.dp-balance')
+  await expect(card.locator('.dp-balance-value > strong')).toContainText('1.000,00')
+  const dateLabel = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium' }).format(new Date(openingDate + 'T12:00:00'))
+  await expect(card.locator('.account-opening-caption')).toContainText(`inkl. Anfangsbestand am ${dateLabel}`)
+  const marker = card.locator('.account-opening-marker')
+  await expect(marker).toHaveCount(1)
+  await marker.scrollIntoViewIfNeeded()
+  const bounds = await marker.boundingBox()
+  if (!bounds) throw new Error('Opening marker is not visible')
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+  await expect(page.getByRole('tooltip')).toContainText(`Anfangsbestand am ${dateLabel}`)
+  await expect(page.getByRole('tooltip')).toContainText(/Monatssaldo\s*0,00/)
+  await expect(page.locator('.dp-monthly .account-opening-marker')).toHaveCount(0)
+})
+
 test('Dashboard Plus shows real monthly balances and a responsive five-card overview', async () => {
   await page.setViewportSize({ width: 1440, height: 1050 })
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
@@ -1690,6 +1743,56 @@ test('booking view preference persists and resolves dashboard and receipt links'
   await expect(page.locator('.journal-view')).toContainText('Ansicht Verweistest')
 })
 
+
+test('classic journal header toggles columns and sorts booking types', async () => {
+  await page.setViewportSize({ width: 1500, height: 950 })
+  await page.evaluate(async () => {
+    const account = (await window.api.paymentAccounts.list()).rows[0]
+    for (const type of ['OUT', 'IN', 'OUT'] as const) {
+      await window.api.vouchers.create({ type, date: '2026-10-10', sphere: 'IDEELL', grossAmount: 20,
+        vatRate: 0, paymentAccountId: account.id, paymentMethod: account.kind === 'CASH' ? 'BAR' : 'BANK' })
+    }
+  })
+  await chooseBookingView('Buchungen (klassisch)')
+  const table = page.locator('.journal-table')
+  const date = table.getByRole('columnheader', { name: 'Datum', exact: true })
+  await date.click({ button: 'right' })
+  const menu = page.getByRole('dialog', { name: 'Spalten anzeigen' })
+  await menu.getByLabel('Datum', { exact: true }).uncheck()
+  await expect(date).toHaveCount(0)
+  await menu.getByLabel('Art', { exact: true }).check()
+  await menu.getByLabel('Netto', { exact: true }).check()
+  await expect(table.getByRole('columnheader', { name: 'Netto', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(menu).toHaveCount(0)
+  const art = table.getByRole('columnheader', { name: 'Art', exact: true })
+  await art.click()
+  const types = table.locator('tbody .voucher-type-badge')
+  await expect(art).toHaveAttribute('aria-sort', 'descending')
+  await expect(types).toHaveText(['OUT', 'OUT', 'IN'])
+  await art.press('Enter')
+  await expect(art).toHaveAttribute('aria-sort', 'ascending')
+  await expect(types).toHaveText(['IN', 'OUT', 'OUT'])
+  await art.click({ button: 'right' })
+  await expect(menu.getByLabel('Datum', { exact: true })).not.toBeChecked()
+  await expect(menu.getByLabel('Netto', { exact: true })).toBeChecked()
+  await menu.getByLabel('Datum', { exact: true }).check()
+  const enabledChoices = menu.locator('input:checked:enabled')
+  while (await enabledChoices.count()) await enabledChoices.first().uncheck()
+  await expect(menu.getByRole('checkbox', { checked: true })).toHaveCount(1)
+  await expect(menu.getByRole('checkbox', { checked: true })).toBeDisabled()
+  await page.keyboard.press('Escape')
+  await page.setViewportSize({ width: 750, height: 650 })
+  await expect(table).toHaveClass(/journal-table--compact/)
+  await date.click({ button: 'right' })
+  await menu.getByLabel('Art', { exact: true }).check()
+  await expect(table).not.toHaveClass(/journal-table--compact/)
+  await expect(art).toBeVisible()
+  await expect.poll(() => page.evaluate(async () => {
+    const result = await window.api.settings.get({ key: 'journal.cols' })
+    return JSON.parse(String(result.value)).type
+  })).toBe(true)
+})
 
 test('advances search and status filters show matching recipients and a clear detail view', async () => {
   await page.setViewportSize({ width: 1500, height: 960 })

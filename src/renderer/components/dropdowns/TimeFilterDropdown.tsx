@@ -1,5 +1,6 @@
+import YearRangeSelect from '../common/YearRangeSelect'
 import DateFilterInput from '../common/DateFilterInput'
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { IconCalendar } from '@tabler/icons-react'
 import AppIcon from '../common/AppIcon'
 import FilterDropdown from './FilterDropdown'
@@ -23,27 +24,6 @@ export default function TimeFilterDropdown({ yearsAvail, from, to, onApply, tool
   }, [from, to])
 
   const hasFilters = !!(from || to)
-
-  const selectedYear = useMemo(() => {
-    if (!f || !t) return ''
-    const fy = f.slice(0, 4)
-    const ty = t.slice(0, 4)
-    if (f === `${fy}-01-01` && t === `${fy}-12-31` && fy === ty) return fy
-    return ''
-  }, [f, t])
-
-  const handleYearSelect = (y: string) => {
-    if (!y) {
-      setF('')
-      setT('')
-      return
-    }
-    const yr = Number(y)
-    const nf = new Date(Date.UTC(yr, 0, 1)).toISOString().slice(0, 10)
-    const nt = new Date(Date.UTC(yr, 11, 31)).toISOString().slice(0, 10)
-    setF(nf)
-    setT(nt)
-  }
 
   const handleReset = () => {
     setF('')
@@ -75,17 +55,7 @@ export default function TimeFilterDropdown({ yearsAvail, from, to, onApply, tool
         </div>
       </div>
 
-      <div className="filter-dropdown__field filter-dropdown__field--mt">
-        <label className="filter-dropdown__label">Schnellauswahl Jahr</label>
-        <select className="input" value={selectedYear} onChange={(e) => handleYearSelect(e.target.value)}>
-          <option value="">—</option>
-          {yearsAvail.map((y) => (
-            <option key={y} value={String(y)}>
-              {y}
-            </option>
-          ))}
-        </select>
-      </div>
+      <YearRangeSelect years={yearsAvail} from={f} to={t} onChange={range => { setF(range.from); setT(range.to) }} />
 
       <div className="filter-dropdown__actions">
         <button className="btn" type="button" onClick={handleReset}>

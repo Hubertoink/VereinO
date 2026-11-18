@@ -1,3 +1,4 @@
+import { listAccountOpenings } from './accountOpenings'
 import { voucherAuditState } from './voucherAuditState'
 import { refreshMembershipVoucher, refreshNextDue } from './membershipLedger'
 import Database from 'better-sqlite3'
@@ -644,7 +645,7 @@ type AdvancedVoucherFilters = {
     offset?: number
     sort?: 'ASC' | 'DESC'
     // Extended sort keys
-    sortBy?: 'date' | 'description' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
+    sortBy?: 'date' | 'type' | 'description' | 'gross' | 'net' | 'attachments' | 'budget' | 'earmark' | 'payment' | 'sphere'
     paymentMethod?: 'BAR' | 'BANK'
     paymentAccountId?: number | null
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
@@ -700,6 +701,7 @@ function buildAdvancedVoucherFilter(filters: PagedVoucherFilters) {
 
 function advancedVoucherOrder(sortBy: AdvancedVoucherFilters['sortBy']) {
     switch (sortBy) {
+        case 'type': return 'v.type'
         case 'description': return "COALESCE(v.description, '') COLLATE NOCASE"
         case 'gross': return 'v.gross_amount'
         case 'net': return 'v.net_amount'
@@ -1095,7 +1097,7 @@ export function summarizeVouchers(filters: {
 
     const byPaymentAccount = d.prepare(`
         WITH filtered AS (
-            SELECT v.payment_account_id, v.type, v.transfer_from_account_id, v.transfer_to_account_id,
+            SELECT v.payment_account_id, v.type, ${pmAdjustedType} AS effective_type, v.transfer_from_account_id, v.transfer_to_account_id,
                    v.net_amount, v.vat_amount, v.gross_amount
             FROM vouchers v${joinSql}${whereSql}
         )
@@ -1105,13 +1107,17 @@ export function summarizeVouchers(filters: {
                pa.color as color,
                IFNULL(SUM(sub.net_amount), 0) as net,
                IFNULL(SUM(sub.vat_amount), 0) as vat,
-               IFNULL(SUM(sub.gross_amount), 0) as gross
+               IFNULL(SUM(sub.gross_amount), 0) as gross,
+               ROUND(SUM(sub.booking_net), 2) as bookingNet
         FROM (
             SELECT CASE WHEN type != 'TRANSFER' THEN payment_account_id ELSE transfer_from_account_id END as account_id,
-                   net_amount, vat_amount, gross_amount
+                   net_amount, vat_amount, gross_amount,
+                   CASE WHEN effective_type = 'OUT' THEN -gross_amount
+                        WHEN type = 'IN' THEN gross_amount ELSE 0 END AS booking_net
             FROM filtered
             UNION ALL
-            SELECT transfer_to_account_id as account_id, net_amount, vat_amount, gross_amount
+            SELECT transfer_to_account_id as account_id, net_amount, vat_amount, gross_amount,
+                   CASE WHEN effective_type = 'IN' THEN gross_amount ELSE 0 END
             FROM filtered WHERE type = 'TRANSFER'
         ) sub
         LEFT JOIN payment_accounts pa ON pa.id = sub.account_id
@@ -1681,7 +1687,7 @@ export function clearAllVouchers() {
     })
 }
 
-export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; budgetId?: number; paymentAccountId?: number | null }) {
+export function cashBalance(params: { includeOpenings?: boolean; from?: string; to?: string; sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'; budgetId?: number; paymentAccountId?: number | null }) {
     const d = getDb()
     const to = params.to ?? new Date().toISOString().slice(0, 10)
     // Wenn 'from' übergeben wird, nutze es; sonst gesamter Zeitraum (kein Untergrenze)
@@ -1764,6 +1770,17 @@ export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEE
         accountBalances.set(id, { id, name: `Konto #${id}`, kind: 'OTHER', color: null, balance: amount, sortOrder: 9999, isActive: 1 })
     }
     let bar = 0, bank = 0
+    if (params.includeOpenings !== false && !params.sphere && budgetId == null) {
+        for (const opening of listAccountOpenings(to, from)) {
+            if (normalizedPaymentAccountId && normalizedPaymentAccountId !== opening.accountId) continue
+            const account = accountBalances.get(opening.accountId)
+            if (!account) continue
+            const amount = opening.amountCents / 100
+            account.balance += amount
+            if (account.kind === 'CASH') bar += amount
+            else bank += amount
+        }
+    }
     for (const r of rows) {
         if (r.type === 'TRANSFER') {
             // Transfer: subtract from source, add to destination
@@ -1788,10 +1805,15 @@ export function cashBalance(params: { from?: string; to?: string; sphere?: 'IDEE
     return { BAR: Math.round(bar * 100) / 100, BANK: Math.round(bank * 100) / 100, accounts }
 }
 
-// Distinct voucher years present in the database
+// Reporting years also include periods whose only entry is an opening balance.
 export function listVoucherYears(): number[] {
     const d = getDb()
-    const rows = d.prepare("SELECT DISTINCT CAST(strftime('%Y', date) AS INTEGER) as year FROM vouchers ORDER BY year DESC").all() as any[]
+    const rows = d.prepare(`
+        SELECT CAST(strftime('%Y', date) AS INTEGER) AS year FROM vouchers
+        UNION
+        SELECT CAST(strftime('%Y', effective_date) AS INTEGER) FROM payment_account_openings
+        ORDER BY year DESC
+    `).all() as any[]
     return rows.map(r => Number(r.year)).filter((y) => Number.isFinite(y))
 }
 

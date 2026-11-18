@@ -848,6 +848,14 @@ const MIGRATIONS: Mig[] = [
       );
       CREATE INDEX idx_member_group_members_group ON member_group_members(group_id, member_id);
     `
+  },
+  {
+    version: 47,
+    up: `CREATE TABLE payment_account_openings (
+      account_id INTEGER PRIMARY KEY REFERENCES payment_accounts(id) ON DELETE RESTRICT,
+      effective_date TEXT NOT NULL,
+      amount_cents INTEGER NOT NULL CHECK(amount_cents <> 0)
+    );`
   }
 ]
 

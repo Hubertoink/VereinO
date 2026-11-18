@@ -4,7 +4,7 @@
 .setup-wizard .modal-header-bar.modal-header-bar.modal-header-bar { padding: 18px 24px; }
 .setup-wizard .modal-header-bar__icon { background: transparent; }
 .setup-steps { flex-shrink: 0; padding: 18px 24px; border-bottom: 1px solid var(--border); }
-.setup-steps ol { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.setup-steps ol { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .setup-steps button { display: flex; align-items: center; gap: 9px; padding: 0; width: 100%; border: 0; background: transparent; color: var(--text-dim); font: inherit; font-size: var(--type-control); font-weight: 550; text-align: left; cursor: pointer; }
 .setup-steps button:disabled { opacity: 1; cursor: default; }
 .setup-step-number { display: inline-grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 50%; font-size: var(--type-caption); }
@@ -97,3 +97,10 @@
 .setup-theme-preview .setup-booking-preview__table > span:nth-child(odd) { background: var(--table-row-alt); }
 .setup-theme-preview .setup-preview-income { color: var(--success); }
 .setup-theme-preview .setup-preview-expense { color: var(--danger); }
+
+.setup-account-choices, .setup-account-openings fieldset { min-width: 0; padding: 0; border: 0; margin: 0; }
+.setup-account-choices legend, .setup-account-openings legend { font-weight: 600; margin-bottom: 8px; }
+.setup-account-openings h3 { margin: 0; font-size: var(--type-section-title); }
+.setup-account-openings fieldset { margin-top: 12px; }
+.setup-custom-account { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.setup-custom-account .field:first-child { flex: 1 1 170px; }
