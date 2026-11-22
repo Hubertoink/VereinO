@@ -10,6 +10,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { initializeExistingOrganization } from './fixtures/initializedOrganization'
 
 let electronApp: ElectronApplication
 let page: Page
@@ -54,11 +55,7 @@ test.beforeAll(async () => {
     }
   })
   page = await waitForVereinOWindow(electronApp)
-  // The first window initially contains the startup screen. The invoice test
-  // needs the fully initialized renderer and its IPC-backed database.
-  await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 20_000 })
-  const later = page.getByRole('button', { name: 'Später', exact: true })
-  await page.addLocatorHandler(later, () => later.click())
+  await initializeExistingOrganization(page)
 })
 
 test.afterAll(async () => {
@@ -99,8 +96,9 @@ async function createInvoicePdf() {
 
 test('receipt widget drops a PDF, preserves fields across modes and saves an open invoice', async () => {
   await page.evaluate(() => window.api.paymentAccounts.upsert({ name: 'Beleg Testbank', kind: 'BANK' }))
-  await page.getByRole('button', { name: 'Einstellungen', exact: true }).click()
+  await page.locator('[data-shortcut-nav="Einstellungen"]').click()
   await expect(page.getByRole('button', { name: 'Belegwidget öffnen', exact: true })).toHaveCount(0)
+  await page.locator('.settings-cluster-trigger').filter({ hasText: 'Darstellung' }).click()
   await page.locator('.settings-subnav').getByTitle('Arbeitsweise', { exact: true }).click()
   await expect(page.getByRole('switch', { name: /Beim Anmelden automatisch starten/ })).toBeDisabled()
   await page.screenshot({ path: 'test-results/settings-workflow.png', animations: 'disabled' })
@@ -232,7 +230,7 @@ test('opens the local invoice modal and extracts a PDF text layer', async () => 
 
   await page.getByRole('button', { name: 'Buchungen', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Rechnung lokal erfassen' })).toHaveCount(0)
-  await page.getByLabel('Verbindlichkeiten', { exact: true }).click()
+  await page.locator('[data-shortcut-nav="Verbindlichkeiten"]').click()
   const scanButton = page.getByRole('button', { name: 'Rechnung erfassen', exact: true })
   await expect(scanButton).toBeVisible()
   await expect(scanButton).toHaveClass(/invoices-scan-button/)
@@ -361,7 +359,7 @@ test('links AI source rectangles to fields and removes evidence after manual edi
       timings: { totalMs: 10, analysisMs: 10, ocrMs: null, doclingMs: null }
     }))
   })
-  await page.getByLabel('Verbindlichkeiten', { exact: true }).click()
+  await page.locator('[data-shortcut-nav="Verbindlichkeiten"]').click()
   await page.getByRole('button', { name: 'Rechnung erfassen', exact: true }).click()
   const dialog = page.locator('.local-invoice-scan')
   await dialog.locator('input[type="file"]').setInputFiles({

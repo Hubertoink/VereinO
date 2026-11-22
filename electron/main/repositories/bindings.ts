@@ -44,11 +44,12 @@ export function upsertBinding(input: { id?: number; code: string; name: string; 
 
 export function deleteBinding(id: number) {
     const d = getDb()
-    const used = d.prepare('SELECT COUNT(1) as c FROM vouchers WHERE earmark_id=?').get(id) as any
-    if ((used?.c || 0) > 0) {
-        throw new Error('Zweckbindung wird in Buchungen verwendet und kann nicht gelöscht werden. Bitte archivieren (inaktiv setzen).')
-    }
-    d.prepare('DELETE FROM earmarks WHERE id=?').run(id)
+    d.transaction(() => {
+        const referenced = d.prepare(`SELECT 1 FROM vouchers WHERE earmark_id = ?
+            UNION ALL SELECT 1 FROM voucher_earmarks WHERE earmark_id = ? LIMIT 1`).get(id, id)
+        if (referenced) throw new Error('Zweckbindung wird in Buchungen verwendet. Bitte archivieren.')
+        d.prepare('DELETE FROM earmarks WHERE id=?').run(id)
+    })()
     return { id }
 }
 

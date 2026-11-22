@@ -13,9 +13,10 @@ import {
   type AiUsage
 } from './ai'
 import {
-  isMittwaldThinkingModel,
-  toMittwaldReasoningEffort
+  mittwaldThinkingOptions
 } from '../../../shared/aiModelProfiles'
+import { selectAiProtocol, type AiConversationRequest, type AiResponse, type AiToolResult } from './aiProviderProtocol'
+import type OpenAI from 'openai'
 import { buildAgentInstructions } from './aiAgentInstructions'
 import { VereinoMcpHost } from './aiMcp'
 import {
@@ -160,7 +161,7 @@ function responseFunctionCalls(response: any) {
   return (response?.output || []).filter((item: any) => item?.type === 'function_call')
 }
 
-function mittwaldToolDefinitions(tools: any[]) {
+function mittwaldToolDefinitions(tools: NonNullable<AiConversationRequest['tools']>) {
   return tools.map((tool) => ({
     type: 'function',
     function: {
@@ -175,15 +176,11 @@ async function createMittwaldAgentResponse(input: {
   client: ReturnType<typeof createClient>
   model: string
   messages: any[]
-  tools: any[]
+  tools: NonNullable<AiConversationRequest['tools']>
   reasoningEffort: 'low' | 'medium' | 'high'
   toolChoice?: 'auto' | 'none'
 }) {
-  const chatTemplateKwargs = isMittwaldThinkingModel(input.model)
-    ? input.model === 'Qwen3.8-27B-NVFP4'
-      ? { reasoning_effort: toMittwaldReasoningEffort(input.reasoningEffort) }
-      : { enable_thinking: false }
-    : undefined
+  const chatTemplateKwargs = mittwaldThinkingOptions(input.model, input.reasoningEffort)
   const completion = await input.client.chat.completions.create({
     model: input.model,
     messages: input.messages,
@@ -207,23 +204,35 @@ async function createMittwaldAgentResponse(input: {
 }
 
 function createAgentResponder(settings: AiSettings) {
-  if (settings.provider === 'anthropic') return createClaudeConversation(settings)
-  const client = createClient(settings)
-  if (settings.provider !== 'mittwald') return (request: any) => client.responses.create(request)
+  type Respond = (request: AiConversationRequest) => Promise<AiResponse>
+  return selectAiProtocol<Respond>(settings.provider, {
+    messages: () => createClaudeConversation(settings),
+    responses: () => {
+      const client = createClient(settings)
+      return request => client.responses.create(request as OpenAI.Responses.ResponseCreateParamsNonStreaming)
+    },
+    chat: () => createMittwaldAgentConversation(createClient(settings))
+  })
+}
 
+function createMittwaldAgentConversation(client: OpenAI) {
   const messages: any[] = []
-  return async (request: any) => {
+  return async (request: AiConversationRequest) => {
     if (!messages.length) messages.push({ role: 'system', content: request.instructions })
-    for (const item of request.input) {
-      if (item.type === 'function_call_output') {
+    const items = typeof request.input === 'string' ? [{ role: 'user' as const, content: request.input }] : request.input
+    for (const item of items) {
+      if ('type' in item) {
         messages.push({ role: 'tool', tool_call_id: item.call_id, content: item.output })
       } else {
-        messages.push({ role: item.role, content: item.content.map((part: { text: string }) => part.text).join('\n') })
+        messages.push({ role: item.role, content: typeof item.content === 'string' ? item.content : item.content.map(part => {
+          if (part.type !== 'input_text') throw new Error('Agentenaufrufe erwarten Text.')
+          return part.text
+        }).join('\n') })
       }
     }
     const response = await createMittwaldAgentResponse({
-      client, model: request.model, messages, tools: request.tools,
-      reasoningEffort: request.reasoning.effort, toolChoice: request.tool_choice
+      client, model: request.model, messages, tools: request.tools ?? [],
+      reasoningEffort: request.reasoning?.effort ?? 'medium', toolChoice: request.tool_choice
     })
     messages.push(response.mittwaldMessage)
     return response
@@ -353,7 +362,7 @@ export async function runAiAgent(input: {
       instructions: instructions || buildAgentInstructions(settings.bookingCommentsEnabled, input.context.organization?.profile, settings.masterDataCreation),
       tools: providerTools,
       reasoning: { effort: settings.defaultReasoningEffort },
-      text: { verbosity: 'medium' }
+      text: { verbosity: 'medium' as const }
     }
 
     let response: any = await respond({
@@ -367,7 +376,7 @@ export async function runAiAgent(input: {
       const calls = responseFunctionCalls(response)
       if (!calls.length) break
 
-      const outputs = []
+      const outputs: AiToolResult[] = []
       for (const call of calls) {
         const tool = toolByName.get(call.name)
         const args = parseToolArguments(call.arguments)
@@ -518,7 +527,7 @@ export async function runAiAgent(input: {
         }
       }
 
-      response = await respond({ ...baseRequest, previous_response_id: response.id, input: outputs } as any)
+      response = await respond({ ...baseRequest, previous_response_id: response.id, input: outputs })
       usage = mergeUsage(usage, normalizeUsage(response, model))
     }
 
@@ -536,7 +545,7 @@ export async function runAiAgent(input: {
           tool_choice: 'none',
           previous_response_id: response.id,
           input: [...unfinishedCalls, { role: 'user', content: [{ type: 'input_text', text: finalPrompt }] }]
-        } as any)
+        })
         usage = mergeUsage(usage, normalizeUsage(response, model))
       } catch {
         // A concise fallback below is preferable to dropping a completed tool result.

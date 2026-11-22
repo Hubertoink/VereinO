@@ -856,8 +856,89 @@ const MIGRATIONS: Mig[] = [
       effective_date TEXT NOT NULL,
       amount_cents INTEGER NOT NULL CHECK(amount_cents <> 0)
     );`
-  }
+  },
+  {
+    version: 48,
+    up: `CREATE TABLE contribution_booking_requests (
+      request_id TEXT PRIMARY KEY,
+      input_hash TEXT NOT NULL,
+      voucher_id INTEGER REFERENCES vouchers(id) ON DELETE SET NULL
+    );`
+  },
+  { version: 49, up: repairLinkedVoucherReversals }
 ]
+
+/** Correct only reciprocal, generated reversals with the original signed amounts or the former ABS projection. */
+export function repairLinkedVoucherReversals(db: DB) {
+  const pairs = db.prepare(`
+    SELECT r.id, o.id AS originalId, o.type, o.payment_method AS paymentMethod, o.transfer_to AS toMethod, o.transfer_from AS fromMethod,
+           r.payment_account_id AS bookedPayment, r.transfer_from_account_id AS bookedFrom, r.transfer_to_account_id AS bookedTo,
+           CASE WHEN o.type IN ('IN','OUT') THEN o.payment_account_id END AS paymentId,
+           CASE WHEN o.type = 'TRANSFER' THEN o.transfer_from_account_id END AS fromId,
+           CASE WHEN o.type = 'TRANSFER' THEN o.transfer_to_account_id END AS toId,
+           o.net_amount AS net, o.vat_amount AS vat, o.gross_amount AS gross,
+           o.budget_amount AS budgetAmount, o.earmark_amount AS earmarkAmount
+    FROM vouchers r JOIN vouchers o ON r.original_id = o.id AND o.reversed_by_id = r.id
+    WHERE o.original_id IS NULL AND r.reversed_by_id IS NULL AND r.sphere = o.sphere
+      AND r.description = 'Storno zu ' || o.voucher_no || CASE WHEN COALESCE(o.description, '') = '' THEN '' ELSE ' - ' || o.description END
+      AND o.id NOT IN (SELECT original_id FROM vouchers WHERE original_id IS NOT NULL GROUP BY original_id HAVING COUNT(*) > 1)
+      AND r.id NOT IN (SELECT reversed_by_id FROM vouchers WHERE reversed_by_id IS NOT NULL GROUP BY reversed_by_id HAVING COUNT(*) > 1)
+      AND r.vat_rate IS o.vat_rate AND r.amount_mode IS o.amount_mode AND r.primary_classification_value_id IS o.primary_classification_value_id
+      AND ROUND(o.net_amount*100) + ROUND(o.vat_amount*100) = ROUND(o.gross_amount*100)
+      AND r.net_amount = ABS(o.net_amount) AND r.vat_amount = ABS(o.vat_amount) AND r.gross_amount = ABS(o.gross_amount)
+      AND ((o.type IN ('IN','OUT') AND r.type = CASE o.type WHEN 'IN' THEN 'OUT' ELSE 'IN' END
+              AND r.payment_method IS o.payment_method)
+        OR (o.type = 'TRANSFER' AND r.type = 'TRANSFER' AND r.transfer_from IS o.transfer_to AND r.transfer_to IS o.transfer_from)
+        OR (o.type = 'INTERNAL' AND r.type = 'TRANSFER' AND r.payment_method IS NULL AND r.transfer_from IS NULL AND r.transfer_to IS NULL
+              AND r.budget_id IS o.budget_id AND r.earmark_id IS o.earmark_id))
+  `).all() as Array<{ id: number; originalId: number; type: string; paymentId: number | null; fromId: number | null;
+    toId: number | null; bookedPayment: number | null; bookedFrom: number | null; bookedTo: number | null;
+    paymentMethod: string | null; fromMethod: string | null; toMethod: string | null;
+    net: number; vat: number; gross: number; budgetAmount: number | null; earmarkAmount: number | null }>
+  if (!pairs.length) return
+  const restore = db.prepare(`UPDATE vouchers SET net_amount = @net, vat_amount = @vat, gross_amount = @gross,
+    payment_account_id = COALESCE(@paymentId, payment_account_id), transfer_from_account_id = COALESCE(@fromId, transfer_from_account_id),
+    transfer_to_account_id = COALESCE(@toId, transfer_to_account_id)
+    WHERE id = @id AND (net_amount IS NOT @net OR vat_amount IS NOT @vat OR gross_amount IS NOT @gross
+      OR (@paymentId IS NOT NULL AND payment_account_id IS NOT @paymentId)
+      OR (@fromId IS NOT NULL AND transfer_from_account_id IS NOT @fromId)
+      OR (@toId IS NOT NULL AND transfer_to_account_id IS NOT @toId))`)
+  const kinds = ['budget', 'earmark'] as const
+  const assignmentTables = kinds.map(kind => ({
+    read: db.prepare(`SELECT ${kind}_id AS target, amount FROM voucher_${kind}s WHERE voucher_id = ? ORDER BY ${kind}_id`),
+    set: db.prepare(`UPDATE voucher_${kind}s SET amount = ? WHERE voucher_id = ? AND ${kind}_id = ?`),
+  }))
+  const accounts = db.prepare('SELECT id, kind FROM payment_accounts ORDER BY sort_order, id').all() as Array<{ id: number; kind: string }>
+  const kindsById = new Map(accounts.map(a => [a.id, a.kind]))
+  const fallback = new Map([['BAR', accounts.find(a => a.kind === 'CASH')?.id], ['BANK', accounts.find(a => a.kind === 'BANK')?.id]])
+  function compatible(expected: number | null, recorded: number | null, method: string | null) {
+    if (expected !== null && !kindsById.has(expected)) return false
+    if (recorded !== null && !kindsById.has(recorded)) return false
+    if (expected !== null && (kindsById.get(expected) === 'CASH' ? 'BAR' : 'BANK') !== method) return false
+    // Older migrations could have filled in a missing ID with the first bank/cash account.
+    return recorded === null || recorded === expected || (method !== null && recorded === fallback.get(method))
+  }
+  for (const pair of pairs) {
+    if (!compatible(pair.paymentId, pair.bookedPayment, pair.paymentMethod) ||
+        !compatible(pair.toId, pair.bookedFrom, pair.toMethod) ||
+        !compatible(pair.fromId, pair.bookedTo, pair.fromMethod)) continue
+    if (pair.type === 'INTERNAL') {
+      const splits = assignmentTables.map(({read}) => ({
+        original: read.all(pair.originalId) as {target: number; amount: number}[],
+        reversal: read.all(pair.id) as {target: number; amount: number}[],
+      }))
+      if (!splits.every(({original, reversal}) => original.length === reversal.length && original.every((entry, i) =>
+        entry.target === reversal[i].target && Math.abs(entry.amount) === reversal[i].amount))) continue
+      for (const [i, {original}] of splits.entries()) {
+        for (const entry of original) assignmentTables[i].set.run(-entry.amount, pair.id, entry.target)
+      }
+      db.prepare(`UPDATE vouchers SET type = 'INTERNAL', budget_amount = ?, earmark_amount = ? WHERE id = ?`)
+        .run(pair.budgetAmount === null ? null : -pair.budgetAmount, pair.earmarkAmount === null ? null : -pair.earmarkAmount, pair.id)
+    }
+    restore.run({ id: pair.id, net: pair.net, vat: pair.vat, gross: pair.gross,
+      paymentId: pair.paymentId, fromId: pair.toId, toId: pair.fromId })
+  }
+}
 
 function tableExists(db: DB, table: string) {
   const row = db
@@ -1175,7 +1256,7 @@ export function ensureVoucherJunctionTables(db: DB) {
         INSERT OR IGNORE INTO voucher_budgets (voucher_id, budget_id, amount)
         SELECT id, budget_id, ${budgetAmountExpr}
         FROM vouchers
-        WHERE budget_id IS NOT NULL;
+        WHERE budget_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM voucher_budgets a WHERE a.voucher_id = vouchers.id);
       `)
     } catch { /* ignore */ }
 
@@ -1184,7 +1265,7 @@ export function ensureVoucherJunctionTables(db: DB) {
         INSERT OR IGNORE INTO voucher_earmarks (voucher_id, earmark_id, amount)
         SELECT id, earmark_id, ${earmarkAmountExpr}
         FROM vouchers
-        WHERE earmark_id IS NOT NULL;
+        WHERE earmark_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM voucher_earmarks a WHERE a.voucher_id = vouchers.id);
       `)
     } catch { /* ignore */ }
   } catch {

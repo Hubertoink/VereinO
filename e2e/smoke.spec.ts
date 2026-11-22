@@ -4,6 +4,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { initializeExistingOrganization } from './fixtures/initializedOrganization'
+
 let electronApp: ElectronApplication
 let page: Page
 let userDataDir: string
@@ -130,18 +132,7 @@ test.beforeEach(async () => {
   })
   page = await waitForVereinOWindow(electronApp)
   await expect(page).toHaveTitle(/VereinO/i, { timeout: 15_000 })
-  // The native window is created with the startup screen before migrations and
-  // IPC handlers are ready. Wait for the actual renderer shell so each test
-  // starts against a fully initialized database.
-  await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 20_000 })
-  const deferSetup = page.getByRole('button', { name: 'Später einrichten', exact: true })
-  await page.addLocatorHandler(deferSetup, () => deferSetup.click(), { times: 1 })
-  const laterButton = page.getByRole('button', { name: 'Später', exact: true })
-  await laterButton.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined)
-  if (await laterButton.isVisible()) {
-    await laterButton.click()
-    await expect(laterButton).toBeHidden()
-  }
+  await initializeExistingOrganization(page)
 })
 
 test.afterEach(async () => {
@@ -310,9 +301,6 @@ test('adjusts and persists background image visibility', async () => {
 
   await page.reload()
   await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 20_000 })
-  const laterAfterReload = page.getByRole('button', { name: 'Später', exact: true })
-  await laterAfterReload.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined)
-  if (await laterAfterReload.isVisible()) await laterAfterReload.click()
   const closeAfterReload = page.locator('.modal-overlay:visible button[aria-label="Schließen"]').first()
   if (await closeAfterReload.isVisible()) await closeAfterReload.click()
   await page.getByRole('button', { name: 'Einstellungen', exact: true }).click()
@@ -327,21 +315,17 @@ test('creates and lists a backup through the real IPC bridge', async () => {
   })
 
   expect(result.created.ok, result.created.error || 'Backup creation failed without an error message').toBe(true)
-  expect(result.created.filePath).toMatch(/database_.+_e2e\.sqlite$/)
+  expect(path.basename(result.created.filePath)).toMatch(/^database_.+_e2e_[0-9a-f-]{36}\.sqlite$/)
   expect(result.listed.ok).toBe(true)
   expect(result.listed.backups?.some(({ filePath }) => filePath === result.created.filePath)).toBe(true)
 })
 
 test('loads split application pages on demand', async () => {
-  const laterButton = page.getByRole('button', { name: 'Später', exact: true })
-  if (await laterButton.isVisible()) await laterButton.click()
 
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
   await expect(page.locator('.dashboard-plus .dp-card').first()).toBeVisible()
   await expectReadablePageCanvas()
 
-  const laterAfterDashboard = page.getByRole('button', { name: 'Später', exact: true })
-  if (await laterAfterDashboard.isVisible()) await laterAfterDashboard.click()
   await page.getByRole('button', { name: 'Einstellungen', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Einstellungen', exact: true })).toBeVisible()
   await expectReadablePageCanvas()
@@ -499,9 +483,6 @@ test('selects a single invoice in a compact flyout before opening recognition', 
 })
 
 test('queues batch invoices in the Submit folder and exposes the review flyout', async () => {
-  const laterButton = page.getByRole('button', { name: 'Später', exact: true })
-  await laterButton.waitFor({ state: 'visible', timeout: 3_000 }).catch(() => undefined)
-  if (await laterButton.isVisible()) await laterButton.click()
   await page.getByLabel('Buchungen', { exact: true }).click()
 
   const splitControl = page.locator('.invoice-split-fab')
@@ -578,9 +559,6 @@ test('queues batch invoices in the Submit folder and exposes the review flyout',
 })
 
 test('presents the optimized booking workflow', async () => {
-  const laterButton = page.getByRole('button', { name: 'Später', exact: true })
-  await laterButton.waitFor({ state: 'visible', timeout: 1_000 }).catch(() => undefined)
-  if (await laterButton.isVisible()) await laterButton.click()
   await chooseBookingEntryPresentation('Dialog')
   await page.getByLabel('Buchungen', { exact: true }).click()
   const totalCards = page.locator('.filter-totals-stat')
@@ -785,7 +763,7 @@ test('presents the optimized booking workflow', async () => {
   await transferTo.click()
   await page.screenshot({ path: 'test-results/quick-add-transfer.png', fullPage: true })
   await expect(dialog.getByRole('button', { name: 'Sphäre der Buchung' })).toHaveCount(0)
-  await dialog.getByRole('button', { name: 'Abbrechen', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
 })
 
 test('routes new bookings through the configured dialog, flyout, and detached window', async () => {
@@ -819,7 +797,7 @@ test('routes new bookings through the configured dialog, flyout, and detached wi
   expect(expandBounds).not.toBeNull()
   await page.mouse.click(expandBounds!.x + expandBounds!.width / 2, expandBounds!.y + expandBounds!.height / 2)
   await expect(dialog).toBeVisible()
-  await dialog.getByRole('button', { name: 'Abbrechen', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
 
   await page.locator('.fab-buchung').click()
   await expect(flyout).toBeVisible()
@@ -1019,8 +997,6 @@ test('parks the compact draft while an existing booking is edited and restores i
 test('keeps expanded tags and comments separated in the detached booking window', async () => {
   await chooseBookingEntryPresentation('Dialog')
   await page.setViewportSize({ width: 1200, height: 780 })
-  const laterButton = page.getByRole('button', { name: 'Später', exact: true })
-  if (await laterButton.isVisible()) await laterButton.click()
   await page.getByLabel('Buchungen', { exact: true }).click()
   await page.locator('.fab-buchung').click()
 
@@ -1124,7 +1100,7 @@ test('distributes untouched budget amounts evenly and preserves manual values', 
   await expect(budgetAmounts.nth(2)).toHaveValue('33.33')
   await expect(budgetAmounts.nth(3)).toHaveValue('0')
 
-  await dialog.getByRole('button', { name: 'Abbrechen', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Schließen', exact: true }).click()
 })
 
 
@@ -1132,7 +1108,6 @@ test('Buchungen Plus filters, inspects and keeps the original journal available'
   await page.clock.setFixedTime(new Date('2026-09-07T12:00:00'))
   // The App initializes the retained calendar month on startup.
   await page.reload()
-  await page.getByRole('button', { name: 'Später', exact: true }).click()
   await chooseBookingEntryPresentation('Dialog')
   await page.locator('#toggle-voucher-delete-mode').check()
   await page.setViewportSize({ width: 1600, height: 1000 })
@@ -1181,7 +1156,7 @@ test('Buchungen Plus filters, inspects and keeps the original journal available'
   await expect(plus.locator('.bp-row')).toHaveCount(20)
   await page.keyboard.press('Escape')
   await page.screenshot({ path: 'test-results/bookings-plus-overview.png', animations: 'disabled' })
-  await expect(plus.getByRole('button', { name: 'Zurücksetzen', exact: true })).toHaveCount(0)
+  await expect(plus.getByRole('button', { name: /: Filter entfernen$/ })).toHaveCount(0)
   await plus.getByRole('button', { name: 'Nach Buchung sortieren', exact: true }).click()
   await expect(plus.locator('.bp-row').first()).toContainText('Ausflug Sommerferien')
   await plus.getByRole('button', { name: 'Nach Buchung sortieren, aufsteigend', exact: true }).click()
@@ -1195,9 +1170,8 @@ test('Buchungen Plus filters, inspects and keeps the original journal available'
   await plus.getByLabel('Buchungen suchen', { exact: true }).fill('Ausflug')
   await expect(plus.locator('.bp-row')).toHaveCount(1)
   await expect(plus.locator('.bp-totals')).toContainText('75,00')
-  await plus.getByRole('button', { name: 'Buchungsfilter', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Zurücksetzen', exact: true })).toBeVisible()
-  await page.keyboard.press('Escape')
+  const searchChip = plus.getByRole('button', { name: 'Suche: Ausflug: Filter entfernen', exact: true })
+  await expect(searchChip).toBeVisible()
   const inputBox = await plus.getByLabel('Buchungen suchen', { exact: true }).boundingBox()
   const clearIconBox = await plus.getByRole('button', { name: 'Suche leeren', exact: true }).locator('svg').boundingBox()
   expect(clearIconBox!.x + clearIconBox!.width).toBeLessThan(inputBox!.x + inputBox!.width)
@@ -1222,9 +1196,7 @@ test('Buchungen Plus filters, inspects and keeps the original journal available'
   await expect(page.locator('.attachments-modal')).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(plus.locator('.bp-inspector')).toContainText('Ausflug Sommerferien')
-  await plus.getByRole('button', { name: 'Buchungsfilter', exact: true }).click()
-  await page.getByRole('button', { name: 'Zurücksetzen', exact: true }).click()
-  await page.keyboard.press('Escape')
+  await searchChip.click()
   await expect(plus.locator('.bp-row')).toHaveCount(20)
   await plus.getByRole('button', { name: 'Vorheriger Monat', exact: true }).click()
   await expect(plus.locator('.bp-row')).toHaveCount(1)
@@ -1242,9 +1214,8 @@ test('Buchungen Plus filters, inspects and keeps the original journal available'
   await page.getByLabel('Von', { exact: true }).fill('2026-09-01')
   await page.keyboard.press('Escape')
   await expect(plus.getByRole('alert')).toContainText('„Von“ darf nicht')
-  await plus.getByRole('button', { name: 'Buchungsfilter', exact: true }).click()
-  await page.getByRole('button', { name: 'Zurücksetzen', exact: true }).click()
-  await page.keyboard.press('Escape')
+  await plus.getByRole('button', { name: /^Ab .+: Filter entfernen$/ }).click()
+  await plus.getByRole('button', { name: /^Bis .+: Filter entfernen$/ }).click()
   await expect(plus.locator('.bp-row')).toHaveCount(20)
   await page.setViewportSize({ width: 700, height: 900 })
   await plus.locator('.bp-row').first().click()
@@ -1257,7 +1228,8 @@ test('Buchungen Plus filters, inspects and keeps the original journal available'
   await plus.getByRole('button', { name: 'Buchungsfilter', exact: true }).click()
   await expect(plus.getByLabel('Buchungen suchen', { exact: true })).toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
-  await plus.getByRole('button', { name: 'Buchungsfilter', exact: true }).click()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Buchungsfilter', exact: true })).toBeHidden()
   await page.screenshot({ path: 'test-results/bookings-plus-mobile.png', animations: 'disabled' })
   expect(await plus.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
   await page.setViewportSize({ width: 1600, height: 1000 })
@@ -1270,7 +1242,6 @@ test('Buchungen Plus marks booking days with and without files beyond the first 
   await page.clock.setFixedTime(new Date('2026-09-07T12:00:00'))
   // The App initializes the retained calendar month on startup.
   await page.reload()
-  await page.getByRole('button', { name: 'Später', exact: true }).click()
   await page.setViewportSize({ width: 1600, height: 1000 })
   await page.evaluate(async () => {
     const account = (await window.api.app.bootstrap()).paymentAccounts[0]
@@ -1330,7 +1301,7 @@ test('Buchungen Plus shares draft tabs and the expanded editor with detached win
   const inputs = await modal.locator('.booking-primary-grid').boundingBox()
   expect(overview!.x).toBeGreaterThan(inputs!.x + inputs!.width)
   await page.screenshot({ path: 'test-results/booking-editor-overview.png', animations: 'disabled' })
-  await modal.getByRole('button', { name: 'Abbrechen', exact: true }).click()
+  await modal.getByRole('button', { name: 'Schließen', exact: true }).click()
   await expect(modal).toHaveCount(0)
   const tab = plus.locator('.bp-draft-tabs .booking-draft-tab').filter({ hasText: 'Entwurf Plus und Journal' })
   await expect(tab).toBeVisible()
@@ -1363,7 +1334,7 @@ test('Buchungen Plus shares draft tabs and the expanded editor with detached win
   await editor.locator('.quick-add-form').evaluate(el => { el.scrollTop = 0 })
   const narrowOverview = await editor.locator('.booking-ai-summary').boundingBox()
   const narrowKind = await editor.locator('.booking-kind-switch').boundingBox()
-  expect(narrowOverview!.y + narrowOverview!.height).toBeLessThanOrEqual(narrowKind!.y)
+  expect(narrowKind!.y + narrowKind!.height).toBeLessThanOrEqual(narrowOverview!.y)
   await detached.screenshot({ path: 'test-results/booking-editor-detached-narrow.png', animations: 'disabled' })
 
   const closed = detached.waitForEvent('close')
@@ -1395,6 +1366,7 @@ test('Buchungen Plus scrolls the filter dropdown without moving the list', async
 
 test('Buchungen Plus protects booking data and edits metadata in the inspector', async () => {
   await chooseBookingEntryPresentation('Dialog')
+  await page.locator('#toggle-voucher-delete-mode').uncheck()
   await expect(page.locator('#toggle-voucher-delete-mode')).not.toBeChecked()
   await page.setViewportSize({ width: 1600, height: 1000 })
   const fixture = await page.evaluate(async () => {
@@ -1407,7 +1379,6 @@ test('Buchungen Plus protects booking data and edits metadata in the inspector',
     return { id: voucher.id, budget: budget.id, earmark: earmark.id, before: result.rows[0] }
   })
   await page.reload()
-  await page.getByRole('button', { name: 'Später', exact: true }).click()
   await chooseBookingView('Buchungen Plus')
   const plus = page.locator('.bookings-plus')
   await expect(plus.locator('.bp-row')).toHaveCount(1)
@@ -1447,8 +1418,6 @@ test('Buchungen Plus protects booking data and edits metadata in the inspector',
   expect(saved.budgets?.[0]).toMatchObject({ budgetId: fixture.budget, amount: 50 })
   expect(saved.earmarksAssigned?.[0]).toMatchObject({ earmarkId: fixture.earmark, amount: 25 })
   for (const key of ['date', 'type', 'sphere', 'description', 'counterparty', 'grossAmount', 'netAmount', 'vatRate', 'paymentAccountId', 'voucherNo'] as const) expect(saved[key]).toBe(fixture.before[key])
-  const backupReminder = page.getByRole('dialog').filter({ hasText: 'Automatische Sicherung' })
-  if (await backupReminder.isVisible()) await backupReminder.getByRole('button', { name: 'Später', exact: true }).click()
   await plus.getByRole('button', { name: 'Weitere Aktionen', exact: true }).click()
   await page.getByRole('button', { name: 'Vollständige Buchungsinfo', exact: true }).click()
   const info = page.locator('.voucher-info-modal-overlay')
@@ -1521,6 +1490,8 @@ test('Dashboard Plus identifies an opening in its total and on the balance line'
 })
 
 test('Dashboard Plus shows real monthly balances and a responsive five-card overview', async () => {
+  await page.clock.setFixedTime(new Date('2026-09-22T12:00:00Z'))
+  await page.reload()
   await page.setViewportSize({ width: 1440, height: 1050 })
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
   const dashboard = page.getByRole('region', { name: 'Dashboard', exact: true })
@@ -1552,24 +1523,25 @@ test('Dashboard Plus shows real monthly balances and a responsive five-card over
     window.api.app.notifyDataChanged(['vouchers', 'members', 'invoices'])
     return { balance, month: today.slice(0, 7), previousMonth: months[10].slice(0, 7) }
   })
-  const reminder = page.getByRole('dialog').filter({ hasText: 'Automatische Sicherung' })
-  await reminder.waitFor({ state: 'visible', timeout: 2000 }).catch(() => undefined)
-  if (await reminder.isVisible()) await reminder.getByRole('button', { name: 'Später', exact: true }).click()
   await expect(dashboard.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible()
   await expect(dashboard.getByRole('img', { name: 'Organisationslogo' })).toBeVisible()
   await expect(dashboard.locator('.dp-balance-value > strong')).toContainText(new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2 }).format(fixture.balance))
   await expect(dashboard.locator('.dp-month')).toHaveCount(18)
-  await expect(dashboard.locator('.dp-budget-tile')).toContainText('Jugendarbeit')
+  const budgetRow = dashboard.getByRole('region', { name: 'Budgetentwicklung', exact: true })
+    .getByRole('row').filter({ hasText: 'Jugendarbeit' })
+  await expect(budgetRow).toBeVisible()
   const assignmentSwitch = dashboard.getByRole('group', { name: 'Budgets oder Zweckbindungen' })
   await assignmentSwitch.getByRole('button', { name: 'Zweckbindungen', exact: true }).click()
-  await expect(dashboard.locator('.dp-budget-tile')).toContainText('Jugendförderung')
-  await expect(dashboard.locator('.dp-budget-tile > b')).toHaveText('200,00 €')
-  await expect(dashboard.locator('.dp-budget-tile')).toContainText('Einnahmen 100,00 €')
-  await expect(dashboard.locator('.dp-budget-tile')).toContainText('Ausgaben 300,00 €')
+  const bindings = dashboard.getByRole('region', { name: 'Entwicklung der Zweckbindungen', exact: true })
+  const bindingRow = bindings.getByRole('row').filter({ has: page.getByRole('rowheader', { name: /Jugendförderung/ }) })
+  await expect(bindingRow.locator('[data-label="Nettoverbrauch"] strong')).toHaveText('200,00 €')
+  await bindingRow.getByRole('button', { name: 'Jugendförderung: Details anzeigen' }).click()
+  const facts = bindings.locator('.finance-facts')
+  await expect(facts.locator('div').filter({ hasText: 'Einnahmen / Zuflüsse' }).locator('dd')).toHaveText('100,00 €')
+  await expect(facts.locator('div').filter({ hasText: 'Ausgaben / Verwendung' }).locator('dd')).toHaveText('300,00 €')
   await dashboard.locator('.dp-budget-overview').screenshot({ path: 'test-results/dashboard-plus-bindings.png' })
   await assignmentSwitch.getByRole('button', { name: 'Budgets', exact: true }).click()
-  await expect(dashboard.locator('.dp-budget-tile')).toContainText('Jugendarbeit')
-  await expect(dashboard.locator('.dp-budget-tile')).toContainText('300,00')
+  await expect(budgetRow.locator('[data-label="Nettoverbrauch"] strong')).toHaveText('300,00 €')
   await expect(dashboard.locator('.dp-distribution')).toContainText('Sphären')
   await expect(dashboard.locator('.dp-distribution > .dp-open-value')).toHaveText('15.300,00 €')
   const stacked = dashboard.getByRole('article', { name: 'Gestapelte Monatsentwicklung' })
@@ -1609,7 +1581,7 @@ test('Dashboard Plus shows real monthly balances and a responsive five-card over
   await stacked.getByRole('button', { name: 'Diagramm', exact: true }).click()
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(dashboard.locator('.dp-grid > .dp-card')).toHaveCount(5)
-  expect(await dashboard.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1)
+  await expect.poll(() => dashboard.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1)
   await page.screenshot({ path: 'test-results/dashboard-plus-mobile.png', fullPage: true })
   await dashboard.locator('.dp-open').scrollIntoViewIfNeeded()
   await page.screenshot({ path: 'test-results/dashboard-plus-mobile-bottom.png', fullPage: true })
@@ -1629,15 +1601,15 @@ test('Dashboard Plus shows real monthly balances and a responsive five-card over
   await electronApp.evaluate(({ ipcMain }) => {
     ipcMain.removeHandler('ai.settings.get')
     ipcMain.handle('ai.settings.get', () => ({ hasApiKey: true }))
-    ipcMain.removeHandler('ai.text.generate')
-    ipcMain.handle('ai.text.generate', (_event, payload) => {
-      if (payload.type !== 'REPORT_TEXT' || !payload.prompt.includes('months') || !payload.prompt.includes('Wie steht der Verein da?')) throw new Error('Dashboard-Kontext fehlt')
-      return { title: 'Finanzlage des Vereins', body: 'Der gebuchte Bestand beträgt 12.160,00 Euro.', notes: ['Offene Posten sind getrennt ausgewiesen.'] }
+    ipcMain.removeHandler('ai.agent.run')
+    ipcMain.handle('ai.agent.run', (_event, payload) => {
+      const scope = payload.uiContext?.reportingScope
+      if (payload.uiContext?.activeArea !== 'Dashboard' || !scope?.from || !scope?.to || payload.prompt !== 'Wie steht der Verein da?')
+        throw new Error('Dashboard-Kontext fehlt')
+      return { sessionId: 'dashboard-test', answer: 'Der gebuchte Bestand beträgt 12.160,00 Euro.', drafts: [], trace: [], toolCalls: [], reports: [] }
     })
   })
   await page.evaluate(() => window.api.app.notifyDataChanged(['settings']))
-  await reminder.waitFor({ state: 'visible', timeout: 2000 }).catch(() => undefined)
-  if (await reminder.isVisible()) await reminder.getByRole('button', { name: 'Später', exact: true }).click()
   await dashboard.getByLabel('Frage zu Reporting oder Controlling').fill('Wie steht der Verein da?')
   await dashboard.getByRole('button', { name: 'Frage senden', exact: true }).click()
   await expect(dashboard.locator('.dp-ai-answers')).toContainText('12.160,00 Euro')
@@ -1654,15 +1626,14 @@ test('Dashboard Plus shows real monthly balances and a responsive five-card over
 test('Dashboard Plus uses organization categories for expense distribution', async () => {
   await page.evaluate(async () => {
     await window.api.classifications.profile.update({ profile: 'GENERAL' })
+    const { value: modules } = await window.api.settings.get<string[]>({ key: 'ui.visibleNavItems' })
+    await window.api.settings.set({ key: 'ui.visibleNavItems', value: modules.filter(key => key !== 'Mitglieder') })
     const category = await window.api.classifications.primary.create({ name: 'Veranstaltungen', color: '#91bdc5' })
     const account = (await window.api.app.bootstrap()).paymentAccounts[0]
     await window.api.vouchers.create({ date: new Date().toISOString().slice(0, 10), type: 'OUT', sphere: 'IDEELL', primaryClassificationValueId: category.id, description: 'Raummiete', grossAmount: 125, vatRate: 0, paymentMethod: account.kind === 'CASH' ? 'BAR' : 'BANK', paymentAccountId: account.id })
     window.api.app.notifyDataChanged(['vouchers', 'settings'])
   })
   await page.reload()
-  const later = page.getByRole('button', { name: 'Später', exact: true })
-  await later.waitFor({ state: 'visible', timeout: 2000 }).catch(() => undefined)
-  if (await later.isVisible()) await later.click()
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
   const dashboard = page.getByRole('region', { name: 'Dashboard', exact: true })
   await expect(dashboard.locator('.dp-distribution')).toContainText('Kategorien')
@@ -1703,9 +1674,6 @@ test('booking view preference persists and resolves dashboard and receipt links'
   await expect(page.locator('.bookings-plus')).toBeVisible()
   await page.reload()
   await expect(page.locator('.bookings-plus')).toBeVisible()
-  const later = page.getByRole('button', { name: 'Später', exact: true })
-  await later.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined)
-  if (await later.isVisible()) await later.click()
   await expect(page.getByRole('button', { name: 'Dashboard Plus', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Buchungen Plus', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
@@ -1720,19 +1688,21 @@ test('booking view preference persists and resolves dashboard and receipt links'
   await page.getByTitle('Zur Buchung', { exact: true }).click()
   await expect(page.locator('.bookings-plus .bp-row')).toHaveCount(1)
   await expect(page.locator('.bp-inspector')).toContainText('Ansicht Verweistest')
-  await page.locator('.bp-reset-badge').click()
-  await expect(page.locator('.bp-search input')).toHaveValue('')
+  const searchFilter = page.getByRole('button', { name: /^Suche: .+: Filter entfernen$/ })
+  const searchField = page.getByRole('searchbox', { name: 'Buchungen suchen', exact: true })
+  await searchFilter.click()
+  await expect(searchField).toHaveValue('')
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
   await page.getByLabel('Buchungen', { exact: true }).click()
-  await expect(page.locator('.bp-search input')).toHaveValue('')
-  await expect(page.locator('.bp-reset-badge')).toHaveCount(0)
+  await expect(searchField).toHaveValue('')
+  await expect(searchFilter).toHaveCount(0)
   await expect(page.locator('.bp-preview-label')).toHaveCount(0)
   await expect(page.locator('.bp-heading')).not.toContainText('Alle Buchungen im Blick')
   // A new receipt link must still apply its filter after the previous one was reset.
   await page.getByRole('button', { name: 'Belege', exact: true }).click()
   await page.getByTitle('Zur Buchung', { exact: true }).click()
-  await expect(page.locator('.bp-search input')).not.toHaveValue('')
-  await page.locator('.bp-search input').fill('keine Treffer')
+  await expect(searchField).not.toHaveValue('')
+  await searchField.fill('keine Treffer')
   await expect(page.locator('.bookings-plus .bp-row')).toHaveCount(0)
   await page.evaluate(id => window.dispatchEvent(new CustomEvent('apply-voucher-jump', { detail: { voucherId: id } })), voucher.id)
   await expect(page.locator('.bookings-plus .bp-row')).toHaveCount(1)
@@ -1895,8 +1865,6 @@ test('advances show spending progress, colored purchase rows and compact creatio
   await expect(create).toHaveCount(0)
   await expect(page.locator('.advances-person h2')).toHaveText('Nikolas Häfner')
   await expect(page.locator('.advances-note')).toContainText('Material für das Jugendhaus')
-  const reminder = page.getByRole('button', { name: 'Später', exact: true })
-  if (await reminder.isVisible()) await reminder.click()
   await page.locator('.advances-recipient-row').filter({ hasText: 'Merle Beckord' }).click()
   await page.setViewportSize({ width: 600, height: 900 })
   await expect(purchase).toBeVisible()
@@ -1921,9 +1889,6 @@ test('monthly charts start at the newest months in dashboard and reports', async
     }
     window.api.app.notifyDataChanged(['vouchers'])
   })
-  const reminder = page.getByRole('button', { name: 'Später', exact: true })
-  await reminder.waitFor({ state: 'visible', timeout: 2000 }).catch(() => undefined)
-  if (await reminder.isVisible()) await reminder.click()
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
   const chart = page.locator('.dp-monthly .dp-chart')
   const distanceFromEnd = (element: Element) => element.scrollWidth - element.clientWidth - element.scrollLeft
@@ -1975,9 +1940,6 @@ test('dashboard tasks navigate to overdue payables and receivables with actual u
   expect(fixture.list.total).toBe(2)
   expect(fixture.list.rows[0].status).toBe('PARTIAL')
   expect(fixture.summary.remainingOut).toBe(80)
-  const reminder = page.getByRole('button', { name: 'Später', exact: true })
-  await reminder.waitFor({ state: 'visible', timeout: 2000 }).catch(() => undefined)
-  if (await reminder.isVisible()) await reminder.click()
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Was zu tun ist' })).toBeVisible()
   const tasks = page.locator('.dp-tasks')
@@ -1996,3 +1958,80 @@ test('dashboard tasks navigate to overdue payables and receivables with actual u
   await page.getByRole('button', { name: 'Filter zurücksetzen', exact: true }).click()
   await expect(page.locator('.app-main tbody')).toContainText('Vollständig bezahlt')
 })
+
+test('confirmed contribution retries and partial payments agree with the bank and member ledger', async () => {
+  const result = await page.evaluate(async () => {
+    const organizationId = (await window.api.organizations.active()).organization!.id
+    const { id: memberId } = await window.api.members.create({
+      memberNo: 'B-01', name: 'Beitragstest', status: 'ACTIVE', join_date: '2026-01-01',
+      contribution_amount: 50.10, contribution_interval: 'YEARLY'
+    })
+    const { paymentAccounts } = await window.api.app.bootstrap()
+    const paymentAccountId = paymentAccounts.find(item => item.kind === 'BANK')!.id
+    const command = {
+      organizationId, requestId: crypto.randomUUID(), memberId, interval: 'YEARLY' as const, periodKey: '2026',
+      date: '2026-01-03', paymentAccountId, paymentMethod: 'BANK' as const, tags: [], amount: 25.05, description: 'Beitrag'
+    }
+    const rejected = await Promise.allSettled([
+      window.api.payments.bookContribution({ ...command, amount: 50.11 }),
+      window.api.payments.bookContribution({ ...command, organizationId: 'anderer-verein' })
+    ])
+    const before = await window.api.vouchers.list({ limit: 5 })
+    const first = await Promise.all([window.api.payments.bookContribution(command), window.api.payments.bookContribution(command)])
+    await window.api.payments.bookContribution({ ...command, requestId: crypto.randomUUID() })
+    const { total, rows } = await window.api.vouchers.list({ limit: 5 })
+    const periods = await window.api.payments.periods({ memberId, through: '2026-12-31' })
+    const balance = await window.api.reports.cashBalance({ paymentAccountId })
+    return {
+      rejected: rejected.map(item => item.status), before: before.total, ids: first.map(entry => entry.id),
+      total, cents: rows.reduce((sum, row) => sum + Math.round(row.grossAmount * 100), 0),
+      period: periods.find(item => item.periodKey === '2026'), bank: balance.BANK
+    }
+  })
+  expect(result.rejected).toEqual(['rejected', 'rejected'])
+  expect(result.ids[0]).toBe(result.ids[1])
+  expect(result).toMatchObject({ before: 0, total: 2, cents: 5010, bank: 50.10, period: { paidAmount: 50.10, remaining: 0 } })
+})
+
+for (const presentation of ['Dialog', 'Eigenes Fenster'] as const) {
+  test(`booking edits preserve VAT and discard unsaved changes in ${presentation}`, async () => {
+    await chooseBookingEntryPresentation(presentation)
+    await page.locator('#toggle-voucher-delete-mode').check()
+    await page.locator('#toggle-booking-edit-tabs').uncheck()
+    const id = await page.evaluate(async () => {
+      const { paymentAccounts } = await window.api.app.bootstrap()
+      const account = paymentAccounts.find(item => item.kind === 'BANK')!
+      const voucher = await window.api.vouchers.create({
+        date: new Date().toISOString().slice(0, 10), type: 'IN', sphere: 'IDEELL', description: 'Eintritt',
+        grossAmount: 119, vatRate: 19, paymentMethod: 'BANK', paymentAccountId: account.id
+      })
+      return voucher.id
+    })
+    await chooseBookingView('Buchungen Plus')
+    const openEdit = async () => {
+      const next = presentation === 'Dialog' ? Promise.resolve(page) : electronApp.waitForEvent('window')
+      await page.locator('.bp-inspector').getByRole('button', { name: 'Bearbeiten', exact: true }).click()
+      return next
+    }
+    const readRow = () => page.evaluate(async voucherId => {
+      const result = await window.api.vouchers.list({ limit: 1, voucherIds: [voucherId] })
+      return result.rows[0]
+    }, id)
+    let editorPage = await openEdit()
+    await editorPage.locator('#quick-add-description').fill('Eintritt bestätigt')
+    await editorPage.locator('.quick-add-modal').getByRole('button', {
+      name: presentation === 'Dialog' ? 'Änderungen speichern' : 'Speichern', exact: true
+    }).click()
+    await expect.poll(readRow).toMatchObject({ description: 'Eintritt bestätigt', netAmount: 100, vatAmount: 19, grossAmount: 119 })
+    if (presentation === 'Eigenes Fenster') await expect.poll(() => editorPage.isClosed()).toBe(true)
+    editorPage = await openEdit()
+    await editorPage.locator('#quick-add-description').fill('Verworfene Änderung')
+    await editorPage.locator('.quick-add-modal').getByRole('button', { name: 'Schließen', exact: true }).click()
+    await editorPage.getByRole('button', {
+      name: presentation === 'Dialog' ? 'Änderungen verwerfen' : 'Verwerfen', exact: true
+    }).click()
+    if (presentation === 'Dialog') await expect(page.locator('.quick-add-modal')).toHaveCount(0)
+    else await expect.poll(() => editorPage.isClosed()).toBe(true)
+    expect(await readRow()).toMatchObject({ description: 'Eintritt bestätigt', netAmount: 100, vatAmount: 19, grossAmount: 119 })
+  })
+}

@@ -1,12 +1,13 @@
 import { AI_BOOKING_COMMENTS_SETTING, aiClassificationInstruction, aiBookingComment, aiBookingCommentInstruction, filterOptionalAssignmentWarnings } from '../../../shared/aiBookingPolicy'
 import { AI_MASTER_DATA_SETTING, aiMasterDataInstruction, normalizeMasterDataPermissions, type AiMasterDataPermissions } from '../../../shared/aiMasterDataPolicy'
 import type { BankAiAnalysisProgress } from '../../../shared/bankAiReviewProgress'
-import { safeStorage, session } from 'electron'
+import { session } from 'electron'
 import { visibleAiText } from '../../../shared/aiVisibleText'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
+import { selectAiProtocol, type AiInputPart, type AiRequest, type AiResponse } from './aiProviderProtocol'
 import { createClaudeResponder } from './aiClaude'
-import { AI_PROVIDER_CONFIG, normalizeProviderModel, type AiProviderId as AiProvider } from '../../../shared/aiProviders'
+import { AI_PROVIDER_CONFIG, AI_PROVIDER_IDS, normalizeProviderModel, type AiProviderId as AiProvider } from '../../../shared/aiProviders'
 import { zodTextFormat } from 'openai/helpers/zod'
 import { PDFDocument } from 'pdf-lib'
 import { z } from 'zod'
@@ -27,21 +28,20 @@ import {
   type TAiInvoiceExtractionResult,
   type TAiTextDraftResult
 } from '../ipc/schemas'
-import { getSetting, setSetting } from './settings'
+import { aiKeySetting, aiKeyStorage, migratedPlainKey, readAiKey, storeAiKey } from './aiCredentials'
+import { getSetting, setSetting, settingsScope } from './settings'
 import { normalizeInvoicePacketGroups } from './invoicePacketSegmentation'
 import { normalizeCreditAmounts, normalizeInvoiceDirection, validateInvoiceExtraction } from './invoiceValidation'
 import { isPdfInputFile, readEmbeddedPdfText } from './aiDocumentRouting'
 import { validateBankReviewResult } from './aiBankReviewValidation'
 import {
-  isMittwaldThinkingModel,
+  mittwaldThinkingOptions,
   supportsMittwaldVision,
   normalizeAiTaskProfile,
   resolveAiTaskModel,
-  toMittwaldReasoningEffort,
   type AiTaskProfile
 } from '../../../shared/aiModelProfiles'
 
-const API_KEY_SETTING = 'ai.openai.apiKey'
 const MODEL_SETTING = 'ai.openai.model'
 const TEXT_MODEL_SETTING = 'ai.openai.textModel'
 const EFFORT_SETTING = 'ai.openai.reasoningEffort'
@@ -75,14 +75,11 @@ const MODEL_PRICING_USD_PER_MILLION: Record<
   'gpt-5-nano': { input: 0.05, cachedInput: 0.005, output: 0.4 }
 }
 
-type AiStoredSecret = {
-  encrypted: boolean
-  value: string
-}
-
 export type AiSettings = {
   masterDataCreation: AiMasterDataPermissions
   bookingCommentsEnabled: boolean
+  keyStorage?: 'secure' | 'session'
+  migratedPlainKey?: boolean
   hasApiKey: boolean
   availableModels?: string[]
   model: string
@@ -211,46 +208,13 @@ export type AiBankReviewTransaction = {
   }>
 }
 
-function canEncrypt() {
-  try {
-    return safeStorage.isEncryptionAvailable()
-  } catch {
-    return false
-  }
-}
-
-function encryptSecret(value: string): AiStoredSecret {
-  if (canEncrypt()) {
-    return {
-      encrypted: true,
-      value: safeStorage.encryptString(value).toString('base64')
-    }
-  }
-  return { encrypted: false, value }
-}
-
-function decryptSecret(stored?: AiStoredSecret | string | null) {
-  if (!stored) return ''
-  if (typeof stored === 'string') return stored
-  if (!stored.encrypted) return stored.value || ''
-  try {
-    return safeStorage.decryptString(Buffer.from(stored.value, 'base64'))
-  } catch {
-    return ''
-  }
-}
-
 function activeProvider(): AiProvider {
-  return getSetting<AiProvider>(PROVIDER_SETTING) || DEFAULT_PROVIDER
-}
-
-function providerKey(provider: AiProvider) {
-  return 'ai.providers.' + provider + '.apiKey'
+  const stored = getSetting(PROVIDER_SETTING)
+  return AI_PROVIDER_IDS.find(id => id === stored) ?? DEFAULT_PROVIDER
 }
 
 function storedSecret(provider: AiProvider) {
-  return getSetting<AiStoredSecret | string>(providerKey(provider)) ??
-    (provider === activeProvider() ? getSetting<AiStoredSecret | string>(API_KEY_SETTING) : undefined)
+  return readAiKey(settingsScope(), provider, getSetting(aiKeySetting(provider)))
 }
 
 function catalogKey(provider: AiProvider) {
@@ -304,7 +268,7 @@ function isMittwaldGenerationModel(modelId: string) {
 }
 
 export function getAiSettings(provider = activeProvider()): AiSettings {
-  const apiKey = decryptSecret(storedSecret(provider))
+  const apiKey = storedSecret(provider)
   const effort = getSetting<'low' | 'medium' | 'high'>(EFFORT_SETTING) || 'medium'
   const preferences = modelPreferences(provider)
   const { invoiceProfile, textProfile } = preferences
@@ -317,6 +281,8 @@ export function getAiSettings(provider = activeProvider()): AiSettings {
     bookingCommentsEnabled: getSetting(AI_BOOKING_COMMENTS_SETTING) !== false,
     masterDataCreation: normalizeMasterDataPermissions(getSetting(AI_MASTER_DATA_SETTING)),
     hasApiKey: !!apiKey.trim(),
+    keyStorage: aiKeyStorage(settingsScope(), provider),
+    migratedPlainKey: getSetting(migratedPlainKey) === true,
     availableModels: availableModels.length ? availableModels : undefined,
     model,
     textModel,
@@ -368,14 +334,8 @@ export function setAiSettings(input: {
     setSetting(PROXY_URL_SETTING, proxyUrl)
   }
 
-  // Move the shared legacy secret before changing its owner, including encrypted values.
-  const legacyKey = getSetting<AiStoredSecret | string>(API_KEY_SETTING)
-  if (legacyKey) {
-    if (!getSetting(providerKey(current.provider))) setSetting(providerKey(current.provider), legacyKey)
-    setSetting(API_KEY_SETTING, null)
-  }
   if (input.apiKey?.trim()) {
-    setSetting(providerKey(provider), encryptSecret(input.apiKey.trim()))
+    setSetting(aiKeySetting(provider), storeAiKey(settingsScope(), provider, input.apiKey.trim()))
     setSetting(catalogKey(provider), [])
   }
   if (provider !== current.provider) {
@@ -399,7 +359,7 @@ export function setAiSettings(input: {
 }
 
 function getApiKey(provider: AiProvider) {
-  const key = decryptSecret(storedSecret(provider)).trim()
+  const key = storedSecret(provider).trim()
   if (!key) throw new Error('API-Key fehlt. Bitte in KI > Einstellungen hinterlegen.')
   return key
 }
@@ -468,21 +428,18 @@ export function createClaudeConversation(settings: AiSettings) {
   return createClaudeResponder(createClaudeClient(settings))
 }
 
-function mittwaldChatContent(content: any[]) {
+function mittwaldChatContent(content: AiInputPart[]): OpenAI.Chat.Completions.ChatCompletionContentPart[] {
   return content.map((part) => {
     if (part?.type === 'input_text') return { type: 'text', text: part.text }
     if (part?.type === 'input_image') {
       return { type: 'image_url', image_url: { url: part.image_url } }
     }
-    if (part?.type === 'input_file') {
-      // Mittwalds GLM-OCR Dokument-Proxy erwartet Dokumente als Data-URI im image_url-Feld.
-      return { type: 'image_url', image_url: { url: part.file_data } }
-    }
-    return part
+    // Mittwalds GLM-OCR Dokument-Proxy erwartet Dokumente als Data-URI im image_url-Feld.
+    return { type: 'image_url', image_url: { url: part.file_data } }
   })
 }
 
-function mittwaldJsonInstruction(format: any) {
+function mittwaldJsonInstruction(format: OpenAI.Responses.ResponseTextConfig['format']) {
   if (format?.type !== 'json_schema' || !format?.schema) return ''
   return [
     'Antworte ausschließlich mit einem gültigen JSON-Objekt ohne Markdown oder Codeblock.',
@@ -504,11 +461,15 @@ function parseMittwaldJson(text: string) {
  * Mittwald implements Chat Completions as its stable OpenAI-compatible surface.
  * The Responses API is kept for providers that support OpenAI structured output natively.
  */
-export async function createAiResponse(request: any, settings = getAiSettings()): Promise<any> {
-  if (settings.provider === 'anthropic') return createClaudeConversation(settings)(request)
-  const client = createClient(settings)
-  if (settings.provider !== 'mittwald') return client.responses.create(request)
+export function createAiResponse(request: AiRequest, settings = getAiSettings()): Promise<AiResponse> {
+  return selectAiProtocol<Promise<AiResponse>>(settings.provider, {
+    messages: () => createClaudeConversation(settings)(request),
+    responses: () => createClient(settings).responses.create(request as OpenAI.Responses.ResponseCreateParamsNonStreaming),
+    chat: () => createMittwaldResponse(request, createClient(settings))
+  })
+}
 
+async function createMittwaldResponse(request: AiRequest, client: OpenAI): Promise<AiResponse> {
   const input = Array.isArray(request.input)
     ? request.input
     : [{ role: 'user', content: request.input }]
@@ -524,17 +485,8 @@ export async function createAiResponse(request: any, settings = getAiSettings())
     messages.push({ role: item?.role || 'user', content })
   }
 
-  const usesQwenThinkingModel = isMittwaldThinkingModel(request.model)
-  const usesStructuredOutput = ['json_schema', 'json_object'].includes(request.text?.format?.type)
-  const chatTemplateKwargs = usesQwenThinkingModel
-    ? usesStructuredOutput || request.model !== 'Qwen3.8-27B-NVFP4'
-      ? { enable_thinking: false }
-      : request.reasoning?.effort
-        ? {
-            reasoning_effort: toMittwaldReasoningEffort(request.reasoning.effort)
-          }
-        : undefined
-    : undefined
+  const usesStructuredOutput = request.text?.format?.type === 'json_schema' || request.text?.format?.type === 'json_object'
+  const chatTemplateKwargs = mittwaldThinkingOptions(request.model, request.reasoning?.effort, usesStructuredOutput)
   const chatRequest = {
     model: request.model,
     messages,
@@ -548,6 +500,7 @@ export async function createAiResponse(request: any, settings = getAiSettings())
       : {})
   }
   let completion = await client.chat.completions.create(chatRequest as any)
+  const initialBudget = chatRequest.max_tokens ?? 4096
   let invalidJson = false
   if (usesStructuredOutput && completion.choices[0]?.finish_reason !== 'length') {
     try { parseMittwaldJson(completion.choices[0]?.message?.content || '') }
@@ -555,11 +508,11 @@ export async function createAiResponse(request: any, settings = getAiSettings())
   }
   // Never parse a cut-off response as if it were complete. Retry once with room
   // for the entire JSON document, bounded to avoid unbounded provider requests.
-  if (usesStructuredOutput && (invalidJson || (completion.choices[0]?.finish_reason === 'length' && chatRequest.max_tokens < 16384))) {
+  if (usesStructuredOutput && (invalidJson || (completion.choices[0]?.finish_reason === 'length' && initialBudget < 16384))) {
     const firstUsage = completion.usage
     completion = await client.chat.completions.create({
       ...chatRequest,
-      max_tokens: invalidJson ? chatRequest.max_tokens : Math.min(16384, chatRequest.max_tokens * 2),
+      max_tokens: invalidJson ? chatRequest.max_tokens : Math.min(16384, initialBudget * 2),
       messages: invalidJson
         ? [...messages, { role: 'user', content: 'Die Antwort war nicht als JSON auswertbar. Antworte erneut auf die ursprüngliche Aufgabe, ausschließlich mit einem vollständigen JSON-Objekt gemäß dem Schema. Keine Einleitung, kein Markdown.' }]
         : messages
@@ -613,10 +566,10 @@ export function extractOutputText(response: any) {
   return visibleAiText(parts.join('\n'))
 }
 
-async function extractMittwaldDocumentText(file: AiInputFile, settings: AiSettings, localTextAvailable = false) {
+async function extractMittwaldDocumentText(file: AiInputFile, settings: AiSettings, localTextAvailable = false, embeddedPagesRead = 0) {
   // Scans and mixed PDFs can contain amounts missing from either source alone.
-  const embedded = !localTextAvailable && isPdfInputFile(file)
-    ? await readEmbeddedPdfText(file.dataBase64).catch(() => '')
+  const embedded = isPdfInputFile(file)
+    ? await readEmbeddedPdfText(file.dataBase64, embeddedPagesRead).catch(() => '')
     : ''
   const response = await createAiResponse({
     model: 'GLM-OCR',
@@ -902,7 +855,7 @@ function inferInputFileMimeType(file: AiInputFile) {
   return 'application/octet-stream'
 }
 
-function toResponseFileContent(file: AiInputFile) {
+function toResponseFileContent(file: AiInputFile): AiInputPart {
   const mimeType = inferInputFileMimeType(file)
   const dataUrl = `data:${mimeType};base64,${file.dataBase64}`
   if (mimeType.startsWith('image/')) {
@@ -1000,13 +953,18 @@ async function expandInputFilesForAnalysis(files: AiInputFile[]): Promise<Expand
 export async function testAiConnection() {
   const settings = getAiSettings()
   let resolvedProxy = ''
+  let availableModels: string[] | undefined
+  const scope = settingsScope()
   try {
-    await configureAiNetwork(settings)
-    resolvedProxy = await aiNetworkSession().resolveProxy(settings.apiBaseUrl)
     const provider = settings.provider
     const secret = getApiKey(provider)
+    const assertCurrent = () => {
+      if (scope !== settingsScope() || secret !== storedSecret(provider).trim()) throw new Error('Die KI-Einstellungen haben sich geändert. Bitte erneut prüfen.')
+    }
+    await configureAiNetwork(settings)
+    resolvedProxy = await aiNetworkSession().resolveProxy(settings.apiBaseUrl)
+    assertCurrent()
     const config = AI_PROVIDER_CONFIG[provider]
-    let availableModels: string[] | undefined
     if (provider !== 'minimax') {
       let ids: string[]
       if (provider === 'anthropic') {
@@ -1019,6 +977,8 @@ export async function testAiConnection() {
       availableModels = [...new Set(ids.map(id => id.trim()).filter(id => id && (
         provider === 'mittwald' ? isMittwaldGenerationModel(id) : config.modelOptions.some(option => option.value === id)
       )))]
+      assertCurrent()
+      setSetting(catalogKey(provider), availableModels)
       if (!availableModels.length) throw new Error(config.label + ' meldet keine passenden Modelle für diesen API-Key.')
       if (provider === 'mittwald' && !availableModels.includes('GLM-OCR')) {
         throw new Error('Mittwald meldet GLM-OCR für die Beleganalyse mit diesem API-Key als nicht verfügbar.')
@@ -1030,6 +990,7 @@ export async function testAiConnection() {
     ]
     const schema = z.object({ ok: z.literal(true) })
     for (const model of new Set(selectedModels)) {
+      assertCurrent()
       if (availableModels && !availableModels.includes(model)) {
         throw new Error('Das ausgewählte Modell ' + model + ' ist für diesen API-Key nicht verfügbar.')
       }
@@ -1047,9 +1008,6 @@ export async function testAiConnection() {
           throw new Error(config.label + ' hat mit ' + model + ' keine passende strukturierte Testantwort geliefert.')
         }
       }
-    }
-    if (availableModels && secret === decryptSecret(storedSecret(provider)).trim()) {
-      setSetting(catalogKey(provider), availableModels)
     }
     return {
       ok: true,
@@ -1091,6 +1049,7 @@ export async function testAiConnection() {
     return {
       ok: false,
       error: errorMessage,
+      availableModels,
       errorCode: errorCode || undefined,
       proxyMode: settings.proxyMode,
       resolvedProxy: resolvedProxy || undefined,
@@ -1162,10 +1121,10 @@ export async function analyzeBookingDocuments(input: {
         role: 'user',
         content: [
           { type: 'input_text', text: prompt },
-          ...filesForAnalysis.flatMap((item, idx) => [
+          ...filesForAnalysis.flatMap<AiInputPart>((item, idx) => [
             { type: 'input_text', text: `Quelle ${idx + 1}: ${item.source.label}` },
             ...(item.documentText !== undefined
-              ? [{ type: 'input_text', text: `Dokumenttext:\n${item.documentText.slice(0, 80_000)}` }]
+              ? [{ type: 'input_text' as const, text: `Dokumenttext:\n${item.documentText.slice(0, 80_000)}` }]
               : [toResponseFileContent(item.file)])
           ])
         ]
@@ -1276,7 +1235,7 @@ export async function segmentInvoicePacket(file: AiInputFile): Promise<{
               'Extrahiere noch keine Buchungsdaten.'
             ].join('\n')
           },
-          ...pageFiles.flatMap((page, index) => [
+          ...pageFiles.flatMap<AiInputPart>((page, index) => [
             { type: 'input_text', text: `Seite ${index + 1} von ${pageCount}` },
             toResponseFileContent(page.file)
           ])
@@ -1343,6 +1302,7 @@ export async function analyzeInvoiceDocument(input: {
   file: AiInputFile
   context: Pick<AiContext, 'organization' | 'aiRules' | 'primaryClassifications' | 'paymentAccounts' | 'budgets' | 'earmarks' | 'tags' | 'parties' | 'generatedAt'>
   localDocumentText?: string | null
+  embeddedPdfPagesRead?: number
   guidance?: {
     instructions?: string
     defaults?: {
@@ -1366,7 +1326,10 @@ export async function analyzeInvoiceDocument(input: {
   let ocrMs: number | null = null
   if (settings.provider === 'mittwald' && model !== 'GLM-OCR') {
     const ocrStartedAt = Date.now()
-    mittwaldOcrText = await extractMittwaldDocumentText(input.file, settings, !!input.localDocumentText?.trim())
+    // OCR/Docling alone proves no PDF text-layer coverage. A truncated local excerpt must be read again.
+    const localText = input.localDocumentText?.trim() || ''
+    const coveredPages = localText && localText.length <= 80_000 ? input.embeddedPdfPagesRead : 0
+    mittwaldOcrText = await extractMittwaldDocumentText(input.file, settings, !!localText, coveredPages)
     ocrMs = Date.now() - ocrStartedAt
   }
   const context = {

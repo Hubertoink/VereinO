@@ -1,3 +1,4 @@
+import type { AiProviderId } from '../../../../shared/aiProviders'
 import { useCallback, useMemo, useRef, useState, type DragEvent } from 'react'
 import { filePreviewKey, isAiAttachmentFile } from './aiAttachments'
 import { useAiAttachmentPreviews } from './useAiAttachmentPreviews'
@@ -5,7 +6,7 @@ import { activeMentionTrigger, mentionInsertToken } from './aiMentions'
 import { normalizeLookup } from './aiText'
 import type { AiMentionOption, Notify } from './aiViewTypes'
 
-export function useAiComposer(notify: Notify, mentionOptions: AiMentionOption[]) {
+export function useAiComposer(notify: Notify, mentionOptions: AiMentionOption[], provider: AiProviderId) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null)
   const dragDepthRef = useRef(0)
@@ -18,11 +19,12 @@ export function useAiComposer(notify: Notify, mentionOptions: AiMentionOption[])
     (incoming: FileList | File[] | null) => {
       const nextFiles = Array.from(incoming || [])
       if (!nextFiles.length) return
-      const accepted = nextFiles.filter(isAiAttachmentFile)
+      const accepted = nextFiles.filter(file => isAiAttachmentFile(file, provider))
       const skipped = nextFiles.length - accepted.length
       if (skipped > 0) {
         notify(
           'info',
+          provider === 'anthropic' ? 'Nicht unterstützte Anhänge wurden übersprungen. Für Claude alte XLS-Dateien bitte in XLSX umwandeln.' :
           `${skipped} Datei(en) wurden übersprungen. Erlaubt sind PDF, PNG, JPG, XLSX, XLS, CSV und TSV.`
         )
       }
@@ -33,7 +35,7 @@ export function useAiComposer(notify: Notify, mentionOptions: AiMentionOption[])
         return additions.length ? [...current, ...additions] : current
       })
     },
-    [notify]
+    [notify, provider]
   )
 
   const handleComposerDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {

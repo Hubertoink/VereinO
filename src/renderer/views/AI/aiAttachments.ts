@@ -1,3 +1,4 @@
+import type { AiProviderId } from '../../../../shared/aiProviders'
 export type AiAttachmentPreview = { key: string; name: string; url: string | null; badge: string }
 
 export function filePreviewKey(file: File) {
@@ -14,7 +15,12 @@ export function attachmentBadge(file: File) {
   return 'DATEI'
 }
 
-export function isAiAttachmentFile(file: File) {
+export function attachmentAccept(provider: AiProviderId) {
+  return provider === 'anthropic' ? '.pdf,.xlsx,.csv,.tsv,image/png,image/jpeg' : '.pdf,.xlsx,.xls,.csv,.tsv,image/png,image/jpeg'
+}
+
+export function isAiAttachmentFile(file: File, provider?: AiProviderId) {
+  if (provider === 'anthropic' && /\.xls$/i.test(file.name)) return false
   const mimeType = String(file.type || '').toLowerCase()
   const name = String(file.name || '').toLowerCase()
   if (mimeType === 'application/pdf') return true

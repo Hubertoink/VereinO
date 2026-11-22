@@ -27,17 +27,18 @@ describe('advanced voucher queries', () => {
       CREATE TABLE payment_accounts (id INTEGER PRIMARY KEY, name TEXT, kind TEXT, color TEXT);
       CREATE TABLE classification_values (id INTEGER PRIMARY KEY, name TEXT, color TEXT, icon TEXT);
       CREATE TABLE voucher_files (id INTEGER PRIMARY KEY, voucher_id INTEGER);
-      CREATE TABLE earmarks (id INTEGER PRIMARY KEY, code TEXT);
+      CREATE TABLE earmarks (id INTEGER PRIMARY KEY, code TEXT, name TEXT, color TEXT);
       CREATE TABLE budgets (id INTEGER PRIMARY KEY, year INTEGER, sphere TEXT, name TEXT, category_name TEXT,
         project_name TEXT, category_id INTEGER, project_id INTEGER, earmark_id INTEGER, color TEXT);
-      CREATE TABLE voucher_budgets (voucher_id INTEGER, budget_id INTEGER);
+      CREATE TABLE voucher_budgets (id INTEGER PRIMARY KEY, voucher_id INTEGER, budget_id INTEGER, amount REAL);
+      CREATE TABLE voucher_earmarks (id INTEGER PRIMARY KEY, voucher_id INTEGER, earmark_id INTEGER, amount REAL);
       CREATE TABLE tags (id INTEGER PRIMARY KEY, name TEXT UNIQUE);
       CREATE TABLE voucher_tags (voucher_id INTEGER, tag_id INTEGER, PRIMARY KEY (voucher_id, tag_id));
       CREATE TABLE cash_checks (voucher_id INTEGER);
       CREATE TABLE member_advances (placeholder_voucher_id INTEGER, resolved_at TEXT);
       INSERT INTO payment_accounts VALUES (1, 'Alpha Bank', 'BANK', '#112233'), (2, 'Kasse', 'CASH', '#445566');
       INSERT INTO classification_values VALUES (10, 'Jugend', '#abcdef', 'users'), (20, 'Sport', '#fedcba', 'ball');
-      INSERT INTO earmarks VALUES (7, 'ZWECK-7');
+      INSERT INTO earmarks(id, code) VALUES (7, 'ZWECK-7');
       INSERT INTO budgets (id, year, sphere, name, color) VALUES (8, 2026, 'IDEELL', 'Material', '#123456');
       INSERT INTO vouchers (id, voucher_no, date, year, type, sphere, primary_classification_value_id,
         payment_method, payment_account_id, description, gross_amount, net_amount, budget_id, earmark_id) VALUES
@@ -50,7 +51,7 @@ describe('advanced voucher queries', () => {
       UPDATE vouchers SET original_id = 1, reversed_by_id = 4, note = 'Notiz', counterparty = 'Testverein',
         party_id = 5, amount_mode = 'GROSS', vat_rate = 0, vat_amount = 0, budget_amount = 100,
         earmark_amount = 100 WHERE id = 1;
-      INSERT INTO voucher_budgets VALUES (2, 8);
+      INSERT INTO voucher_budgets (voucher_id, budget_id, amount) VALUES (2, 8, 200);
       INSERT INTO tags VALUES (1, 'Event'), (2, 'Spende');
       INSERT INTO voucher_tags VALUES (1, 1), (1, 2), (2, 1);
       INSERT INTO voucher_files VALUES (1, 1), (2, 1), (3, 2);

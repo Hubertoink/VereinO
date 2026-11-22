@@ -1,25 +1,9 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import type { ContentBlockParam, MessageParam, Tool } from '@anthropic-ai/sdk/resources/messages'
 
-type InputPart =
-  | { type: 'input_text'; text: string }
-  | { type: 'input_image'; image_url: string }
-  | { type: 'input_file'; file_data: string; filename: string }
-type InputMessage =
-  | { role: 'system' | 'user' | 'assistant'; content: string | InputPart[] }
-  | { type: 'function_call_output'; call_id: string; output: string }
-type ClaudeRequest = {
-  model: string
-  input: string | InputMessage[]
-  instructions?: string
-  reasoning?: { effort: 'low' | 'medium' | 'high' }
-  max_output_tokens?: number
-  text?: { verbosity?: string; format?: { type: string; name: string; schema: Tool['input_schema'] } }
-  tools?: { name: string; description?: string; parameters: Record<string, unknown> }[]
-  tool_choice?: 'none' | 'auto'
-}
+import type { AiConversationRequest, AiInputPart } from './aiProviderProtocol'
 
-async function claudeContent(part: InputPart): Promise<ContentBlockParam> {
+async function claudeContent(part: AiInputPart): Promise<ContentBlockParam> {
   if (part.type === 'input_text') return { type: 'text', text: part.text }
   const uri = part.type === 'input_image' ? part.image_url : part.file_data
   const comma = uri.indexOf(',')
@@ -54,10 +38,10 @@ async function claudeContent(part: InputPart): Promise<ContentBlockParam> {
 // between turns while exposing only visible text and local tool calls to VereinO.
 export function createClaudeResponder(client: Anthropic) {
   const history: MessageParam[] = []
-  return async (request: ClaudeRequest) => {
+  return async (request: AiConversationRequest) => {
     const system = [request.instructions || '']
-    const items: InputMessage[] = typeof request.input === 'string'
-      ? [{ role: 'user', content: request.input }]
+    const items = typeof request.input === 'string'
+      ? [{ role: 'user' as const, content: request.input }]
       : request.input
     const messages = [...history]
     const results: ContentBlockParam[] = []
@@ -79,11 +63,11 @@ export function createClaudeResponder(client: Anthropic) {
     const tools: Tool[] = (request.tools || []).map(tool => ({
       name: tool.name, description: tool.description, input_schema: { ...tool.parameters, type: 'object' }
     }))
-    const format = request.text?.format
+    const format = request.text?.format?.type === 'json_schema' ? request.text.format : undefined
     if (format?.type === 'json_schema') {
       // Invoice and bank schemas exceed the strict-output limit for nullable fields.
       // Return the result as a tool input and let the existing domain validators check it.
-      tools.push({ name: format.name, description: 'Strukturiertes Ergebnis der Aufgabe.', input_schema: format.schema })
+      tools.push({ name: format.name, description: 'Strukturiertes Ergebnis der Aufgabe.', input_schema: { ...format.schema, type: 'object' } })
       system.push('Übermittle das vollständige Ergebnis mit dem Werkzeug ' + format.name + '.')
     }
     const response = await client.messages.create({

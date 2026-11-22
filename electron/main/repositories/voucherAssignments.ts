@@ -17,60 +17,62 @@ export type VoucherEarmarkAssignment = {
     color?: string | null
 }
 
-export function getVoucherBudgets(voucherId: number): VoucherBudgetAssignment[] {
-    const db = getDb()
-    const rows = db.prepare(`
-        SELECT vb.id, vb.budget_id as budgetId, vb.amount,
-               CASE
-                   WHEN b.name IS NOT NULL AND b.name <> '' THEN b.name
-                   WHEN b.category_name IS NOT NULL AND b.category_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.category_name)
-                   WHEN b.project_name IS NOT NULL AND b.project_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.project_name)
-                   ELSE printf('%04d-%s', b.year, b.sphere)
-               END as label,
-               b.color
-        FROM voucher_budgets vb
-        JOIN budgets b ON b.id = vb.budget_id
-        WHERE vb.voucher_id = ?
-        ORDER BY vb.id
-    `).all(voucherId) as VoucherBudgetAssignment[]
-    if (rows.length) return rows
+type AssignmentRows<T> = Map<number, T[]>
 
-    return db.prepare(`
-        SELECT 0 as id, v.budget_id as budgetId,
-               COALESCE(NULLIF(v.budget_amount, 0), ABS(v.gross_amount), 0) as amount,
+function groupByVoucher<T>(rows: (T & { voucherId: number })[]): AssignmentRows<T> {
+    const result: AssignmentRows<T> = new Map()
+    for (const { voucherId, ...assignment } of rows) {
+        const existing = result.get(voucherId)
+        if (existing) existing.push(assignment as T)
+        else result.set(voucherId, [assignment as T])
+    }
+    return result
+}
+
+// The split table is authoritative. Only vouchers without split rows use the legacy amount.
+function assignmentsForPage(kind: 'budget' | 'earmark') {
+    return `WITH selected AS (SELECT value AS id FROM json_each(?)), assignments AS (
+        SELECT a.voucher_id AS voucherId, a.id, a.${kind}_id AS targetId, a.amount
+        FROM voucher_${kind}s a JOIN selected s ON s.id = a.voucher_id
+        UNION ALL
+        SELECT v.id, 0, v.${kind}_id, COALESCE(NULLIF(v.${kind}_amount, 0), ABS(v.gross_amount), 0)
+        FROM selected s JOIN vouchers v ON v.id = s.id
+        WHERE v.${kind}_id IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM voucher_${kind}s a WHERE a.voucher_id = v.id
+        )
+    )`
+}
+
+export function readPageBudgets(ids: number[]): AssignmentRows<VoucherBudgetAssignment> {
+    if (!ids.length) return new Map()
+    const rows = getDb().prepare(`${assignmentsForPage('budget')}
+        SELECT a.voucherId, a.id, a.targetId as budgetId, a.amount,
                CASE
                    WHEN b.name IS NOT NULL AND b.name <> '' THEN b.name
                    WHEN b.category_name IS NOT NULL AND b.category_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.category_name)
                    WHEN b.project_name IS NOT NULL AND b.project_name <> '' THEN printf('%04d-%s-%s', b.year, b.sphere, b.project_name)
                    ELSE printf('%04d-%s', b.year, b.sphere)
-               END as label,
-               b.color
-        FROM vouchers v
-        JOIN budgets b ON b.id = v.budget_id
-        WHERE v.id = ? AND v.budget_id IS NOT NULL
-    `).all(voucherId) as VoucherBudgetAssignment[]
+               END AS label, b.color
+        FROM assignments a JOIN budgets b ON b.id = a.targetId ORDER BY a.voucherId, a.id
+    `).all(JSON.stringify(ids)) as (VoucherBudgetAssignment & { voucherId: number })[]
+    return groupByVoucher<VoucherBudgetAssignment>(rows)
+}
+
+export function readPageEarmarks(ids: number[]): AssignmentRows<VoucherEarmarkAssignment> {
+    if (!ids.length) return new Map()
+    const rows = getDb().prepare(`${assignmentsForPage('earmark')}
+        SELECT a.voucherId, a.id, a.targetId as earmarkId, a.amount, e.code, e.name, e.color
+        FROM assignments a JOIN earmarks e ON e.id = a.targetId ORDER BY a.voucherId, a.id
+    `).all(JSON.stringify(ids)) as (VoucherEarmarkAssignment & { voucherId: number })[]
+    return groupByVoucher<VoucherEarmarkAssignment>(rows)
+}
+
+export function getVoucherBudgets(voucherId: number): VoucherBudgetAssignment[] {
+    return readPageBudgets([voucherId]).get(voucherId) ?? []
 }
 
 export function getVoucherEarmarks(voucherId: number): VoucherEarmarkAssignment[] {
-    const db = getDb()
-    const rows = db.prepare(`
-        SELECT ve.id, ve.earmark_id as earmarkId, ve.amount,
-               e.code, e.name, e.color
-        FROM voucher_earmarks ve
-        JOIN earmarks e ON e.id = ve.earmark_id
-        WHERE ve.voucher_id = ?
-        ORDER BY ve.id
-    `).all(voucherId) as VoucherEarmarkAssignment[]
-    if (rows.length) return rows
-
-    return db.prepare(`
-        SELECT 0 as id, v.earmark_id as earmarkId,
-               COALESCE(NULLIF(v.earmark_amount, 0), ABS(v.gross_amount), 0) as amount,
-               e.code, e.name, e.color
-        FROM vouchers v
-        JOIN earmarks e ON e.id = v.earmark_id
-        WHERE v.id = ? AND v.earmark_id IS NOT NULL
-    `).all(voucherId) as VoucherEarmarkAssignment[]
+    return readPageEarmarks([voucherId]).get(voucherId) ?? []
 }
 
 export function setVoucherBudgets(

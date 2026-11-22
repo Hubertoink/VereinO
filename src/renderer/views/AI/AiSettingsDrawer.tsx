@@ -60,6 +60,8 @@ export const AiSettingsDrawer = forwardRef<HTMLElement, Props>(function AiSettin
         <span>API-Key</span>
         <input className="input" type="password" value={apiKey} onChange={(event) => onApiKeyChange(event.target.value)} placeholder={settings.hasApiKey ? 'Gespeichert - leer lassen zum Beibehalten' : 'API-Key für diesen Anbieter eingeben'} />
       </label>
+      {settings.keyStorage === 'session' && <p className="helper ai-field-wide">Der sichere Betriebssystemspeicher ist nicht verfügbar. Der API-Schlüssel gilt nur bis zum Beenden von VereinO.</p>}
+      {settings.migratedPlainKey && <p className="helper ai-field-wide">Diese Datenbank enthielt früher unverschlüsselte API-Schlüssel. Wenn du Sicherungen weitergegeben hast, ersetze die betroffenen Schlüssel beim Anbieter.</p>}
       <label className="field">
         <span>Anbieter</span>
         <select className="input" value={settings.provider} onChange={(event) => onProviderChange(event.target.value as TAiSettingsGetOutput['provider'])}>

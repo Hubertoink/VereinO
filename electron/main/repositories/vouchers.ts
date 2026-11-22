@@ -1,3 +1,4 @@
+import { assignmentMonthly, signedAllocationAmountSql } from './assignmentMonthly'
 import { listAccountOpenings } from './accountOpenings'
 import { voucherAuditState } from './voucherAuditState'
 import { refreshMembershipVoucher, refreshNextDue } from './membershipLedger'
@@ -15,6 +16,8 @@ import { filePayloadToBuffer } from '../services/filePayload'
 import { getOrganizationProfileDefinition, resolvePrimaryClassificationValueId } from './classifications'
 import type { FileDataPayload, UploadFilePayload } from '../../../shared/filePayload'
 import {
+    readPageBudgets,
+    readPageEarmarks,
     getVoucherBudgets,
     getVoucherEarmarks,
     setVoucherBudgets,
@@ -188,6 +191,22 @@ function appendVoucherSearchFilter(wh: string[], params: any[], raw?: string, al
     wh.push(`(${parts.join(' OR ')})`)
 }
 
+function warnOverdrawnEarmarks(id: number, type: string, gross: number, date: string, warnings: string[]) {
+    if (type === 'TRANSFER' || (type === 'IN' && gross >= 0) || (type === 'OUT' && gross <= 0)) return
+    const d = getDb()
+    if (getSetting<{allowNegative?: boolean}>('earmark', d)?.allowNegative) return
+    for (const entry of getVoucherEarmarks(id)) {
+        if (type === 'INTERNAL' && entry.amount >= 0) continue
+        const budget = d.prepare('SELECT budget FROM earmarks WHERE id=?').get(entry.earmarkId) as { budget: number | null }
+        const monthly = assignmentMonthly('earmark', entry.earmarkId, { to: date })
+        const available = monthly.reduce((balance, row) => balance + row.inflow - row.spent, Number(budget.budget || 0))
+        if (round2(available) < 0) {
+            warnings.push('Zweckbindung würde den verfügbaren Rahmen unterschreiten.')
+            return
+        }
+    }
+}
+
 function getAdvancePlaceholderRef(d: DB, voucherId: number) {
         return d.prepare(`
                 SELECT id
@@ -351,23 +370,7 @@ export function createVoucher(input: {
                 if (em.endDate && input.date > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
             }
 
-            // Negative-balance protection (using junction table)
-            const cfg = (getSetting<{ allowNegative?: boolean }>('earmark', d) || { allowNegative: false })
-            if (!cfg.allowNegative && input.type === 'OUT') {
-                const balRow = d.prepare(`
-                    SELECT
-                      IFNULL(SUM(CASE WHEN v.type='IN' THEN ve.amount ELSE 0 END),0) as allocated,
-                      IFNULL(SUM(CASE WHEN v.type='OUT' THEN ve.amount ELSE 0 END),0) as released
-                    FROM voucher_earmarks ve
-                    JOIN vouchers v ON v.id = ve.voucher_id
-                    WHERE ve.earmark_id = ? AND v.date <= ?
-                `).get(ea.earmarkId, input.date) as any
-                const budget = Number(em?.budget ?? 0) || 0
-                const currentBalance = Math.round(((balRow.allocated || 0) - (balRow.released || 0)) * 100) / 100
-                const remaining = Math.round(((budget + currentBalance) * 100)) / 100
-                const wouldBe = Math.round(((remaining - (ea.amount ?? 0)) * 100)) / 100
-                if (wouldBe < 0) warnings.push('Zweckbindung würde den verfügbaren Rahmen unterschreiten.')
-            }
+
         }
 
         // Budget validations (single or multiple)
@@ -498,6 +501,7 @@ export function createVoucher(input: {
             data: input
         })
 
+        warnOverdrawnEarmarks(id, input.type, grossAmount, input.date, warnings)
         return { id, voucherNo: lastVoucherNo, grossAmount, warnings }
     })
 }
@@ -516,11 +520,13 @@ export function reverseVoucher(originalId: number, userId: number | null) {
         const year = now.getFullYear()
         const seq = nextVoucherSequence(d, year, original.sphere, todayISO)
         const voucherNo = makeVoucherNo(year, todayISO, original.sphere, seq)
-        const reverseType = original.type === 'IN' ? 'OUT' : original.type === 'OUT' ? 'IN' : 'TRANSFER'
+        const reverseType = original.type === 'IN' ? 'OUT' : original.type === 'OUT' ? 'IN' : original.type
         const reverseDescription = `Storno zu ${original.voucher_no}${original.description ? ` - ${original.description}` : ''}`
-        const reverseNet = Math.abs(Number(original.net_amount || 0))
-        const reverseVat = Math.abs(Number(original.vat_amount || 0))
-        const reverseGross = Math.abs(Number(original.gross_amount || 0))
+        // IN/OUT reverse direction through the type; a refund retains its signed amount.
+        const reverseNet = Number(original.net_amount || 0)
+        const reverseVat = Number(original.vat_amount || 0)
+        const reverseGross = Number(original.gross_amount || 0)
+        const reverseAssignment = (amount: number) => original.type === 'INTERNAL' ? -amount : amount
         const reversePaymentMethod = original.type === 'TRANSFER' ? null : (original.payment_method ?? null)
         const reverseTransferFrom = original.type === 'TRANSFER' ? (original.transfer_to ?? null) : null
         const reverseTransferTo = original.type === 'TRANSFER' ? (original.transfer_from ?? null) : null
@@ -530,8 +536,8 @@ export function reverseVoucher(originalId: number, userId: number | null) {
         year, seq_no, voucher_no, date, type, sphere, primary_classification_value_id, account_id, category_id, project_id,
         earmark_id, earmark_amount, budget_id, budget_amount, description, note,
         net_amount, vat_rate, vat_amount, gross_amount, amount_mode,
-        payment_method, transfer_from, transfer_to, counterparty, party_id, created_by, original_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        payment_method, transfer_from, transfer_to, payment_account_id, transfer_from_account_id, transfer_to_account_id, counterparty, party_id, created_by, original_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
         const info = stmt.run(
             year,
@@ -545,9 +551,9 @@ export function reverseVoucher(originalId: number, userId: number | null) {
             original.category_id,
             original.project_id,
             original.earmark_id,
-            original.earmark_amount == null ? null : Math.abs(Number(original.earmark_amount)),
+            original.earmark_amount == null ? null : reverseAssignment(Number(original.earmark_amount)),
             original.budget_id,
-            original.budget_amount == null ? null : Math.abs(Number(original.budget_amount)),
+            original.budget_amount == null ? null : reverseAssignment(Number(original.budget_amount)),
             reverseDescription,
             null,
             reverseNet,
@@ -558,6 +564,9 @@ export function reverseVoucher(originalId: number, userId: number | null) {
             reversePaymentMethod,
             reverseTransferFrom,
             reverseTransferTo,
+            original.type === 'IN' || original.type === 'OUT' ? original.payment_account_id ?? null : null,
+            original.type === 'TRANSFER' ? original.transfer_to_account_id ?? null : null,
+            original.type === 'TRANSFER' ? original.transfer_from_account_id ?? null : null,
             original.counterparty ?? null,
             original.party_id ?? null,
             userId ?? null,
@@ -569,8 +578,8 @@ export function reverseVoucher(originalId: number, userId: number | null) {
         if (originalBudgets.length) {
             const stmtB = d.prepare('INSERT INTO voucher_budgets (voucher_id, budget_id, amount) VALUES (?, ?, ?)')
             for (const a of originalBudgets) {
-                const amount = Math.abs(Number(a.amount || 0))
-                if (a.budgetId && amount > 0) stmtB.run(id, a.budgetId, amount)
+                const amount = reverseAssignment(Number(a.amount || 0))
+                if (a.budgetId && amount !== 0) stmtB.run(id, a.budgetId, amount)
             }
         }
 
@@ -578,8 +587,8 @@ export function reverseVoucher(originalId: number, userId: number | null) {
         if (originalEarmarks.length) {
             const stmtE = d.prepare('INSERT INTO voucher_earmarks (voucher_id, earmark_id, amount) VALUES (?, ?, ?)')
             for (const a of originalEarmarks) {
-                const amount = Math.abs(Number(a.amount || 0))
-                if (a.earmarkId && amount > 0) stmtE.run(id, a.earmarkId, amount)
+                const amount = reverseAssignment(Number(a.amount || 0))
+                if (a.earmarkId && amount !== 0) stmtE.run(id, a.earmarkId, amount)
             }
         }
 
@@ -664,6 +673,11 @@ type PagedVoucherFilters = AdvancedVoucherFilters & {
     voucherIds?: number[]
 }
 
+function assignmentFilter(kind: 'budget' | 'earmark', alias = 'v') {
+    return `(EXISTS (SELECT 1 FROM voucher_${kind}s a WHERE a.voucher_id = ${alias}.id AND a.${kind}_id = ?)
+        OR (${alias}.${kind}_id = ? AND NOT EXISTS (SELECT 1 FROM voucher_${kind}s a WHERE a.voucher_id = ${alias}.id)))`
+}
+
 function buildAdvancedVoucherFilter(filters: PagedVoucherFilters) {
     const { paymentMethod, paymentAccountId, sphere, primaryClassificationValueId, type, from, to, earmarkId, budgetId, voucherIds, q, tag } = filters
     const params: any[] = []
@@ -679,9 +693,9 @@ function buildAdvancedVoucherFilter(filters: PagedVoucherFilters) {
     if (type) { wh.push('v.type = ?'); params.push(type) }
     if (from) { wh.push('v.date >= ?'); params.push(from) }
     if (to) { wh.push('v.date <= ?'); params.push(to) }
-    if (earmarkId) { wh.push('v.earmark_id = ?'); params.push(earmarkId) }
+    if (earmarkId != null) { wh.push(assignmentFilter('earmark')); params.push(earmarkId, earmarkId) }
     if (budgetId != null) {
-        wh.push('(EXISTS (SELECT 1 FROM voucher_budgets vb WHERE vb.voucher_id = v.id AND vb.budget_id = ?) OR v.budget_id = ?)')
+        wh.push(assignmentFilter('budget'))
         params.push(budgetId, budgetId)
     }
     if (voucherIds?.length) {
@@ -796,6 +810,18 @@ export function listVouchersAdvancedPaged(filters: PagedVoucherFilters): { rows:
     return { rows: selectAdvancedVoucherRows(d, filters, query, true), total }
 }
 
+export function listJournalVouchers(filters: PagedVoucherFilters) {
+    const { rows, total } = listVouchersAdvancedPaged(filters)
+    const ids = rows.map(row => row.id)
+    const budgets = readPageBudgets(ids)
+    const earmarks = readPageEarmarks(ids)
+    return { rows: rows.map(row => ({
+        ...row,
+        budgets: budgets.get(row.id) ?? [],
+        earmarksAssigned: earmarks.get(row.id) ?? [],
+    })), total }
+}
+
 type BatchVoucherFilterParams = {
     paymentMethod?: 'BAR' | 'BANK'
     paymentAccountId?: number | null
@@ -823,11 +849,11 @@ function appendBatchVoucherFilters(wh: string[], args: any[], params: BatchVouch
     if (params.to) { wh.push('date <= ?'); args.push(params.to) }
     appendVoucherSearchFilter(wh, args, params.q)
     if (params.filterEarmarkId != null) {
-        wh.push('(earmark_id = ? OR EXISTS (SELECT 1 FROM voucher_earmarks ve WHERE ve.voucher_id = vouchers.id AND ve.earmark_id = ?))')
+        wh.push(assignmentFilter('earmark', 'vouchers'))
         args.push(params.filterEarmarkId, params.filterEarmarkId)
     }
     if (params.filterBudgetId != null) {
-        wh.push('(budget_id = ? OR EXISTS (SELECT 1 FROM voucher_budgets vb WHERE vb.voucher_id = vouchers.id AND vb.budget_id = ?))')
+        wh.push(assignmentFilter('budget', 'vouchers'))
         args.push(params.filterBudgetId, params.filterBudgetId)
     }
     if (params.tag) {
@@ -836,76 +862,48 @@ function appendBatchVoucherFilters(wh: string[], args: any[], params: BatchVouch
     }
 }
 
-// Batch-assign an earmarkId to vouchers matching filters
-export function batchAssignEarmark(params: BatchVoucherFilterParams & {
-    earmarkId: number
-    onlyWithout?: boolean // when true, only rows where earmark_id IS NULL
-}) {
-    const d = getDb()
-    const wh: string[] = []
-    const args: any[] = []
-    wh.push('original_id IS NULL AND reversed_by_id IS NULL')
-    appendBatchVoucherFilters(wh, args, params)
-    if (params.onlyWithout) wh.push('earmark_id IS NULL')
-    const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
+type BatchAllocation = BatchVoucherFilterParams & { onlyWithout?: boolean }
 
-    // Validate earmark exists and active
-    const em = d.prepare('SELECT id, is_active as isActive FROM earmarks WHERE id=?').get(params.earmarkId) as any
-    if (!em) throw new Error('Zweckbindung nicht gefunden')
-    if (!em.isActive) throw new Error('Zweckbindung ist inaktiv und kann nicht verwendet werden')
-
-    const res = d.prepare(`UPDATE vouchers SET earmark_id = ?${whereSql}`).run(params.earmarkId, ...args)
-    const updated = Number(res.changes || 0)
-
-    // Log batch assignment to audit
-    if (updated > 0) {
-        const earmarkInfo = d.prepare('SELECT code, name FROM earmarks WHERE id=?').get(params.earmarkId) as any
-        writeAudit(
-            d,
-            null,
-            'VOUCHER',
-            0,
-            'BATCH_ASSIGN_EARMARK',
-            { earmarkId: params.earmarkId, earmarkCode: earmarkInfo?.code, earmarkName: earmarkInfo?.name, count: updated, filters: params }
-        )
-    }
-
-    return { updated }
+function replaceBatchAllocations(filters: BatchAllocation, kind: 'budget' | 'earmark', targetId: number) {
+    return withTransaction(d => {
+        const conditions = ['original_id IS NULL', 'reversed_by_id IS NULL']
+        const args: unknown[] = []
+        appendBatchVoucherFilters(conditions, args, filters)
+        const rows = d.prepare(`SELECT id, type, gross_amount AS gross FROM vouchers WHERE ${conditions.join(' AND ')}`).all(...args) as Array<{id: number; type: string; gross: number}>
+        const ids = rows.map(row => row.id)
+        const previous = kind === 'budget' ? readPageBudgets(ids) : readPageEarmarks(ids)
+        let updated = 0
+        for (const row of rows) {
+            const entries = previous.get(row.id) ?? []
+            if (filters.onlyWithout && entries.length) continue
+            if (row.type === 'INTERNAL' && (!entries.length || entries.some(e => e.amount < 0) && entries.some(e => e.amount > 0))) {
+                throw new Error('Interne Umbuchungen mit mehreren Richtungen bitte einzeln zuordnen.')
+            }
+            const assigned = round2(entries.reduce((sum, e) => sum + e.amount, 0))
+            const amount = row.type === 'INTERNAL' ? assigned : Math.abs(entries.length ? assigned : row.gross)
+            if (!amount) throw new Error('Eine Zuordnung benötigt einen Betrag.')
+            const entry = entries[0]
+            if (entries.length === 1 && ('budgetId' in entry ? entry.budgetId : entry.earmarkId) === targetId) continue
+            const patch = kind === 'budget'
+                ? { budgets: [{ budgetId: targetId, amount }] }
+                : { earmarks: [{ earmarkId: targetId, amount }] }
+            updateVoucherMetaInTransaction(d, { id: row.id, ...patch })
+            updated++
+        }
+        if (updated) {
+            const action = kind === 'budget' ? 'BATCH_ASSIGN_BUDGET' : 'BATCH_ASSIGN_EARMARK'
+            writeAudit(d, null, 'VOUCHER', 0, action, { [kind + 'Id']: targetId, count: updated, filters })
+        }
+        return { updated }
+    })
 }
 
-// Batch-assign a budgetId to vouchers matching filters
-export function batchAssignBudget(params: BatchVoucherFilterParams & {
-    budgetId: number
-    onlyWithout?: boolean
-}) {
-    const d = getDb()
-    const wh: string[] = []
-    const args: any[] = []
-    wh.push('original_id IS NULL AND reversed_by_id IS NULL')
-    appendBatchVoucherFilters(wh, args, params)
-    if (params.onlyWithout) wh.push('budget_id IS NULL')
-    const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
+export function batchAssignBudget(params: BatchAllocation & { budgetId: number }) {
+    return replaceBatchAllocations(params, 'budget', params.budgetId)
+}
 
-    // Validate budget exists
-    const b = d.prepare('SELECT id FROM budgets WHERE id=?').get(params.budgetId) as any
-    if (!b) throw new Error('Budget nicht gefunden')
-    const res = d.prepare(`UPDATE vouchers SET budget_id = ?${whereSql}`).run(params.budgetId, ...args)
-    const updated = Number(res.changes || 0)
-
-    // Log batch assignment to audit
-    if (updated > 0) {
-        const budgetInfo = d.prepare('SELECT name, year FROM budgets WHERE id=?').get(params.budgetId) as any
-        writeAudit(
-            d,
-            null,
-            'VOUCHER',
-            0,
-            'BATCH_ASSIGN_BUDGET',
-            { budgetId: params.budgetId, budgetName: budgetInfo?.name, budgetYear: budgetInfo?.year, count: updated, filters: params }
-        )
-    }
-
-    return { updated }
+export function batchAssignEarmark(params: BatchAllocation & { earmarkId: number }) {
+    return replaceBatchAllocations(params, 'earmark', params.earmarkId)
 }
 
 // Batch-assign tags to vouchers matching filters (adds tags, does not remove existing)
@@ -955,7 +953,7 @@ export function batchAssignTags(params: BatchVoucherFilterParams & {
     return { updated }
 }
 
-export function summarizeVouchers(filters: {
+type ReportVoucherFilters = {
     paymentMethod?: 'BAR' | 'BANK'
     paymentAccountId?: number | null
     sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
@@ -968,17 +966,15 @@ export function summarizeVouchers(filters: {
     q?: string
     tag?: string
     includeInternalVouchers?: boolean
-}) {
-    const d = getDb()
-    const { paymentMethod, paymentAccountId, sphere, primaryClassificationValueId, type, from, to, earmarkId, budgetId, q, tag, includeInternalVouchers = false } = filters
-    const normalizedPaymentAccountId = paymentAccountId != null ? Number(paymentAccountId) : null
-    const paramsBase: any[] = []
+}
+
+// Reports aggregate full voucher amounts. Account/budget usage queries calculate allocated amounts separately.
+function reportVoucherSelection(filters: ReportVoucherFilters) {
+    const { type, includeInternalVouchers = false } = filters
+    const paymentMethod = filters.paymentMethod === 'BANK' || filters.paymentMethod === 'BAR' ? filters.paymentMethod : undefined
+    const normalizedPaymentAccountId = Number(filters.paymentAccountId) || null
+    const { params: paramsBase, joinSql, whereSql: baseWhere } = buildAdvancedVoucherFilter({ ...filters, type: undefined })
     const wh: string[] = []
-    let joinSql = ''
-    if (paymentMethod) { wh.push('(v.payment_method = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from = ? OR v.transfer_to = ?)))'); paramsBase.push(paymentMethod, paymentMethod, paymentMethod) }
-    if (normalizedPaymentAccountId) { wh.push('(v.payment_account_id = ? OR (v.type = \'TRANSFER\' AND (v.transfer_from_account_id = ? OR v.transfer_to_account_id = ?)))'); paramsBase.push(normalizedPaymentAccountId, normalizedPaymentAccountId, normalizedPaymentAccountId) }
-    if (sphere) { wh.push('v.sphere = ?'); paramsBase.push(sphere) }
-    if (primaryClassificationValueId != null) { wh.push('v.primary_classification_value_id = ?'); paramsBase.push(primaryClassificationValueId) }
     // When both type and paymentMethod are active, include TRANSFERs that act as
     // the requested type for this payment method (e.g. transfer_to=pm → IN).
     if (type && normalizedPaymentAccountId && (type === 'IN' || type === 'OUT')) {
@@ -1001,44 +997,48 @@ export function summarizeVouchers(filters: {
     if (!type && !includeInternalVouchers) {
         wh.push("v.type <> 'INTERNAL'")
     }
-    if (budgetId != null) {
-        wh.push('(EXISTS (SELECT 1 FROM voucher_budgets vb WHERE vb.voucher_id = v.id AND vb.budget_id = ?) OR v.budget_id = ?)')
-        paramsBase.push(budgetId, budgetId)
-    }
-    if (from) { wh.push('v.date >= ?'); paramsBase.push(from) }
-    if (to) { wh.push('v.date <= ?'); paramsBase.push(to) }
-    if (earmarkId != null) { wh.push('v.earmark_id = ?'); paramsBase.push(earmarkId) }
-    appendVoucherSearchFilter(wh, paramsBase, q, 'v')
-    if (tag) {
-        joinSql = ' JOIN voucher_tags vt ON vt.voucher_id = v.id JOIN tags t ON t.id = vt.tag_id'
-        wh.push('t.name = ?')
-        paramsBase.push(tag)
-    }
-    const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
-
+    const whereSql = baseWhere + (wh.length ? (baseWhere ? ' AND ' : ' WHERE ') + wh.join(' AND ') : '')
     // When paymentMethod filter is active, remap transfer direction via type:
     // transfer_from = pm → treated as OUT (money leaves this Zahlweg)
     // transfer_to = pm → treated as IN (money enters this Zahlweg)
     // Amounts stay positive (same convention as regular IN/OUT vouchers in the DB).
-    const pmAdjustedType = paymentMethod
-        ? `CASE WHEN v.type = 'TRANSFER' AND v.transfer_from = '${paymentMethod}' THEN 'OUT' WHEN v.type = 'TRANSFER' AND v.transfer_to = '${paymentMethod}' THEN 'IN' ELSE v.type END`
-        : normalizedPaymentAccountId
-            ? `CASE WHEN v.type = 'TRANSFER' AND v.transfer_from_account_id = ${normalizedPaymentAccountId} THEN 'OUT' WHEN v.type = 'TRANSFER' AND v.transfer_to_account_id = ${normalizedPaymentAccountId} THEN 'IN' ELSE v.type END`
-        : 'v.type'
+    let pmAdjustedType = 'v.type'
+    if (normalizedPaymentAccountId || paymentMethod) {
+        const source = normalizedPaymentAccountId ? 'v.transfer_from_account_id' : 'v.transfer_from'
+        const target = normalizedPaymentAccountId ? 'v.transfer_to_account_id' : 'v.transfer_to'
+        const selected = normalizedPaymentAccountId || (paymentMethod === 'BAR' ? "'BAR'" : "'BANK'")
+        // A bank-to-bank transfer has both directions for the Bank group, and zero net movement.
+        pmAdjustedType = type === 'IN' || type === 'OUT' ? `'${type}'` : `CASE
+            WHEN v.type <> 'TRANSFER' THEN v.type
+            WHEN ${source} = ${selected} AND ${target} = ${selected} THEN 'TRANSFER'
+            WHEN ${source} = ${selected} THEN 'OUT'
+            WHEN ${target} = ${selected} THEN 'IN' ELSE v.type END`
+    }
 
+    return { paramsBase, joinSql, whereSql, pmAdjustedType, paymentMethod }
+}
+
+export function listReportVouchers(filters: AdvancedVoucherFilters) {
+    const { paramsBase, whereSql, joinSql } = reportVoucherSelection(filters)
+    return selectAdvancedVoucherRows(getDb(), filters, { params: paramsBase, whereSql, joinSql }, false)
+}
+
+export function summarizeVouchers(filters: ReportVoucherFilters) {
+    const d = getDb()
+    const { paramsBase, joinSql, whereSql, pmAdjustedType, paymentMethod } = reportVoucherSelection(filters)
     const totals = d.prepare(`
         SELECT
-            IFNULL(SUM(v.net_amount), 0) as net,
-            IFNULL(SUM(v.vat_amount), 0) as vat,
-            IFNULL(SUM(v.gross_amount), 0) as gross
+            ROUND(IFNULL(SUM(v.net_amount), 0), 2) as net,
+            ROUND(IFNULL(SUM(v.vat_amount), 0), 2) as vat,
+            ROUND(IFNULL(SUM(v.gross_amount), 0), 2) as gross
         FROM vouchers v${joinSql}${whereSql}
     `).get(...paramsBase) as any
 
     const bySphere = d.prepare(`
         SELECT v.sphere as key,
-               IFNULL(SUM(v.net_amount), 0) as net,
-               IFNULL(SUM(v.vat_amount), 0) as vat,
-               IFNULL(SUM(v.gross_amount), 0) as gross
+               ROUND(IFNULL(SUM(v.net_amount), 0), 2) as net,
+               ROUND(IFNULL(SUM(v.vat_amount), 0), 2) as vat,
+               ROUND(IFNULL(SUM(v.gross_amount), 0), 2) as gross
         FROM vouchers v${joinSql}${whereSql}
         GROUP BY v.sphere
         ORDER BY v.sphere
@@ -1047,9 +1047,9 @@ export function summarizeVouchers(filters: {
     const byPrimaryClassification = d.prepare(`
         SELECT COALESCE(cv.name, v.sphere) as key,
                cv.color as color,
-               IFNULL(SUM(v.net_amount), 0) as net,
-               IFNULL(SUM(v.vat_amount), 0) as vat,
-               IFNULL(SUM(v.gross_amount), 0) as gross
+               ROUND(IFNULL(SUM(v.net_amount), 0), 2) as net,
+               ROUND(IFNULL(SUM(v.vat_amount), 0), 2) as vat,
+               ROUND(IFNULL(SUM(v.gross_amount), 0), 2) as gross
         FROM vouchers v${joinSql}
         LEFT JOIN classification_values cv ON cv.id = v.primary_classification_value_id
         ${whereSql}
@@ -1062,9 +1062,9 @@ export function summarizeVouchers(filters: {
         // When paymentMethod filter is active, all matched vouchers belong to that pm
         byPaymentMethod = d.prepare(`
             SELECT '${paymentMethod}' as key,
-                   IFNULL(SUM(v.net_amount), 0) as net,
-                   IFNULL(SUM(v.vat_amount), 0) as vat,
-                   IFNULL(SUM(v.gross_amount), 0) as gross
+                   ROUND(IFNULL(SUM(v.net_amount), 0), 2) as net,
+                   ROUND(IFNULL(SUM(v.vat_amount), 0), 2) as vat,
+                   ROUND(IFNULL(SUM(v.gross_amount), 0), 2) as gross
             FROM vouchers v${joinSql}${whereSql}
             GROUP BY key
             ORDER BY key IS NULL, key
@@ -1079,9 +1079,9 @@ export function summarizeVouchers(filters: {
                 FROM vouchers v${joinSql}${whereSql}
             )
             SELECT pm as key,
-                   IFNULL(SUM(net_amount), 0) as net,
-                   IFNULL(SUM(vat_amount), 0) as vat,
-                   IFNULL(SUM(gross_amount), 0) as gross
+                   ROUND(IFNULL(SUM(net_amount), 0), 2) as net,
+                   ROUND(IFNULL(SUM(vat_amount), 0), 2) as vat,
+                   ROUND(IFNULL(SUM(gross_amount), 0), 2) as gross
             FROM (
                 SELECT CASE WHEN type != 'TRANSFER' THEN payment_method ELSE transfer_from END as pm,
                        net_amount, vat_amount, gross_amount
@@ -1127,9 +1127,9 @@ export function summarizeVouchers(filters: {
 
     const byType = d.prepare(`
         SELECT ${pmAdjustedType} as key,
-               IFNULL(SUM(v.net_amount), 0) as net,
-               IFNULL(SUM(v.vat_amount), 0) as vat,
-               IFNULL(SUM(v.gross_amount), 0) as gross
+               ROUND(IFNULL(SUM(v.net_amount), 0), 2) as net,
+               ROUND(IFNULL(SUM(v.vat_amount), 0), 2) as vat,
+               ROUND(IFNULL(SUM(v.gross_amount), 0), 2) as gross
         FROM vouchers v${joinSql}${whereSql}
         GROUP BY ${pmAdjustedType}
         ORDER BY ${pmAdjustedType}
@@ -1148,110 +1148,25 @@ export function summarizeVouchers(filters: {
     }
 }
 
-export function monthlyVouchers(filters: {
-    from?: string
-    to?: string
-    paymentMethod?: 'BAR' | 'BANK'
-    sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
-    earmarkId?: number
-    budgetId?: number
-}) {
-    const d = getDb()
-    const { from, to, paymentMethod, sphere, type, earmarkId, budgetId } = filters
-    const params: any[] = []
-    const wh: string[] = []
-    if (from) { wh.push('date >= ?'); params.push(from) }
-    if (to) { wh.push('date <= ?'); params.push(to) }
-    if (paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
-    if (sphere) { wh.push('sphere = ?'); params.push(sphere) }
-    // When both type and paymentMethod are active, include TRANSFERs that act as
-    // the requested type for this payment method (e.g. transfer_to=pm → IN).
-    if (type && paymentMethod && (type === 'IN' || type === 'OUT')) {
-        if (type === 'IN') {
-            wh.push(`(type = 'IN' OR (type = 'TRANSFER' AND transfer_to = ?))`)
-            params.push(paymentMethod)
-        } else {
-            wh.push(`(type = 'OUT' OR (type = 'TRANSFER' AND transfer_from = ?))`)
-            params.push(paymentMethod)
-        }
-    } else if (type) { wh.push('type = ?'); params.push(type) }
-    if (earmarkId != null) { wh.push('earmark_id = ?'); params.push(earmarkId) }
-    if (budgetId != null) { wh.push('budget_id = ?'); params.push(budgetId) }
-    const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
-    // When paymentMethod is active, remap transfers: transfer_from=pm → outflow, transfer_to=pm → inflow
-    const netExpr = paymentMethod
-        ? `CASE WHEN type = 'IN' THEN net_amount WHEN type = 'OUT' THEN -net_amount WHEN type = 'TRANSFER' AND transfer_from = '${paymentMethod}' THEN -ABS(net_amount) WHEN type = 'TRANSFER' AND transfer_to = '${paymentMethod}' THEN ABS(net_amount) ELSE 0 END`
-        : `CASE WHEN type = 'IN' THEN net_amount WHEN type = 'OUT' THEN -net_amount ELSE 0 END`
-    const vatExpr = paymentMethod
-        ? `CASE WHEN type = 'IN' THEN vat_amount WHEN type = 'OUT' THEN -vat_amount WHEN type = 'TRANSFER' AND transfer_from = '${paymentMethod}' THEN -ABS(vat_amount) WHEN type = 'TRANSFER' AND transfer_to = '${paymentMethod}' THEN ABS(vat_amount) ELSE 0 END`
-        : `CASE WHEN type = 'IN' THEN vat_amount WHEN type = 'OUT' THEN -vat_amount ELSE 0 END`
-    const grossExpr = paymentMethod
-        ? `CASE WHEN type = 'IN' THEN gross_amount WHEN type = 'OUT' THEN -gross_amount WHEN type = 'TRANSFER' AND transfer_from = '${paymentMethod}' THEN -ABS(gross_amount) WHEN type = 'TRANSFER' AND transfer_to = '${paymentMethod}' THEN ABS(gross_amount) ELSE 0 END`
-        : `CASE WHEN type = 'IN' THEN gross_amount WHEN type = 'OUT' THEN -gross_amount ELSE 0 END`
-    const rows = d.prepare(`
-        SELECT strftime('%Y-%m', date) as month,
-               IFNULL(SUM(${netExpr}), 0) as net,
-               IFNULL(SUM(${vatExpr}), 0) as vat,
-               IFNULL(SUM(${grossExpr}), 0) as gross
-        FROM vouchers${whereSql}
-        GROUP BY strftime('%Y-%m', date)
-        ORDER BY month ASC
-    `).all(...params) as any[]
-    return rows
+function voucherSeries(filters: ReportVoucherFilters, period: 'month' | 'date') {
+    const { paramsBase, joinSql, whereSql, pmAdjustedType } = reportVoucherSelection({
+        includeInternalVouchers: true,
+        ...filters,
+    })
+    const date = period === 'month' ? "strftime('%Y-%m', v.date)" : 'v.date'
+    const signed = (column: string) => `ROUND(COALESCE(SUM(CASE ${pmAdjustedType}
+        WHEN 'IN' THEN v.${column} WHEN 'OUT' THEN -v.${column} ELSE 0 END), 0), 2)`
+    return getDb().prepare(`SELECT ${date} AS ${period}, ${signed('net_amount')} AS net,
+            ${signed('vat_amount')} AS vat, ${signed('gross_amount')} AS gross
+        FROM vouchers v${joinSql}${whereSql} GROUP BY ${date} ORDER BY ${date}`).all(...paramsBase) as any[]
 }
 
-export function dailyVouchers(filters: {
-    from?: string
-    to?: string
-    paymentMethod?: 'BAR' | 'BANK'
-    sphere?: 'IDEELL' | 'ZWECK' | 'VERMOEGEN' | 'WGB'
-    type?: 'IN' | 'OUT' | 'TRANSFER' | 'INTERNAL'
-    earmarkId?: number
-    budgetId?: number
-}) {
-    const d = getDb()
-    const { from, to, paymentMethod, sphere, type, earmarkId, budgetId } = filters
-    const params: any[] = []
-    const wh: string[] = []
-    if (from) { wh.push('date >= ?'); params.push(from) }
-    if (to) { wh.push('date <= ?'); params.push(to) }
-    if (paymentMethod) { wh.push('(payment_method = ? OR (type = \'TRANSFER\' AND (transfer_from = ? OR transfer_to = ?)))'); params.push(paymentMethod, paymentMethod, paymentMethod) }
-    if (sphere) { wh.push('sphere = ?'); params.push(sphere) }
-    // When both type and paymentMethod are active, include TRANSFERs that act as
-    // the requested type for this payment method (e.g. transfer_to=pm → IN).
-    if (type && paymentMethod && (type === 'IN' || type === 'OUT')) {
-        if (type === 'IN') {
-            wh.push(`(type = 'IN' OR (type = 'TRANSFER' AND transfer_to = ?))`)
-            params.push(paymentMethod)
-        } else {
-            wh.push(`(type = 'OUT' OR (type = 'TRANSFER' AND transfer_from = ?))`)
-            params.push(paymentMethod)
-        }
-    } else if (type) { wh.push('type = ?'); params.push(type) }
-    if (earmarkId != null) { wh.push('earmark_id = ?'); params.push(earmarkId) }
-    if (budgetId != null) { wh.push('budget_id = ?'); params.push(budgetId) }
-    const whereSql = wh.length ? ' WHERE ' + wh.join(' AND ') : ''
-    // When paymentMethod is active, remap transfers: transfer_from=pm → outflow, transfer_to=pm → inflow
-    const netExpr = paymentMethod
-        ? `CASE WHEN type = 'IN' THEN net_amount WHEN type = 'OUT' THEN -net_amount WHEN type = 'TRANSFER' AND transfer_from = '${paymentMethod}' THEN -ABS(net_amount) WHEN type = 'TRANSFER' AND transfer_to = '${paymentMethod}' THEN ABS(net_amount) ELSE 0 END`
-        : `CASE WHEN type = 'IN' THEN net_amount WHEN type = 'OUT' THEN -net_amount ELSE 0 END`
-    const vatExpr = paymentMethod
-        ? `CASE WHEN type = 'IN' THEN vat_amount WHEN type = 'OUT' THEN -vat_amount WHEN type = 'TRANSFER' AND transfer_from = '${paymentMethod}' THEN -ABS(vat_amount) WHEN type = 'TRANSFER' AND transfer_to = '${paymentMethod}' THEN ABS(vat_amount) ELSE 0 END`
-        : `CASE WHEN type = 'IN' THEN vat_amount WHEN type = 'OUT' THEN -vat_amount ELSE 0 END`
-    const grossExpr = paymentMethod
-        ? `CASE WHEN type = 'IN' THEN gross_amount WHEN type = 'OUT' THEN -gross_amount WHEN type = 'TRANSFER' AND transfer_from = '${paymentMethod}' THEN -ABS(gross_amount) WHEN type = 'TRANSFER' AND transfer_to = '${paymentMethod}' THEN ABS(gross_amount) ELSE 0 END`
-        : `CASE WHEN type = 'IN' THEN gross_amount WHEN type = 'OUT' THEN -gross_amount ELSE 0 END`
-    const rows = d.prepare(`
-        SELECT date,
-               IFNULL(SUM(${netExpr}), 0) as net,
-               IFNULL(SUM(${vatExpr}), 0) as vat,
-               IFNULL(SUM(${grossExpr}), 0) as gross
-        FROM vouchers${whereSql}
-        GROUP BY date
-        ORDER BY date ASC
-    `).all(...params) as any[]
-    return rows
+export function monthlyVouchers(filters: ReportVoucherFilters) {
+    return voucherSeries(filters, 'month')
+}
+
+export function dailyVouchers(filters: ReportVoucherFilters) {
+    return voucherSeries(filters, 'date')
 }
 
 export function updateVoucher(input: {
@@ -1282,7 +1197,10 @@ export function updateVoucher(input: {
     grossAmount?: number
     amountMode?: 'NET' | 'GROSS'
 }) {
-    const d = getDb()
+    return withTransaction(db => updateVoucherInTransaction(db, input))
+}
+
+function updateVoucherInTransaction(d: DB, input: Parameters<typeof updateVoucher>[0]) {
     const warnings: string[] = []
     const current = d.prepare(`
         SELECT id, year, seq_no as seqNo, voucher_no as voucherNo, date, type, sphere,
@@ -1337,22 +1255,7 @@ export function updateVoucher(input: {
             if (em.endDate && newDate > em.endDate) throw new Error(`Buchungsdatum liegt nach Ende der Zweckbindung (${em.endDate})`)
         }
 
-        const cfg = (getSetting<{ allowNegative?: boolean }>('earmark', d) || { allowNegative: false })
-        if (!cfg.allowNegative && newType === 'OUT') {
-            const balRow = d.prepare(`
-                SELECT
-                  IFNULL(SUM(CASE WHEN v.type='IN' THEN ve.amount ELSE 0 END),0) as allocated,
-                  IFNULL(SUM(CASE WHEN v.type='OUT' THEN ve.amount ELSE 0 END),0) as released
-                FROM voucher_earmarks ve
-                JOIN vouchers v ON v.id = ve.voucher_id
-                WHERE ve.earmark_id = ? AND v.date <= ? AND v.id <> ?
-            `).get(newEarmarkId, newDate, input.id) as any
-            const balance = Math.round(((balRow.allocated || 0) - (balRow.released || 0)) * 100) / 100
-            const budget = Number(em?.budget ?? 0) || 0
-            const remaining = Math.round(((budget + balance) * 100)) / 100
-            const wouldBe = Math.round(((remaining - (current.grossAmount || 0)) * 100)) / 100
-            if (wouldBe < 0) warnings.push('Zweckbindung würde den verfügbaren Rahmen unterschreiten.')
-        }
+
     }
 
     // Budget validations if budget set
@@ -1493,18 +1396,18 @@ export function updateVoucher(input: {
     if (normalizedEarmarks !== undefined) setVoucherEarmarks(input.id, normalizedEarmarks)
     // Apply tag changes before snapshotting 'after' so audit contains new tags state
     if (input.tags) setVoucherTags(input.id, input.tags)
-    try {
-        const after = d.prepare(`
-            SELECT id, date, type, sphere, primary_classification_value_id as primaryClassificationValueId, description, note, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
-                   earmark_id as earmarkId, earmark_amount as earmarkAmount, budget_id as budgetId, budget_amount as budgetAmount,
-                     net_amount as netAmount, vat_rate as vatRate, gross_amount as grossAmount, amount_mode as amountMode
-            FROM vouchers WHERE id=?
-        `).get(input.id) as any
-        const afterTags = getTagsForVoucher(input.id)
-        const afterFull = { ...after, tags: afterTags }
-        const auditStateAfter = voucherAuditState(d.prepare('SELECT * FROM vouchers WHERE id=?').get(input.id) as Record<string, unknown>, getTagsForVoucher(input.id), getVoucherBudgets(input.id), getVoucherEarmarks(input.id))
-        if (auditStateBefore !== auditStateAfter) writeAudit(d as any, null, 'vouchers', input.id, 'UPDATE', { before: currentFull, after: afterFull, changes: input })
-    } catch { /* ignore audit failures */ }
+    const after = d.prepare(`
+        SELECT id, date, type, sphere, primary_classification_value_id as primaryClassificationValueId, description, note, payment_method as paymentMethod, transfer_from as transferFrom, transfer_to as transferTo,
+               earmark_id as earmarkId, earmark_amount as earmarkAmount, budget_id as budgetId, budget_amount as budgetAmount,
+                 net_amount as netAmount, vat_rate as vatRate, gross_amount as grossAmount, amount_mode as amountMode
+        FROM vouchers WHERE id=?
+    `).get(input.id) as any
+    const afterTags = getTagsForVoucher(input.id)
+    const afterFull = { ...after, tags: afterTags }
+    const auditStateAfter = voucherAuditState(d.prepare('SELECT * FROM vouchers WHERE id=?').get(input.id) as Record<string, unknown>, getTagsForVoucher(input.id), getVoucherBudgets(input.id), getVoucherEarmarks(input.id))
+    if (auditStateBefore !== auditStateAfter) writeAudit(d as any, null, 'vouchers', input.id, 'UPDATE', { before: currentFull, after: afterFull, changes: input })
+
+    warnOverdrawnEarmarks(input.id, newType, effectiveGrossAmount, newDate, warnings)
     return { id: input.id, warnings }
 }
 
@@ -1519,7 +1422,10 @@ export function updateVoucherMeta(input: {
     earmarks?: Array<{ earmarkId: number; amount: number }>
     tags?: string[]
 }) {
-    const d = getDb()
+    return withTransaction(db => updateVoucherMetaInTransaction(db, input))
+}
+
+function updateVoucherMetaInTransaction(d: DB, input: Parameters<typeof updateVoucherMeta>[0]) {
     const current = d.prepare(`
         SELECT id, voucher_no as voucherNo, date, type, sphere, note, gross_amount as grossAmount,
                earmark_id as earmarkId, earmark_amount as earmarkAmount,
@@ -1596,22 +1502,21 @@ export function updateVoucherMeta(input: {
     if (normalizedEarmarks !== undefined) setVoucherEarmarks(input.id, normalizedEarmarks)
     if (input.tags !== undefined) setVoucherTags(input.id, input.tags)
 
-    try {
-        const after = d.prepare(`
-            SELECT id, voucher_no as voucherNo, date, type, sphere, note,
-                   earmark_id as earmarkId, earmark_amount as earmarkAmount,
-                   budget_id as budgetId, budget_amount as budgetAmount
-            FROM vouchers WHERE id=?
-        `).get(input.id) as any
-        const afterFull = {
-            ...after,
-            tags: getTagsForVoucher(input.id),
-            budgets: getVoucherBudgets(input.id),
-            earmarks: getVoucherEarmarks(input.id),
-        }
-        const auditStateAfter = voucherAuditState(d.prepare('SELECT * FROM vouchers WHERE id=?').get(input.id) as Record<string, unknown>, getTagsForVoucher(input.id), getVoucherBudgets(input.id), getVoucherEarmarks(input.id))
-        if (auditStateBefore !== auditStateAfter) writeAudit(d as any, null, 'vouchers', input.id, 'UPDATE_META', { before: beforeFull, after: afterFull, changes: input })
-    } catch { /* ignore audit failures */ }
+    const after = d.prepare(`
+        SELECT id, voucher_no as voucherNo, date, type, sphere, note,
+               earmark_id as earmarkId, earmark_amount as earmarkAmount,
+               budget_id as budgetId, budget_amount as budgetAmount
+        FROM vouchers WHERE id=?
+    `).get(input.id) as any
+    const afterFull = {
+        ...after,
+        tags: getTagsForVoucher(input.id),
+        budgets: getVoucherBudgets(input.id),
+        earmarks: getVoucherEarmarks(input.id),
+    }
+    const auditStateAfter = voucherAuditState(d.prepare('SELECT * FROM vouchers WHERE id=?').get(input.id) as Record<string, unknown>, getTagsForVoucher(input.id), getVoucherBudgets(input.id), getVoucherEarmarks(input.id))
+    if (auditStateBefore !== auditStateAfter) writeAudit(d as any, null, 'vouchers', input.id, 'UPDATE_META', { before: beforeFull, after: afterFull, changes: input })
+
 
     return { id: input.id }
 }
@@ -1711,12 +1616,13 @@ export function cashBalance(params: { includeOpenings?: boolean; from?: string; 
         // When budgetId is provided, compute movement based on budget allocation amounts.
         // Prefer junction table voucher_budgets; fallback to legacy columns (budget_id/budget_amount).
         joinSql = ' LEFT JOIN voucher_budgets vb ON vb.voucher_id = v.id AND vb.budget_id = @budgetId '
-        wh.push('(vb.budget_id IS NOT NULL OR v.budget_id = @budgetId)')
-        grossExpr = `CASE
+        wh.push(`(vb.budget_id IS NOT NULL OR (v.budget_id = @budgetId AND
+            NOT EXISTS (SELECT 1 FROM voucher_budgets a WHERE a.voucher_id = v.id)))`)
+        grossExpr = signedAllocationAmountSql(`CASE
             WHEN vb.amount IS NOT NULL THEN vb.amount
-            WHEN v.budget_id = @budgetId THEN COALESCE(v.budget_amount, v.gross_amount)
+            WHEN v.budget_id = @budgetId THEN COALESCE(NULLIF(v.budget_amount, 0), ABS(v.gross_amount))
             ELSE 0
-        END`
+        END`)
     }
 
     const whereSql = ' WHERE ' + wh.join(' AND ')
@@ -1757,19 +1663,19 @@ export function cashBalance(params: { includeOpenings?: boolean; from?: string; 
     `).all() as Array<{ id: number; name: string; kind: string; color?: string | null; sortOrder: number; isActive: number }>
     const accountBalances = new Map<number, { id: number; name: string; kind: string; color?: string | null; balance: number; sortOrder: number; isActive: number }>()
     for (const account of accountRows) {
+        if (normalizedPaymentAccountId && account.id !== normalizedPaymentAccountId) continue
         accountBalances.set(account.id, { ...account, balance: 0 })
     }
-    const addAccountBalance = (accountId: unknown, amount: number) => {
-        const id = Number(accountId)
-        if (!Number.isFinite(id)) return
-        const existing = accountBalances.get(id)
-        if (existing) {
-            existing.balance += amount
-            return
-        }
-        accountBalances.set(id, { id, name: `Konto #${id}`, kind: 'OTHER', color: null, balance: amount, sortOrder: 9999, isActive: 1 })
-    }
     let bar = 0, bank = 0
+    const post = (accountId: number | null, method: string | null, amount: number) => {
+        if (normalizedPaymentAccountId && accountId !== normalizedPaymentAccountId) return
+        if (method === 'BAR') bar += amount
+        if (method === 'BANK') bank += amount
+        if (accountId == null) return
+        const existing = accountBalances.get(accountId)
+        if (existing) existing.balance += amount
+        else accountBalances.set(accountId, { id: accountId, name: `Konto #${accountId}`, kind: 'OTHER', color: null, balance: amount, sortOrder: 9999, isActive: 1 })
+    }
     if (params.includeOpenings !== false && !params.sphere && budgetId == null) {
         for (const opening of listAccountOpenings(to, from)) {
             if (normalizedPaymentAccountId && normalizedPaymentAccountId !== opening.accountId) continue
@@ -1785,17 +1691,11 @@ export function cashBalance(params: { includeOpenings?: boolean; from?: string; 
         if (r.type === 'TRANSFER') {
             // Transfer: subtract from source, add to destination
             const amt = r.gross || 0
-            if (r.transferFrom === 'BAR') bar -= amt
-            if (r.transferFrom === 'BANK') bank -= amt
-            if (r.transferTo === 'BAR') bar += amt
-            if (r.transferTo === 'BANK') bank += amt
-            addAccountBalance(r.transferFromAccountId, -amt)
-            addAccountBalance(r.transferToAccountId, amt)
+            post(r.transferFromAccountId, r.transferFrom, -amt)
+            post(r.transferToAccountId, r.transferTo, amt)
         } else {
             const sign = r.type === 'IN' ? 1 : r.type === 'OUT' ? -1 : 0
-            if (r.pm === 'BAR') bar += sign * (r.gross || 0)
-            if (r.pm === 'BANK') bank += sign * (r.gross || 0)
-            addAccountBalance(r.paymentAccountId, sign * (r.gross || 0))
+            post(r.paymentAccountId, r.pm, sign * (r.gross || 0))
         }
     }
     const accounts = Array.from(accountBalances.values())

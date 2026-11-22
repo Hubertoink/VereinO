@@ -5,7 +5,7 @@ import { BrowserWindow } from 'electron'
 jest.mock('electron', () => ({ BrowserWindow: jest.fn() }))
 jest.mock('node:fs/promises', () => ({ writeFile: jest.fn() }))
 jest.mock('../../electron/main/repositories/vouchers', () => ({
-  listVouchersAdvanced: jest.fn(), summarizeVouchers: jest.fn(), monthlyVouchers: jest.fn()
+  listReportVouchers: jest.fn(), listVouchersAdvanced: jest.fn(), summarizeVouchers: jest.fn(), monthlyVouchers: jest.fn()
 }))
 jest.mock('../../electron/main/services/settings', () => ({ getSetting: jest.fn() }))
 jest.mock('../../electron/main/services/exportPaths', () => ({
@@ -13,7 +13,7 @@ jest.mock('../../electron/main/services/exportPaths', () => ({
 }))
 
 import { exportReport } from '../../electron/main/services/reportExport'
-import { listVouchersAdvanced, monthlyVouchers, summarizeVouchers } from '../../electron/main/repositories/vouchers'
+import { listReportVouchers, listVouchersAdvanced, monthlyVouchers, summarizeVouchers } from '../../electron/main/repositories/vouchers'
 import { getSetting } from '../../electron/main/services/settings'
 import { createExportStamp, ensureExportsDir } from '../../electron/main/services/exportPaths'
 
@@ -43,6 +43,7 @@ describe('report export service', () => {
     jest.mocked(ensureExportsDir).mockResolvedValue(exportDir)
     jest.mocked(getSetting).mockImplementation(key => key === 'org.name' ? 'Testverein' : '')
     jest.mocked(listVouchersAdvanced).mockReturnValue([{ ...voucher }])
+    jest.mocked(listReportVouchers).mockReturnValue([{ ...voucher }])
     jest.mocked(summarizeVouchers).mockReturnValue({
       bySphere: [{ key: 'IDEELL', gross: 125 }],
       byPaymentMethod: [{ key: 'BANK', gross: 125 }],
@@ -97,7 +98,7 @@ describe('report export service', () => {
 
   it('renders PDF from exactly two filtered monthly queries, preserving refunds and output bytes', async () => {
     const filters = { paymentMethod: 'BANK', sphere: 'IDEELL', earmarkId: 7, budgetId: 8 }
-    jest.mocked(listVouchersAdvanced).mockReturnValue([{ ...voucher, description: '<Material> & Test', originalId: 5 }])
+    jest.mocked(listReportVouchers).mockReturnValue([{ ...voucher, description: '<Material> & Test', originalId: 5 }])
     const filePath = path.join(exportDir, 'Controlling_fixed-stamp.pdf')
     await expect(exportReport({ ...baseInput, format: 'PDF', filters, amountMode: 'OUT_NEGATIVE' })).resolves.toEqual({ filePath })
     expect(jest.mocked(monthlyVouchers).mock.calls).toEqual([

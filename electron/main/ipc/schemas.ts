@@ -1621,6 +1621,21 @@ export const PaymentsMarkPaidInput = z.object({
   datePaid: z.string().nullable().optional()
 })
 export const PaymentsMarkPaidOutput = z.object({ ok: z.boolean() })
+export const ContributionBookingInput = z.object({
+  requestId: z.string().min(16).max(80),
+  organizationId: z.string().min(1),
+  memberId: z.number().int().positive(),
+  periodKey: z.string().min(4).max(10),
+  interval: z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY']),
+  amount: z.number().finite().positive().multipleOf(0.01),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  description: z.string(),
+  paymentMethod: PaymentMethod.optional(),
+  paymentAccountId: z.number().int().positive().nullable().optional(),
+  tags: z.array(z.string())
+})
+export type TContributionBookingInput = z.infer<typeof ContributionBookingInput>
+
 export const ContributionPaymentInput = z.object({
   memberId: z.number().int().positive(), amount: z.number().positive(), voucherId: z.number().int().positive().nullable().optional(),
   receiptId: z.number().int().positive().optional(), datePaid: z.string().nullable().optional(), startPeriod: z.string().optional(), token: z.string().optional(),

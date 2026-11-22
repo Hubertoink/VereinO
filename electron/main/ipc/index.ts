@@ -1,3 +1,5 @@
+import { registerJournalHandlers } from './journal'
+import { assertPublicSetting } from '../services/aiCredentials'
 import { MemberHistoryInput, MemberHistoryOutput } from '../../../shared/memberHistory'
 import { getMemberHistory } from '../repositories/memberHistory'
 import { GroupChangeSchema, MemberAudienceSchema } from '../../../shared/memberGroups'
@@ -29,11 +31,6 @@ import {
   VoucherReverseOutput,
   FiscalReportInput,
   FiscalReportOutput,
-  VouchersListInput,
-  VouchersListOutput,
-  VoucherUpdateInput,
-  VoucherMetaUpdateInput,
-  VoucherUpdateOutput,
   VoucherDeleteInput,
   VoucherDeleteOutput,
   ReportsSummaryInput,
@@ -154,6 +151,7 @@ import {
   PaymentsListDueInput,
   ContributionPaymentInput,
   PaymentsListDueOutput,
+  ContributionBookingInput,
   PaymentsMarkPaidInput,
   PaymentsMarkPaidOutput,
   PaymentsUnmarkInput,
@@ -272,9 +270,6 @@ import {
   createVoucher,
   reverseVoucher,
   listRecentVouchers,
-  listVouchersAdvancedPaged,
-  updateVoucher,
-  updateVoucherMeta,
   deleteVoucher,
   summarizeVouchers,
   monthlyVouchers,
@@ -288,11 +283,7 @@ import {
   listVoucherYears,
   batchAssignEarmark,
   batchAssignBudget,
-  batchAssignTags,
-  getVoucherBudgets,
-  getVoucherEarmarks,
-  setVoucherBudgets,
-  setVoucherEarmarks
+  batchAssignTags
 } from '../repositories/vouchers'
 import {
   createInvoice,
@@ -406,6 +397,7 @@ import {
   AuditRecentOutput,
 } from './schemas'
 import * as backup from '../services/backup'
+import { bookContribution } from '../repositories/contributionBooking'
 import * as mp from '../repositories/members_payments'
 import { membershipBankCandidates } from '../services/bankMembership'
 import {
@@ -974,6 +966,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
       },
       context: buildAiInvoiceContext(),
       localDocumentText,
+      embeddedPdfPagesRead: parsed.embeddedPdfPagesRead,
       guidance: parsed.guidance
     })
     return AiInvoiceExtractOutput.parse({
@@ -1478,29 +1471,13 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
 
   ipcMain.handle('reports.monthly', async (_e, payload) => {
     const parsed = ReportsMonthlyInput.parse(payload)
-    const buckets = monthlyVouchers({
-      from: parsed.from,
-      to: parsed.to,
-      paymentMethod: parsed.paymentMethod as any,
-      sphere: parsed.sphere as any,
-      type: parsed.type as any,
-      earmarkId: (parsed as any).earmarkId,
-      budgetId: (parsed as any).budgetId
-    })
+    const buckets = monthlyVouchers(parsed)
     return ReportsMonthlyOutput.parse({ buckets })
   })
 
   ipcMain.handle('reports.daily', async (_e, payload) => {
     const parsed = ReportsMonthlyInput.parse(payload) // Same input schema
-    const buckets = dailyVouchers({
-      from: parsed.from,
-      to: parsed.to,
-      paymentMethod: parsed.paymentMethod as any,
-      sphere: parsed.sphere as any,
-      type: parsed.type as any,
-      earmarkId: (parsed as any).earmarkId,
-      budgetId: (parsed as any).budgetId
-    })
+    const buckets = dailyVouchers(parsed)
     return { buckets } // Same output format, just date instead of month
   })
 
@@ -1614,64 +1591,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     return TreasurerReportOutput.parse(result)
   })
 
-  const voucherListSchemaIdentifiers = [
-    'cash_checks',
-    'member_advances',
-    'amount_mode',
-    'budget_id',
-    'budget_amount',
-    'earmark_amount',
-    'transfer_from',
-    'transfer_to'
-  ]
-
-  ipcMain.handle('vouchers.list', async (_e, payload) => {
-    return withSchemaHealRetry(() => {
-      const parsed = VouchersListInput.parse(payload) ?? { limit: 20, offset: 0, sort: 'DESC' }
-      const { rows, total } = listVouchersAdvancedPaged({
-        limit: parsed.limit,
-        offset: parsed.offset ?? 0,
-        hasFiles: parsed.hasFiles,
-        sort: (parsed.sort as any) || 'DESC',
-        sortBy: (parsed as any).sortBy,
-        paymentMethod: parsed.paymentMethod as any,
-        paymentAccountId: parsed.paymentAccountId ?? undefined,
-        sphere: parsed.sphere as any,
-        type: parsed.type as any,
-        from: parsed.from,
-        to: parsed.to,
-        earmarkId: parsed.earmarkId,
-        budgetId: (parsed as any).budgetId,
-        voucherIds: parsed.voucherIds,
-        q: parsed.q,
-        tag: (parsed as any).tag
-      })
-      const enrichedRows = rows.map((r: any) => ({
-        ...r,
-        budgets: getVoucherBudgets(r.id),
-        earmarksAssigned: getVoucherEarmarks(r.id)
-      }))
-      return VouchersListOutput.parse({ rows: enrichedRows, total })
-    }, voucherListSchemaIdentifiers)
-  })
-
-  ipcMain.handle('vouchers.update', async (_e, payload) => {
-    const parsed = VoucherUpdateInput.parse(payload)
-    const res = updateVoucher(parsed as any)
-    // Handle multiple budget/earmark assignments if provided
-    if (parsed.budgets !== undefined) {
-      setVoucherBudgets(parsed.id, parsed.budgets)
-    }
-    if (parsed.earmarks !== undefined) {
-      setVoucherEarmarks(parsed.id, parsed.earmarks)
-    }
-    return VoucherUpdateOutput.parse(res)
-  })
-
-  ipcMain.handle('vouchers.updateMeta', async (_e, payload) => {
-    const parsed = VoucherMetaUpdateInput.parse(payload)
-    return VoucherUpdateOutput.parse(updateVoucherMeta(parsed as any))
-  })
+  registerJournalHandlers(withSchemaHealRetry)
 
   ipcMain.handle('paymentAccounts.list', async (_e, payload) => {
     const parsed = PaymentAccountsListInput.parse(payload)
@@ -2388,6 +2308,13 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
     const res = mp.listDue(parsed as any)
     return PaymentsListDueOutput.parse(res as any)
   })
+  ipcMain.handle('payments.bookContribution', (_event, payload) => {
+    const input = ContributionBookingInput.parse(payload)
+    if (getActiveOrganization()?.id !== input.organizationId) {
+      throw new Error('Der Verein wurde gewechselt. Bitte die Beitragsbuchung im ursprünglichen Verein öffnen.')
+    }
+    return bookContribution(input)
+  })
   ipcMain.handle('payments.markPaid', async (_e, payload) => {
     const parsed = PaymentsMarkPaidInput.parse(payload)
     const res = mp.markPaid(parsed as any)
@@ -2663,11 +2590,13 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions = {}) {
   // Settings: simple key/value
   ipcMain.handle('settings.get', async (_e, payload) => {
     const parsed = SettingsGetInput.parse(payload)
+    assertPublicSetting(parsed.key)
     const value = getSetting(parsed.key)
     return SettingsGetOutput.parse({ value })
   })
   ipcMain.handle('settings.set', async (_e, payload) => {
     const parsed = SettingsSetInput.parse(payload)
+    assertPublicSetting(parsed.key)
     setSetting(parsed.key, parsed.value)
     return SettingsSetOutput.parse({ ok: true })
   })

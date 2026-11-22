@@ -1,6 +1,6 @@
 jest.mock('../ai', () => ({
-  createClient: () => ({ responses: { create: mockCreate } }),
-  getAiSettings: () => ({ provider: 'openai', textModel: 'test-model', defaultReasoningEffort: 'low' }),
+  createClient: () => ({ responses: { create: mockCreate }, chat: { completions: { create: mockChat } } }),
+  getAiSettings: () => ({ provider: mockProvider, textModel: mockProvider === 'mittwald' ? 'Qwen3.8-27B-NVFP4' : 'test-model', defaultReasoningEffort: 'low' }),
   compactContext: () => ({}), extractOutputText: (response: any) => jest.requireActual('../../../../shared/aiVisibleText').visibleAiText(response.output_text || ''),
   normalizeUsage: () => ({ inputTokens: 1, cachedInputTokens: 0, outputTokens: 1, reasoningTokens: 0, totalTokens: 2, estimatedCostUsd: 0, pricingNote: 'test' })
 }))
@@ -12,6 +12,8 @@ import { runAiAgent } from '../aiAgent'
 import { buildReportFinance } from '../../../../shared/aiReporting'
 
 const mockCreate = jest.fn()
+const mockChat = jest.fn()
+let mockProvider = 'openai'
 const mockCallTool = jest.fn()
 const mockHost = {
   listTools: async () => [{ name: 'reports_answer', description: 'Finanzauswertung', annotations: { readOnlyHint: true } }, { name: 'reports_summary', annotations: { readOnlyHint: true } }],
@@ -22,7 +24,7 @@ const call = (name = 'reports_answer') => ({ id: 'response', output: [{ type: 'f
 const report = { title: 'Finanzen', summary: 'Die Ausgaben übersteigen die Einnahmen.', notes: [], blocks: [{ type: 'metrics' as const, data: 'finance' as const }],
   datasets: { finance: buildReportFinance({ from: '2026-08-01', to: '2026-08-31' }, [], [{ month: '2026-08', gross: -119 }], 0) } }
 
-beforeEach(() => jest.clearAllMocks())
+beforeEach(() => { mockProvider = 'openai'; jest.clearAllMocks() })
 
 test.each(['Dashboard', 'AI'])('organization rules reach the central agent from %s', async activeArea => {
   mockCreate.mockResolvedValueOnce({ output_text: 'Antwort nach Vereinsregel.' })
@@ -70,4 +72,19 @@ test('a graphical report does not swallow the answer to additional parts of a fr
   const result = await runAiAgent({ prompt: 'Ordne unsere Finanzen ein und prüfe offene Beiträge.', context: {} })
   expect(result.reports).toEqual([report])
   expect(result.answer).toBe('Zusätzlich sind zwei Mitgliedsbeiträge offen.')
+})
+
+test('Mittwald agent retains tool results and uses conversational reasoning on follow-up requests', async () => {
+  mockProvider = 'mittwald'
+  const tool = { id: 'tool-1', type: 'function', function: { name: 'reports_summary', arguments: '{}' } }
+  mockChat.mockResolvedValueOnce({ choices: [{ message: { role: 'assistant', content: '', tool_calls: [tool] } }] })
+    .mockResolvedValueOnce({ choices: [{ message: { role: 'assistant', content: 'Zusammenfassung.' } }] })
+  mockCallTool.mockResolvedValue({ agentResult: { ok: true, data: { amount: 10 } }, mcpResult: {} })
+  const result = await runAiAgent({ prompt: 'Fasse die Buchungen zusammen.', context: {} })
+  expect(result.answer).toBe('Zusammenfassung.')
+  expect(mockCreate).not.toHaveBeenCalled()
+  expect(mockChat.mock.calls[1][0]).toMatchObject({
+    chat_template_kwargs: { reasoning_effort: 'low' },
+    messages: expect.arrayContaining([{ role: 'tool', tool_call_id: 'tool-1', content: expect.stringContaining('10') }])
+  })
 })

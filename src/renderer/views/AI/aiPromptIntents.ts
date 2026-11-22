@@ -78,13 +78,6 @@ export function wantsReportExport(prompt: string) {
   )
 }
 
-export function wantsReportFollowup(prompt: string) {
-  const normalized = normalizeLookup(prompt)
-  return /(bericht|report|controlling|kpi|kennzahl|auswertung|saldo|salden|einnahm|ausgab|jahresergebnis|spendenanteil|top|zeitraum|monat|monate|quartal|auffaellig|auffallig|heraussticht|raussticht)/.test(
-    normalized
-  )
-}
-
 export function wantsTagRead(prompt: string) {
   const normalized = normalizeLookup(prompt)
   return (

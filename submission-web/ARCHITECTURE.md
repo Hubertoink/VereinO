@@ -59,14 +59,14 @@ submission-web/
 | Build | Vite | Schnelles Bundling, Hot Reload in Dev |
 | Server | Express.js | Statisches File-Serving in Production |
 | Container | Docker | Deployment auf Mittwald/Server |
-| Storage | LocalStorage | Offline-fähige Datenhaltung |
+| Storage | IndexedDB | Einreichungen und Belegdateien auf dem Gerät |
 
 ## Datenfluss
 
 ### 1. Eingabe (Web App)
 
 ```javascript
-// Submission-Objekt Struktur
+// Submission-Objekt im JSON-Export
 {
   id: "sub_1733000000000_abc123",    // Eindeutige ID
   date: "2025-12-04",                 // Buchungsdatum
@@ -179,13 +179,11 @@ const amountInput = document.getElementById('amount')
 | `showConfirm()` | Bestätigungs-Dialog |
 | `showAlert()` | Info-Dialog (z.B. Sphäre-Hilfe) |
 
-### LocalStorage
+### Lokale Speicherung
 
-```javascript
-// Schlüssel
-'vereino_submissions'     // Array der Einreichungen
-'vereino_submitter_name'  // Name des Einreichers
-```
+Die IndexedDB-Datenbank `vereino-submissions` speichert Buchungen in Einfügereihenfolge und Belegdateien als Blobs. Speichern und Löschen ändern beide Object Stores in einer Transaktion. Der JSON-Export liest einen konsistenten Stand und kodiert die Anhänge als Base64.
+
+Beim ersten Zugriff übernimmt die App die frühere Liste aus dem LocalStorage-Schlüssel `vereino-submissions`. Nach erfolgreichem Commit entfernt sie die alte Liste. Eine abgebrochene Migration lässt die Originaldaten intakt. Ein Migrationsvermerk pro Buchung schützt vor Duplikaten, falls der Browser zwischen Commit und Aufräumen geschlossen wurde. Der Name des Einreichers bleibt unter `vereino-submitter` im LocalStorage.
 
 ## Styling (styles.css)
 
@@ -243,7 +241,7 @@ docker run -d -p 3333:3333 --name vereino-submissions vereino-submission-web
 ## Sicherheitshinweise
 
 - **Keine Authentifizierung**: Die App ist für den internen Vereinsgebrauch gedacht
-- **LocalStorage**: Daten bleiben auf dem Gerät des Nutzers
+- **IndexedDB**: Buchungen und Belege bleiben auf dem Gerät des Nutzers
 - **Bildkompression**: Reduziert Dateigrößen vor Export
 - **Kein Server-Storage**: Keine Daten werden serverseitig gespeichert
 

@@ -435,6 +435,7 @@ export const AiInvoiceExtractInput = z.object({
       message: 'Ungültige Base64-Datei'
     }),
   localDocumentText: z.string().max(250_000).optional(),
+  embeddedPdfPagesRead: z.number().int().min(0).max(50).optional(),
   guidance: AiInvoiceGuidance.optional()
 })
 export const AiInvoiceExtractOutput = z.object({
@@ -711,6 +712,8 @@ export const AiSettingsGetOutput = z.object({
   masterDataCreation: AiMasterDataPermissions.default({}),
   bookingCommentsEnabled: z.boolean().default(true),
   hasApiKey: z.boolean(),
+  keyStorage: z.enum(['secure', 'session']).optional(),
+  migratedPlainKey: z.boolean().optional(),
   availableModels: z.array(z.string()).optional(),
   model: z.string(),
   textModel: z.string(),
@@ -743,6 +746,8 @@ export const AiSettingsSetOutput = z.object({
   bookingCommentsEnabled: z.boolean().default(true),
   ok: z.boolean(),
   hasApiKey: z.boolean(),
+  keyStorage: z.enum(['secure', 'session']).optional(),
+  migratedPlainKey: z.boolean().optional(),
   availableModels: z.array(z.string()).optional(),
   model: z.string(),
   textModel: z.string(),

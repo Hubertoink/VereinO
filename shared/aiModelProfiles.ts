@@ -117,7 +117,7 @@ export function resolveAiTaskModel(input: {
     if (preferred) return preferred
     return AI_PROVIDER_CONFIG[input.provider].modelOptions.find(option =>
       availableModels.has(option.value) && option.value !== 'GLM-OCR' && option.value !== 'Qwen3.5-122B-A10B-FP8'
-    )?.value || candidates[0]
+    )?.value ?? (input.provider === 'mittwald' ? [...availableModels].find(id => id !== 'GLM-OCR') : undefined) ?? candidates[0]
   }
   return candidates[0] || configuredModel
 }
@@ -132,4 +132,10 @@ export function supportsMittwaldVision(model: string) {
 
 export function toMittwaldReasoningEffort(effort: 'low' | 'medium' | 'high') {
   return effort === 'high' ? 'xhigh' : effort
+}
+
+export function mittwaldThinkingOptions(model: string, effort?: 'low' | 'medium' | 'high', structured = false) {
+  if (!isMittwaldThinkingModel(model)) return undefined
+  if (structured || model !== 'Qwen3.8-27B-NVFP4') return { enable_thinking: false }
+  return effort ? { reasoning_effort: toMittwaldReasoningEffort(effort) } : undefined
 }

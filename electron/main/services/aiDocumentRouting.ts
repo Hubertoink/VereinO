@@ -9,13 +9,13 @@ export function isPdfInputFile(file: {
   return mimeType === 'application/pdf' || file.fileName.toLowerCase().endsWith('.pdf')
 }
 
-export async function readEmbeddedPdfText(dataBase64: string): Promise<string> {
+export async function readEmbeddedPdfText(dataBase64: string, pagesAlreadyRead = 0): Promise<string> {
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs')
   const loading = getDocument({ data: Uint8Array.from(Buffer.from(dataBase64, 'base64')), isEvalSupported: false })
   try {
     const pdf = await loading.promise
     const pages: string[] = []
-    for (let pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+    for (let pageNo = pagesAlreadyRead + 1; pageNo <= pdf.numPages; pageNo++) {
       const page = await pdf.getPage(pageNo)
       const content = await page.getTextContent()
       const text = joinPdfTextItems(content.items.filter(item => 'str' in item))

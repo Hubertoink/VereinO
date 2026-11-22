@@ -361,6 +361,7 @@ const rendererApi = {
     export: (payload) => invoke('members.export', payload)
   },
   payments: {
+    bookContribution: (payload) => invoke('payments.bookContribution', payload),
     availableVouchers: (payload) => invoke('payments.availableVouchers', payload),
     previewAllocation: (payload) => invoke('payments.previewAllocation', payload),
     allocate: (payload) => invoke('payments.allocate', payload),

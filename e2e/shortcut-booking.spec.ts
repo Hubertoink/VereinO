@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { initializeExistingOrganization } from './fixtures/initializedOrganization'
 
 test('Alt+N opens a booking flyout from other pages and foreground dialogs', async () => {
   const userData = await fs.mkdtemp(path.join(os.tmpdir(), 'vereino-shortcuts-'))
@@ -14,10 +15,7 @@ test('Alt+N opens a booking flyout from other pages and foreground dialogs', asy
   })
   try {
     const page = await app.firstWindow()
-    await expect(page.locator('[data-shortcut-nav="Dashboard"]')).toBeVisible({ timeout: 30_000 })
-    const later = page.getByRole('button', { name: 'Später', exact: true })
-    await later.waitFor({ state: 'visible', timeout: 5000 }).catch(() => undefined)
-    if (await later.isVisible()) await later.click()
+    await initializeExistingOrganization(page)
     await page.keyboard.press('Alt')
     await expect(page.locator('.shortcut-badge[aria-label^="Dashboard:"]')).toBeVisible()
     await page.keyboard.press('Escape')

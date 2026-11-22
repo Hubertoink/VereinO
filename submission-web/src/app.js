@@ -1,3 +1,5 @@
+import { addSubmission, clearSubmissions, deleteSubmission, listSubmissions, readSubmissionsForExport } from './submissionStore.js'
+
 /**
  * VereinO Submission Web App
  * Mobile-first app for submitting vouchers
@@ -5,7 +7,9 @@
 
 // ===== State =====
 let submissions = []
-let currentImage = null
+let selectedAttachment = null
+let submitting = false
+let previewUrl = null
 let categoryCatalog = null
 
 const defaultPaymentMethods = [
@@ -70,7 +74,7 @@ function init() {
     dateInput.value = new Date().toISOString().split('T')[0]
 
     // Load saved data
-    loadFromStorage()
+    void refreshSubmissions()
     try {
         localStorage.removeItem('vereino-category-catalog')
     } catch (e) {
@@ -80,10 +84,9 @@ function init() {
     renderCatalogControls()
     
     // Load saved submitter name
-    const savedName = localStorage.getItem('vereino-submitter')
-    if (savedName) {
-        submitterInput.value = savedName
-    }
+    try {
+        submitterInput.value = localStorage.getItem('vereino-submitter') || ''
+    } catch { /* The form remains usable without saved preferences. */ }
     
     // Update badge counts
     updateBadges()
@@ -147,14 +150,15 @@ function setupEventListeners() {
     // Save submitter name on change
     submitterInput.addEventListener('blur', () => {
         if (submitterInput.value.trim()) {
-            localStorage.setItem('vereino-submitter', submitterInput.value.trim())
+            try { localStorage.setItem('vereino-submitter', submitterInput.value.trim()) } catch { /* optional preference */ }
         }
     })
 }
 
 // ===== Form Handling =====
-function handleFormSubmit(e) {
+async function handleFormSubmit(e) {
     e.preventDefault()
+    if (submitting) return
     
     // Validate required fields
     if (!dateInput.value || !amountInput.value || !descriptionInput.value || !submitterInput.value) {
@@ -216,18 +220,28 @@ function handleFormSubmit(e) {
         })),
         submittedBy: submitterInput.value.trim(),
         submittedAt: new Date().toISOString(),
-        attachment: currentImage
+        attachment: null
     }
     
-    // Publish the new state only after it has been persisted successfully.
-    if (!saveToStorage([...submissions, submission])) return
-    
-    // Update UI
-    updateBadges()
-    showToast('Buchung hinzugefügt!', 'success')
-    
-    // Reset form (keep date and submitter)
-    resetForm()
+    submitting = true
+    form.inert = true
+    form.setAttribute('aria-busy', 'true')
+    try {
+        const selection = selectedAttachment
+        const attachment = selection ? await selection.ready : null
+        if (selection !== selectedAttachment || (selection && !attachment)) return
+        if (attachment) submission.attachment = { name: attachment.name, mimeType: attachment.blob.type }
+        submissions = await addSubmission(submission, attachment?.blob)
+        updateBadges()
+        showToast('Buchung hinzugefügt!', 'success')
+        resetForm()
+    } catch (error) {
+        storageError(error)
+    } finally {
+        form.inert = false
+        form.removeAttribute('aria-busy')
+        submitting = false
+    }
 }
 
 function resetForm() {
@@ -258,85 +272,67 @@ function handleImageSelect(e) {
     const file = e.target.files[0]
     if (!file) return
     
-    // Check file size (max 10MB for files, 5MB for images)
+    clearImage()
     const isImage = file.type.startsWith('image/')
     const maxSize = isImage ? 5 * 1024 * 1024 : 10 * 1024 * 1024
-    
+    const selection = {}
+    selectedAttachment = selection
+    removeImageBtn.hidden = false
+    imagePlaceholder.hidden = true
+    filePreview.hidden = false
+    fileName.textContent = file.name
     if (file.size > maxSize) {
+        fileName.textContent = 'Datei zu groß'
         showToast(`Datei zu groß (max. ${isImage ? '5' : '10'}MB)`, 'error')
+        selection.ready = Promise.resolve(null)
         return
     }
-    
-    const reader = new FileReader()
-    reader.onload = (event) => {
+    selection.ready = prepareAttachment(file, isImage).then(attachment => {
+        if (selectedAttachment !== selection) return null
         if (isImage) {
-            // Compress image
-            compressImage(event.target.result, (compressedData) => {
-                currentImage = {
-                    name: `${file.name.replace(/\.[^.]+$/, '') || 'beleg'}.jpg`,
-                    mimeType: 'image/jpeg',
-                    dataBase64: compressedData.split(',')[1] // Remove data URL prefix
-                }
-                
-                // Show image preview
-                previewImg.src = compressedData
-                previewImg.hidden = false
-                filePreview.hidden = true
-                imagePlaceholder.hidden = true
-                removeImageBtn.hidden = false
-            })
-        } else {
-            // Handle non-image files (PDF, documents, etc.)
-            currentImage = {
-                name: file.name,
-                mimeType: file.type || 'application/octet-stream',
-                dataBase64: event.target.result.split(',')[1] // Remove data URL prefix
-            }
-            
-            // Show file preview
-            previewImg.hidden = true
-            filePreview.hidden = false
-            fileName.textContent = file.name
-            imagePlaceholder.hidden = true
-            removeImageBtn.hidden = false
+            previewUrl = URL.createObjectURL(attachment.blob)
+            previewImg.src = previewUrl
+            previewImg.hidden = false
+            filePreview.hidden = true
         }
-    }
-    reader.readAsDataURL(file)
+        return attachment
+    }).catch(() => {
+        if (selectedAttachment === selection) {
+            fileName.textContent = 'Beleg konnte nicht gelesen werden'
+            showToast('Beleg konnte nicht gelesen werden. Bitte erneut auswählen oder entfernen.', 'error')
+        }
+        return null
+    })
 }
 
-function compressImage(dataUrl, callback) {
-    const img = new Image()
-    img.onload = () => {
-        const canvas = document.createElement('canvas')
-        const ctx = canvas.getContext('2d')
-        
-        // Calculate new dimensions (max 1200px)
-        let { width, height } = img
-        const maxSize = 1200
-        
-        if (width > maxSize || height > maxSize) {
-            if (width > height) {
-                height = Math.round((height * maxSize) / width)
-                width = maxSize
-            } else {
-                width = Math.round((width * maxSize) / height)
-                height = maxSize
-            }
-        }
-        
-        canvas.width = width
-        canvas.height = height
-        
-        // Draw and compress
-        ctx.drawImage(img, 0, 0, width, height)
-        const compressed = canvas.toDataURL('image/jpeg', 0.8)
-        callback(compressed)
+async function prepareAttachment(file, isImage) {
+    if (!isImage) {
+        const blob = file.type ? file : file.slice(0, file.size, 'application/octet-stream')
+        return { name: file.name, blob }
     }
-    img.src = dataUrl
+    const image = new Image()
+    const source = URL.createObjectURL(file)
+    try {
+        image.src = source
+        await image.decode()
+        const scale = Math.min(1, 1200 / Math.max(image.width, image.height))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.round(image.width * scale))
+        canvas.height = Math.max(1, Math.round(image.height * scale))
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height)
+        const blob = await new Promise((resolve, reject) => {
+            canvas.toBlob(result => result ? resolve(result) : reject(new Error('Bildkompression fehlgeschlagen.')), 'image/jpeg', 0.8)
+        })
+        return { name: (file.name.replace(/\.[^.]+$/, '') || 'beleg') + '.jpg', blob }
+    } finally {
+        URL.revokeObjectURL(source)
+    }
 }
 
 function clearImage() {
-    currentImage = null
+    selectedAttachment = null
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    previewUrl = null
     imageInput.value = ''
     previewImg.src = ''
     previewImg.hidden = true
@@ -408,8 +404,8 @@ function handleDeleteSubmission(id) {
         title: 'Buchung löschen?',
         message: 'Diese Buchung wird aus der Liste entfernt.',
         confirmText: 'Löschen',
-        onConfirm: () => {
-            if (!saveToStorage(submissions.filter(s => s.id !== id))) return
+        onConfirm: async () => {
+            try { submissions = await deleteSubmission(id) } catch (error) { storageError(error); return }
             updateBadges()
             renderSubmissionsList()
             showToast('Buchung gelöscht', 'success')
@@ -423,8 +419,8 @@ function handleClearAll() {
         title: 'Alle löschen?',
         message: 'Alle Buchungen werden unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.',
         confirmText: 'Alle löschen',
-        onConfirm: () => {
-            if (!saveToStorage([])) return
+        onConfirm: async () => {
+            try { submissions = await clearSubmissions() } catch (error) { storageError(error); return }
             updateBadges()
             renderSubmissionsList()
             showToast('Alle Buchungen gelöscht', 'success')
@@ -433,8 +429,16 @@ function handleClearAll() {
 }
 
 // ===== Download =====
-function handleDownload() {
-    if (submissions.length === 0) {
+async function handleDownload() {
+    let snapshot
+    try {
+        snapshot = await readSubmissionsForExport()
+    } catch (error) {
+        console.error('Failed to export submissions', error)
+        showToast('Buchungen konnten nicht vollständig exportiert werden.', 'error')
+        return
+    }
+    if (snapshot.length === 0) {
         showToast('Keine Buchungen zum Download', 'error')
         return
     }
@@ -448,7 +452,7 @@ function handleDownload() {
             exportedAt: categoryCatalog.exportedAt || null,
             paymentMethods: categoryCatalog.paymentMethods || []
         } : null,
-        submissions: submissions.map(sub => ({
+        submissions: snapshot.map(sub => ({
             externalId: sub.id,
             date: sub.date,
             type: sub.type,
@@ -491,31 +495,23 @@ function handleDownload() {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     
-    showToast(`${submissions.length} Buchung(en) exportiert`, 'success')
+    showToast(`${snapshot.length} Buchung(en) exportiert`, 'success')
 }
 
 // ===== Storage =====
-function saveToStorage(nextSubmissions) {
-    try {
-        localStorage.setItem('vereino-submissions', JSON.stringify(nextSubmissions))
-        submissions = nextSubmissions
-        return true
-    } catch (e) {
-        console.error('Failed to save to localStorage', e)
-        showToast('Änderung konnte nicht gespeichert werden. Bitte erneut versuchen oder vorhandene Buchungen exportieren.', 'error')
-        return false
-    }
+function storageError(error) {
+    console.error('Failed to store submissions', error)
+    showToast('Änderung konnte nicht gespeichert werden. Bitte erneut versuchen oder vorhandene Buchungen exportieren.', 'error')
 }
 
-function loadFromStorage() {
+async function refreshSubmissions() {
     try {
-        const saved = localStorage.getItem('vereino-submissions')
-        if (saved) {
-            submissions = JSON.parse(saved)
-        }
-    } catch (e) {
-        console.error('Failed to load from localStorage', e)
-        submissions = []
+        submissions = await listSubmissions()
+        updateBadges()
+        if (!listView.hidden) renderSubmissionsList()
+    } catch (error) {
+        console.error('Failed to load submissions', error)
+        showToast('Lokale Buchungen konnten nicht geladen werden. Bitte Speicher prüfen und erneut laden.', 'error')
     }
 }
 

@@ -14,10 +14,13 @@ test('dashboard report sources open filtered bookings and the app has one vertic
   } })
   try {
     const page = await app.firstWindow()
-    await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 25000 })
+    await page.waitForFunction(() => !!window.api?.organizations?.active)
     const later = page.getByRole('button', { name: 'Später', exact: true })
     await page.addLocatorHandler(later, () => later.click())
     await page.evaluate(async () => {
+      // The reporting scenario starts in an established organization after the reload.
+      await window.api.settings.set({ key: 'setup.completed', value: true })
+      await window.api.settings.set({ key: 'backup.auto', value: 'OFF' })
       const active = await window.api.organizations.active()
       await window.api.organizations.setAppearance({ orgId: active.organization!.id, bookingView: 'plus', backgroundImage: 'niko-bg', glassModals: true })
       await window.api.ai.settings.set({ apiKey: 'sk-test-report-no-network' })

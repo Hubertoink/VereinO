@@ -160,6 +160,8 @@ export type AiMemberUpdateState = {
 export type PaymentDueRow = TPaymentsListDueOutput['rows'][number]
 
 export type AiContributionPaymentState = {
+  requestId?: string
+  organizationId?: string
   memberId: number
   memberName: string
   periodKey: string

@@ -14,24 +14,28 @@ test.beforeAll(async () => {
     import { AI_PROVIDER_OPTIONS, DEFAULT_AI_SETTINGS } from './src/renderer/views/AI/aiSettings'
     import { AI_PROVIDER_CONFIG } from './shared/aiProviders'
     const root = createRoot(document.getElementById('root'))
-    let stored = { ...DEFAULT_AI_SETTINGS }
+    let stored = { ...DEFAULT_AI_SETTINGS, hasApiKey: true }
     window.savedSettings = []
     window.api = { ai: { settings: {
       get: async (provider = stored.provider) => provider === stored.provider ? { ...stored } : {
         ...DEFAULT_AI_SETTINGS, provider, model: AI_PROVIDER_CONFIG[provider].defaultModel,
         textModel: AI_PROVIDER_CONFIG[provider].defaultTextModel, apiBaseUrl: AI_PROVIDER_CONFIG[provider].apiBaseUrl
       },
+      testConnection: () => new Promise(resolve => { window.finishConnection = resolve }),
       set: async payload => { window.savedSettings.push(payload); stored = { ...stored, ...payload }; return { ...stored, ok: true } }
     } } }
-    const notify = () => {}
+    window.notices = []
+    const notify = (...args) => window.notices.push(args)
     function Settings() {
-      const [busy, setBusy] = useState(false)
-      const state = useAiSettings(notify, setBusy)
+      const [open, setOpen] = useState(true)
+      const state = useAiSettings(notify, open)
+      window.reloadOrganization = state.loadSettings
       useEffect(() => { void state.loadSettings() }, [state.loadSettings])
-      return <div className="modal-overlay"><AiSettingsDrawer settings={state.settings} apiKey={state.apiKey} modelOptions={state.providerModelOptions}
-        providerOptions={AI_PROVIDER_OPTIONS} connectionTest={null} connectionNeedsSave={state.connectionNeedsSave} busy={busy}
-        onClose={() => {}} onApiKeyChange={state.updateApiKey} onSettingsChange={state.setSettings} onProviderChange={state.handleProviderChange}
-        onInvalidateConnection={state.invalidateConnection} onSave={state.saveSettings} onTestConnection={() => {}} /></div>
+      if (!open) return <button onClick={() => setOpen(true)}>{state.settings.provider} {state.settings.hasApiKey ? 'aktiv' : 'inaktiv'}</button>
+      return <div className="modal-overlay"><AiSettingsDrawer settings={state.draft} apiKey={state.apiKey} modelOptions={state.providerModelOptions}
+        providerOptions={AI_PROVIDER_OPTIONS} connectionTest={state.connectionTest} connectionNeedsSave={state.connectionNeedsSave} busy={state.settingsBusy}
+        onClose={() => setOpen(false)} onApiKeyChange={state.updateApiKey} onSettingsChange={state.setSettings} onProviderChange={state.handleProviderChange}
+        onInvalidateConnection={state.invalidateConnection} onSave={state.saveSettings} onTestConnection={state.testConnection} /></div>
     }
     let version = 0
     window.renderSettings = () => root.render(<Settings key={++version} />)
@@ -76,4 +80,22 @@ test('AI booking comments default on, persist after save and can be disabled', a
   await page.getByRole('button', { name: 'Speichern', exact: true }).click()
   await page.evaluate(() => (window as any).renderSettings())
   await expect(option).not.toBeChecked()
+})
+
+test('dismisses a provider draft and ignores a connection result from the previous organization', async ({ page }) => {
+  await page.route('http://settings.test/**', route => route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' }))
+  await page.goto('http://settings.test/')
+  await page.addScriptTag({ content: script })
+  await page.getByRole('combobox', { name: 'Anbieter', exact: true }).selectOption('anthropic')
+  await expect(page.getByText('Beleganalyse: Claude Sonnet 5.5')).toBeVisible()
+  await page.getByRole('button', { name: /schließen/i }).click()
+  await page.getByRole('button', { name: 'openai aktiv' }).click()
+  await page.getByRole('button', { name: 'Verbindung testen' }).click()
+  await page.evaluate(async () => {
+    const app = window as any
+    await app.reloadOrganization()
+    app.finishConnection({ ok: true, availableModels: ['stale'] })
+  })
+  await expect(page.getByRole('status')).toHaveCount(0)
+  expect(await page.evaluate(() => (window as any).notices)).toEqual([])
 })

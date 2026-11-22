@@ -7,6 +7,24 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.6.0] - 2026-11-22
+
+### Behoben
+
+- Stornos gleichen das ursprüngliche Zahlungskonto aus. Bei Transfers werden Quell- und Zielkonto getauscht, bei internen Umbuchungen die Vorzeichen der Zuordnungen umgekehrt. Beim Öffnen korrigiert VereinO eindeutig zuordenbare historische Stornos.
+- Bestätigte KI-Beitragszahlungen speichern Beleg und Beitragszuordnung gemeinsam. Eine wiederholte Freigabe erzeugt keinen zweiten Beleg. Eigenständige Teilzahlungen in gleicher Höhe bleiben möglich.
+- Änderungen an Buchungen übernehmen Belegdaten, Tags und Aufteilungen gemeinsam. Ungültige Zuordnungen lassen die gesamte Buchung im vorherigen Zustand. Auch Sammeländerungen berücksichtigen vorhandene Teilbeträge.
+- Journal, Tages- und Monatsauswertung sowie PDF-Berichte berücksichtigen die gewählten Filter und geteilte Zuordnungen konsistent. Beim Budgetverbrauch zählt der zugeordnete Anteil. Beim Bearbeiten einer Bruttobuchung bleibt der Umsatzsteuersatz erhalten.
+- Der KI-Chat verwendet nach dem Schließen eines ungespeicherten Anbieterentwurfs weiter die gespeicherte Konfiguration. Mittwald berücksichtigt bei längeren PDFs auch die späteren Seiten innerhalb des Scanlimits.
+
+### Geändert
+
+- Das Journal lädt Budget- und Zweckbindungszuordnungen für eine ganze Seite gemeinsam. Die mobile Einreichung speichert Belege und Anhänge zusammen in IndexedDB und übernimmt vorhandene lokale Einreichungen.
+
+### Sicherheit
+
+- VereinO speichert KI-Zugangsschlüssel mit dem sicheren Schlüsselspeicher des Betriebssystems. Ist dieser nicht verfügbar, gilt der Schlüssel nur für die laufende Sitzung. Vorhandene Klartextwerte werden beim Öffnen des Vereins migriert. Bereits weitergegebene Sicherungen können den alten Schlüssel enthalten.
+
 ## [5.5.0] - 2026-11-18
 
 ### Hinzugefügt

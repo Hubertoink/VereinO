@@ -322,15 +322,7 @@ export type TReportsSummaryInput = z.infer<typeof ReportsSummaryInput>
 export type TReportsSummaryOutput = z.infer<typeof ReportsSummaryOutput>
 
 // Monthly buckets
-export const ReportsMonthlyInput = z.object({
-  from: z.string().optional(),
-  to: z.string().optional(),
-  paymentMethod: PaymentMethod.optional(),
-  sphere: Sphere.optional(),
-  type: VoucherType.optional(),
-  earmarkId: z.number().optional(),
-  budgetId: z.number().optional()
-})
+export const ReportsMonthlyInput = ReportsSummaryInput
 
 export const ReportsMonthlyOutput = z.object({
   buckets: z.array(

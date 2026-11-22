@@ -1,10 +1,11 @@
+import { bookReviewedContribution } from './bookReviewedContribution'
 import { createAiMemberWorkflow } from './aiMemberWorkflow'
 import { currentAiDraftComment } from '../../utils/aiBookingDraft'
 import { resolveBankDraftParty } from '../../utils/bankDraftParty'
 import { takeAgentReview } from '../../utils/aiAgentHandoff'
 import { bankDraftSourceFromTransaction } from '../../types/bankDraftSource'
 import { AgentReimbursementCard } from './AgentReimbursementCard'
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './AIView.css'
 import { dispatchDataChanged } from '../../utils/refresh'
 import { AgentRuntimePanel } from './AgentRuntimePanel'
@@ -135,10 +136,11 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
   } = useAiDrawers()
   const [initialChat] = useState<AiChatSnapshot>({})
   const [activeOrganizationId, setActiveOrganizationId] = useState<string | null>(null)
+  const chatOrganization = useRef<string | null>(null)
   const [chatSnapshotReady, setChatSnapshotReady] = useState(false)
   const [busy, setBusy] = useState(false)
   const {
-    settings,
+    settings, draft: settingsDraft, settingsBusy,
     saveMasterDataPermission,
     masterDataSaving,
     setSettings,
@@ -152,7 +154,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     handleProviderChange,
     updateApiKey,
     invalidateConnection
-  } = useAiSettings(notify, setBusy)
+  } = useAiSettings(notify, showSettings)
   const {
     jobs,
     selectedJob,
@@ -185,7 +187,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     handleComposerDragOver,
     handleComposerDragLeave,
     handleComposerDrop
-  } = useAiComposer(notify, mentionOptions)
+  } = useAiComposer(notify, mentionOptions, settings.provider)
   const { messages, setMessages, pushMessage } = useAiMessages(initialChat.messages)
   const {
     bankReview,
@@ -615,6 +617,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
       if (cancelled || !resolvedOrganizationId) return
 
       const snapshot = readAiChatSnapshot<AiChatSnapshot>(resolvedOrganizationId)
+      chatOrganization.current = resolvedOrganizationId
       setChatSnapshotReady(false)
       setActiveOrganizationId(resolvedOrganizationId)
       setMessages(snapshot.messages || [])
@@ -1476,9 +1479,9 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
     const paymentMethod = paymentMethodForAccount(account?.kind) || 'BANK'
     const tags = ['Mitgliedsbeitrag']
     const warnings = []
-    if (Math.abs(amount - Number(due.amount || 0)) > 0.01) {
+    if (Math.round(amount * 100) !== Math.round(Number(due.amount || 0) * 100)) {
       warnings.push(
-        `Buchungsbetrag ${euro.format(amount)} weicht vom offenen Beitragsbetrag ${euro.format(Number(due.amount || 0))} ab. VereinO markiert den Zeitraum nach Freigabe als bezahlt.`
+        `Buchungsbetrag ${euro.format(amount)} weicht vom offenen Beitragsbetrag ${euro.format(Number(due.amount || 0))} ab. Die Zuordnung darf den offenen Betrag nicht übersteigen. Bei einer Teilzahlung bleibt der Rest offen.`
       )
     }
     if (!account)
@@ -1487,6 +1490,8 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
       )
 
     const draft: AiContributionPaymentState = {
+      requestId: crypto.randomUUID(),
+      organizationId: activeOrganizationId ?? undefined,
       memberId: member.id,
       memberName: member.name,
       periodKey: due.periodKey,
@@ -1634,28 +1639,12 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
 
   const createContributionPayment = async () => {
     if (!pendingContributionPayment || pendingContributionPayment.status === 'CREATED') return
+    const organizationId = pendingContributionPayment.organizationId ?? activeOrganizationId
     setBusy(true)
     try {
-      const voucher = await window.api.vouchers.create({
-        date: pendingContributionPayment.date,
-        type: 'IN',
-        sphere: 'IDEELL',
-        description: pendingContributionPayment.description,
-        note: '',
-        grossAmount: pendingContributionPayment.amount,
-        vatRate: 0,
-        paymentMethod: pendingContributionPayment.paymentMethod || undefined,
-        paymentAccountId: pendingContributionPayment.paymentAccountId ?? undefined,
-        tags: pendingContributionPayment.tags
-      })
-      await window.api.payments.markPaid({
-        memberId: pendingContributionPayment.memberId,
-        periodKey: pendingContributionPayment.periodKey,
-        interval: pendingContributionPayment.interval || 'YEARLY',
-        amount: pendingContributionPayment.amount,
-        voucherId: voucher.id,
-        datePaid: pendingContributionPayment.date
-      })
+      if (!organizationId) throw new Error('Bitte zuerst einen Verein auswählen.')
+      const voucher = await bookReviewedContribution(pendingContributionPayment, organizationId)
+      if (chatOrganization.current !== organizationId) return
       const nextState: AiContributionPaymentState = {
         ...pendingContributionPayment,
         status: 'CREATED',
@@ -1672,13 +1661,11 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
       dispatchDataChanged(['vouchers', 'members'])
       onBooked?.()
       notify('success', `Beitragsbuchung ${voucher.voucherNo} erstellt.`)
-    } catch (error: any) {
-      notify('error', error?.message || String(error))
-      pushMessage({
-        role: 'assistant',
-        title: 'Beitragsbuchung fehlgeschlagen',
-        body: error?.message || String(error)
-      })
+    } catch (error) {
+      if (chatOrganization.current !== activeOrganizationId) return
+      const message = error instanceof Error ? error.message : String(error)
+      notify('error', message)
+      pushMessage({ role: 'assistant', title: 'Beitragsbuchung fehlgeschlagen', body: message })
     } finally {
       setBusy(false)
     }
@@ -4497,6 +4484,7 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
 
   const renderComposer = (placement: 'initial' | 'followup') => (
     <AiComposer
+      provider={settings.provider}
       placement={placement}
       busy={busy}
       prompt={prompt}
@@ -4827,13 +4815,13 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
       {showSettings && (
         <AiSettingsDrawer
           ref={settingsDrawerRef}
-          settings={settings}
+          settings={settingsDraft}
           apiKey={apiKey}
           modelOptions={providerModelOptions}
           providerOptions={AI_PROVIDER_OPTIONS}
           connectionTest={connectionTest}
           connectionNeedsSave={connectionNeedsSave}
-          busy={busy}
+          busy={busy || settingsBusy}
           onClose={() => setShowSettings(false)}
           onApiKeyChange={updateApiKey}
           onSettingsChange={setSettings}

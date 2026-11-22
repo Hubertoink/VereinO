@@ -10,22 +10,6 @@ export async function setDoclingEnabled(enabled: boolean) {
   return getDoclingStatus()
 }
 
-export function cleanDoclingMarkdown(markdown: string) {
-  return markdown
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*$/gm, '')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/__([^_]+)__/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/^\s*[-*+]\s+/gm, '')
-    .replace(/[ \t]+\|[ \t]+/g, '\t')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-}
-
 export async function extractWithDocling(
   _input: { fileName: string; mimeType?: string | null } & FileDataPayload
 ): Promise<{ ok: boolean; markdown: string; text: string; document: unknown; version: string | null }> {

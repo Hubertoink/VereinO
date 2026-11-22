@@ -3,6 +3,8 @@ import { getDb } from '../db/database'
 
 type DB = InstanceType<typeof Database>
 
+export function settingsScope(): string { return getDb().name }
+
 export function getSetting<T = unknown>(key: string, db?: DB): T | undefined {
     const d = db ?? getDb()
     const row = d.prepare('SELECT value_json FROM settings WHERE key=?').get(key) as

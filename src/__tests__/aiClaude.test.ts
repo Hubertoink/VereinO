@@ -62,3 +62,12 @@ it('rejects truncated tool calls before any local action is executed', async () 
   create.mockResolvedValue({ stop_reason: 'max_tokens', content: [{ type: 'tool_use', id: 'x', name: 'draft', input: {} }], usage })
   await expect(createClaudeResponder(client)({ model, input: 'Erstelle einen Entwurf.' })).rejects.toThrow('Tokenlimit')
 })
+
+it('offers only supported Claude attachments for the picker and drop validator', () => {
+  const { attachmentAccept, isAiAttachmentFile } = require('../renderer/views/AI/aiAttachments')
+  const file = { name: 'Bank.xls', type: 'application/vnd.ms-excel' }
+  expect(attachmentAccept('anthropic').split(',')).not.toContain('.xls')
+  expect(isAiAttachmentFile(file, 'anthropic')).toBe(false)
+  expect(isAiAttachmentFile(file, 'openai')).toBe(true)
+  expect(isAiAttachmentFile({ name: 'Bank.xlsx' }, 'anthropic')).toBe(true)
+})

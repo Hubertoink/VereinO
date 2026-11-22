@@ -116,7 +116,12 @@ export function listBudgets(params: {
 
 export function deleteBudget(id: number) {
     const d = getDb()
-    d.prepare('DELETE FROM budgets WHERE id=?').run(id)
+    d.transaction(() => {
+        const referenced = d.prepare(`SELECT 1 FROM vouchers WHERE budget_id = ?
+            UNION ALL SELECT 1 FROM voucher_budgets WHERE budget_id = ? LIMIT 1`).get(id, id)
+        if (referenced) throw new Error('Budget wird in Buchungen verwendet. Bitte archivieren.')
+        d.prepare('DELETE FROM budgets WHERE id=?').run(id)
+    })()
     return { id }
 }
 

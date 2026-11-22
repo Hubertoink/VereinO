@@ -55,7 +55,6 @@ export function suggestVouchers(input: { name?: string | null; amount: number; p
   return { rows }
 }
 
-export function recomputeNextDue(memberId: number) { return withTransaction(d => refreshNextDue(memberId, d)) }
 export function status(input: { memberId: number }) { return contributionStatus(input.memberId) }
 export function getMemberPaymentStatuses(members: MemberPaymentStatusInput[]) {
   return new Map(members.map(member => [member.id, contributionStatus(member.id)]))

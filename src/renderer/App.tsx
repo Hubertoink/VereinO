@@ -1,10 +1,18 @@
+import {
+  friendlyVoucherError,
+  voucherRowToBookingForm,
+  serializeBookingForm,
+  buildVoucherUpdatePayloadFromForm,
+  persistBookingEdit,
+  type BookingEditForm
+} from './views/BookingsPlus/bookingEdit'
+import { scannedInvoiceToBooking } from './utils/scannedInvoiceToBooking'
 import { currentAiDraftComment } from './utils/aiBookingDraft'
 import { openReportBookings } from './utils/reportNavigation'
 import ModalHeader from './components/ModalHeader'
 import PageTutorials from './components/tutorials/PageTutorials'
 import { resolveBankDraftParty } from './utils/bankDraftParty'
 import { bankDraftSourceFromTransaction } from './types/bankDraftSource'
-import { invoiceDescription } from './utils/invoiceDescription'
 import { markOrganizationReady } from './utils/organizationTransition'
 import { usePageHistory } from './hooks/usePageHistory'
 import { useOverlayScrollLock } from './hooks/useOverlayScrollLock'
@@ -19,12 +27,8 @@ import type { UpdateState } from '../types/api'
 import { UpdateNoticeContext, type UpdateNotice } from './context/UpdateNoticeContext'
 import LoadingState from './components/LoadingState'
 import ReceiptWidget from './components/ReceiptWidget'
-import DiscardReceiptModal from './components/modals/DiscardReceiptModal'
-import { useQuickAdd, type QA } from './hooks/useQuickAdd'
-import type {
-  LocalInvoiceScanDraftState,
-  LocalInvoiceScanResult
-} from './components/modals/LocalInvoiceScanModal'
+import { useQuickAdd } from './hooks/useQuickAdd'
+import type { LocalInvoiceScanDraftState } from './components/modals/LocalInvoiceScanModal'
 import type { InvoiceAiGuidance } from './types/invoiceAiGuidance'
 import type { OrganizationProfile } from '../../shared/classification'
 import { ToastProvider } from './context/ToastContext'
@@ -40,13 +44,10 @@ import { useSidebarFlyoutPosition } from './hooks/useSidebarFlyoutPosition'
 import InvoiceBatchControl from './components/InvoiceBatchControl'
 import CompactBookingFlyout from './components/CompactBookingFlyout'
 import QuickAddModal from './components/modals/QuickAddModal'
-import { getInternalAssignmentValidationState } from './components/modals/voucherMetaValidation'
 import type { NavKey } from './utils/navItems'
 import { navItems } from './utils/navItems'
 
 import { LeaderShortcuts, type ShortcutCommand } from './components/shortcuts/LeaderShortcuts'
-import { shouldPromptDiscardForEdit } from './views/Journal/utils/journalEditDiscardPrompt'
-import { shouldPromptDiscardForDraftClose } from './utils/quickAddCloseBehavior'
 import { notifyBookingSaved } from './utils/notifyBookingSaved'
 import {
   base64ToFile,
@@ -54,15 +55,12 @@ import {
   encodeFilesForUpload,
   uploadPayloadToFile
 } from './utils/fileEncoding'
-import {
-  normalizeVoucherBudgetAssignments,
-  normalizeVoucherEarmarkAssignments
-} from './utils/voucherAssignmentFallbacks'
 import { invoiceDraftTabText } from './utils/invoiceDraftLabel'
 import type { DashboardTaskTarget } from '../../shared/dashboardTasks'
 import { selectAiDraftBookingType } from './utils/aiBookingDraft'
 import { addDataChangedListener, dispatchDataChanged } from './utils/refresh'
 
+const DetachedQuickAddWindow = lazy(() => import('./DetachedQuickAddWindow'))
 const ReportsView = lazy(() => import('./views/Reports/ReportsView'))
 const JournalView = lazy(() => import('./views/Journal/JournalView'))
 const BookingsPlusView = lazy(() => import('./views/BookingsPlus/BookingsPlusView'))
@@ -72,9 +70,7 @@ const AutoBackupPromptModal = lazy(() => import('./components/modals/AutoBackupP
 const UpdateAvailableModal = lazy(() => import('./components/modals/UpdateAvailableModal'))
 const MetaFilterModal = lazy(() => import('./components/modals/MetaFilterModal'))
 const TimeFilterModal = lazy(() => import('./components/modals/TimeFilterModal'))
-const AttachmentsModal = lazy(() => import('./components/modals/AttachmentsModal'))
 const LocalInvoiceScanModal = lazy(() => import('./components/modals/LocalInvoiceScanModal'))
-const VoucherInfoModal = lazy(() => import('./components/modals/VoucherInfoModal'))
 const SetupWizardModal = lazy(() => import('./components/modals/SetupWizardModal'))
 const SettingsView = lazy(() =>
   import('./views/Settings/SettingsView').then((module) => ({ default: module.SettingsView }))
@@ -96,25 +92,6 @@ const appLogo: string = new URL('../../build/Icon.ico', import.meta.url).href
 // changing every other organization as well.
 const VISIBLE_NAV_ITEMS_SETTING_KEY = 'ui.visibleNavItems'
 const LEGACY_VISIBLE_NAV_ITEMS_MIGRATION_KEY = 'ui.visibleNavItems.migratedToOrganizationSettings'
-
-function friendlyVoucherError(e: any) {
-  const msg = String(e?.message || e || '')
-  if (/Zweckbindung.*liegt vor Beginn/i.test(msg))
-    return 'Warnung: Das Buchungsdatum liegt vor dem Startdatum der ausgewählten Zweckbindung.'
-  if (/Zweckbindung.*liegt nach Ende/i.test(msg))
-    return 'Warnung: Das Buchungsdatum liegt nach dem Enddatum der ausgewählten Zweckbindung.'
-  if (/Zweckbindung ist inaktiv/i.test(msg))
-    return 'Warnung: Die ausgewählte Zweckbindung ist inaktiv und kann nicht verwendet werden.'
-  if (/Zweckbindung würde den verfügbaren Rahmen unterschreiten/i.test(msg))
-    return 'Warnung: Diese Änderung würde den verfügbaren Rahmen der Zweckbindung unterschreiten.'
-  if (/UNIQUE constraint failed.*voucher_budgets/i.test(msg))
-    return 'Fehler: Ein Budget kann nur einmal pro Buchung zugeordnet werden. Bitte entferne doppelte Budget-Einträge.'
-  if (/UNIQUE constraint failed.*voucher_earmarks/i.test(msg))
-    return 'Fehler: Eine Zweckbindung kann nur einmal pro Buchung zugeordnet werden. Bitte entferne doppelte Einträge.'
-  if (/UNIQUE constraint failed/i.test(msg))
-    return 'Fehler: Doppelter Eintrag - diese Kombination existiert bereits.'
-  return 'Fehler: ' + msg
-}
 
 function TopHeaderOrg({
   notify
@@ -218,51 +195,6 @@ function resetVoucherFilters(options: {
   }
 }
 
-function voucherRowToBookingForm(row: any) {
-  return {
-    ...row,
-    id: Number(row?.id),
-    date: row?.date || new Date().toISOString().slice(0, 10),
-    type: row?.type || 'IN',
-    sphere: row?.sphere || 'IDEELL',
-    description: row?.description ?? '',
-    paymentMethod: row?.paymentMethod ?? undefined,
-    paymentAccountId: row?.paymentAccountId ?? null,
-    paymentAccountName: row?.paymentAccountName ?? null,
-    transferFrom: row?.transferFrom ?? undefined,
-    transferTo: row?.transferTo ?? undefined,
-    transferFromAccountId: row?.transferFromAccountId ?? null,
-    transferFromAccountName: row?.transferFromAccountName ?? null,
-    transferToAccountId: row?.transferToAccountId ?? null,
-    transferToAccountName: row?.transferToAccountName ?? null,
-    mode:
-      row?.amountMode ??
-      row?.mode ??
-      (Number(row?.netAmount ?? 0) > 0 && row?.amountMode !== 'GROSS' ? 'NET' : 'GROSS'),
-    netAmount: row?.netAmount ?? undefined,
-    grossAmount: row?.grossAmount ?? undefined,
-    vatRate: row?.vatRate ?? 0,
-    tags: Array.isArray(row?.tags) ? row.tags : [],
-    budgets: normalizeVoucherBudgetAssignments(row),
-    earmarksAssigned: normalizeVoucherEarmarkAssignments(row)
-  }
-}
-
-function bookingFormGrossAmount(row: any) {
-  if (row?.type === 'TRANSFER') return Number(row?.grossAmount || 0)
-  if ((row?.mode ?? 'GROSS') === 'GROSS') return Number(row?.grossAmount || 0)
-  const net = Number(row?.netAmount || 0)
-  const vatRate = Number(row?.vatRate || 0)
-  return Math.round(net * (1 + vatRate / 100) * 100) / 100
-}
-
-function bookingEditTitle(row: any) {
-  const desc = String(row?.description || '').trim()
-  return desc
-    ? `Buchung (${desc.length > 60 ? desc.slice(0, 60) + '...' : desc}) bearbeiten`
-    : 'Buchung bearbeiten'
-}
-
 function currentLocalMonth() {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -295,221 +227,6 @@ function buildBankBookingDescription(transaction: {
       : ''
   ].filter(Boolean)
   return (parts.join(' · ') || counterparty || 'Bankbeleg').slice(0, 255)
-}
-
-function voucherMutationBlockReason(row: any) {
-  if (!row) return ''
-  if (row.originalId) {
-    const ref = row.originalVoucherNo ? ` #${row.originalVoucherNo}` : ''
-    return `Diese Stornobuchung ist mit der Originalbuchung${ref} verknüpft und kann nicht bearbeitet oder erneut storniert werden.`
-  }
-  if (row.reversedById) {
-    const ref = row.reversedByVoucherNo ? ` #${row.reversedByVoucherNo}` : ''
-    return `Diese Buchung wurde bereits storniert${ref ? ` durch${ref}` : ''} und kann nicht mehr bearbeitet werden.`
-  }
-  return ''
-}
-
-function serializeBookingForm(row: any) {
-  if (!row) return ''
-  return JSON.stringify({
-    date: row.date || '',
-    type: row.type || null,
-    sphere: row.sphere || null,
-    description: (row.description || '').trim(),
-    note: (row.note || '').trim(),
-    counterparty: (row.counterparty || '').trim(),
-    partyId: row.partyId ?? null,
-    primaryClassificationValueId: row.primaryClassificationValueId ?? null,
-    paymentMethod: row.paymentMethod || null,
-    paymentAccountId: row.paymentAccountId || null,
-    transferFrom: row.transferFrom || null,
-    transferTo: row.transferTo || null,
-    transferFromAccountId: row.transferFromAccountId || null,
-    transferToAccountId: row.transferToAccountId || null,
-    mode: row.mode || 'GROSS',
-    grossAmount: Number(row.grossAmount ?? 0),
-    netAmount: Number(row.netAmount ?? 0),
-    vatRate: Number(row.vatRate ?? 0),
-    tags: Array.isArray(row.tags) ? [...row.tags].sort() : [],
-    budgets: Array.isArray(row.budgets)
-      ? [...row.budgets]
-          .map((b: any) => ({ budgetId: Number(b.budgetId || 0), amount: Number(b.amount || 0) }))
-          .sort((a: any, b: any) => a.budgetId - b.budgetId || a.amount - b.amount)
-      : [],
-    earmarksAssigned: Array.isArray(row.earmarksAssigned)
-      ? [...row.earmarksAssigned]
-          .map((e: any) => ({ earmarkId: Number(e.earmarkId || 0), amount: Number(e.amount || 0) }))
-          .sort((a: any, b: any) => a.earmarkId - b.earmarkId || a.amount - b.amount)
-      : []
-  })
-}
-
-function buildVoucherUpdatePayloadFromForm(row: any): { payload?: any; error?: string } {
-  if (!row?.id) return { error: 'Buchung konnte nicht gespeichert werden: ID fehlt.' }
-  if (!row.date) return { error: 'Bitte wähle ein Buchungsdatum aus.' }
-  const blockReason = voucherMutationBlockReason(row)
-  if (blockReason) return { error: blockReason }
-  if (row.type === 'TRANSFER' && (!row.transferFromAccountId || !row.transferToAccountId)) {
-    return { error: 'Bitte wähle Quell- und Zielkonto für den Transfer aus.' }
-  }
-  if (row.type !== 'TRANSFER' && row.type !== 'INTERNAL' && !row.paymentAccountId) {
-    return { error: 'Bitte wähle ein Buchungskonto aus.' }
-  }
-
-  const budgets = Array.isArray(row.budgets)
-    ? row.budgets
-        .filter((b: any) => b.budgetId && (row.type === 'INTERNAL' ? Number(b.amount) !== 0 : Number(b.amount) > 0))
-        .map((b: any) => ({ budgetId: Number(b.budgetId), amount: Number(b.amount) }))
-    : []
-  const earmarks = Array.isArray(row.earmarksAssigned)
-    ? row.earmarksAssigned
-        .filter((e: any) => e.earmarkId && (row.type === 'INTERNAL' ? Number(e.amount) !== 0 : Number(e.amount) > 0))
-        .map((e: any) => ({ earmarkId: Number(e.earmarkId), amount: Number(e.amount) }))
-    : []
-
-  const budgetIds = budgets.map((b: any) => b.budgetId)
-  if (new Set(budgetIds).size !== budgetIds.length) {
-    return {
-      error:
-        'Ein Budget kann nur einmal pro Buchung zugeordnet werden. Bitte entferne die doppelten Einträge.'
-    }
-  }
-  const earmarkIds = earmarks.map((e: any) => e.earmarkId)
-  if (new Set(earmarkIds).size !== earmarkIds.length) {
-    return {
-      error:
-        'Eine Zweckbindung kann nur einmal pro Buchung zugeordnet werden. Bitte entferne die doppelten Einträge.'
-    }
-  }
-
-  const grossAmount = bookingFormGrossAmount(row)
-  if (!Number.isFinite(grossAmount) || grossAmount <= 0) {
-    return { error: 'Bitte gib einen Betrag größer als 0 € ein.' }
-  }
-  const internalValidation = getInternalAssignmentValidationState({ budgets, earmarks, isInternal: row.type === 'INTERNAL', grossAmount })
-  if (!internalValidation.hasValidAssignments) {
-    return { error: internalValidation.budgetHint || internalValidation.earmarkHint }
-  }
-  const totalBudgetAmount = budgets.reduce((sum: number, b: any) => sum + Number(b.amount || 0), 0)
-  if (row.type !== 'INTERNAL' && totalBudgetAmount > grossAmount * 1.001) {
-    return {
-      error: `Die Summe der Budget-Beträge (${totalBudgetAmount.toFixed(2)} €) übersteigt den Buchungsbetrag (${grossAmount.toFixed(2)} €).`
-    }
-  }
-  const totalEarmarkAmount = earmarks.reduce(
-    (sum: number, e: any) => sum + Number(e.amount || 0),
-    0
-  )
-  if (row.type !== 'INTERNAL' && totalEarmarkAmount > grossAmount * 1.001) {
-    return {
-      error: `Die Summe der Zweckbindungs-Beträge (${totalEarmarkAmount.toFixed(2)} €) übersteigt den Buchungsbetrag (${grossAmount.toFixed(2)} €).`
-    }
-  }
-
-  const payload: any = {
-    id: Number(row.id),
-    date: row.date,
-    description: row.description ?? null,
-    note: row.note?.trim() ? row.note.trim() : null,
-    counterparty: row.counterparty?.trim() || null,
-    partyId: row.partyId ?? null,
-    type: row.type,
-    sphere: row.sphere,
-    earmarkId: earmarks.length > 0 ? earmarks[0].earmarkId : null,
-    earmarkAmount: earmarks.length > 0 ? earmarks[0].amount : null,
-    budgetId: budgets.length > 0 ? budgets[0].budgetId : null,
-    budgetAmount: budgets.length > 0 ? budgets[0].amount : null,
-    budgets,
-    earmarks,
-    tags: Array.isArray(row.tags) ? row.tags : []
-  }
-  if (typeof row.primaryClassificationValueId === 'number') {
-    payload.primaryClassificationValueId = row.primaryClassificationValueId
-  }
-
-  if (row.type === 'TRANSFER') {
-    payload.paymentMethod = null
-    payload.paymentAccountId = null
-    payload.transferFrom = row.transferFrom ?? null
-    payload.transferTo = row.transferTo ?? null
-    payload.transferFromAccountId = row.transferFromAccountId ?? null
-    payload.transferToAccountId = row.transferToAccountId ?? null
-    payload.grossAmount = Number(row.grossAmount || 0)
-    payload.vatRate = 0
-    payload.amountMode = 'GROSS'
-  } else {
-    payload.paymentMethod = row.type === 'INTERNAL' ? null : row.paymentMethod ?? null
-    payload.paymentAccountId = row.type === 'INTERNAL' ? null : row.paymentAccountId ?? null
-    payload.transferFrom = null
-    payload.transferTo = null
-    payload.transferFromAccountId = null
-    payload.transferToAccountId = null
-    if ((row.mode ?? 'GROSS') === 'GROSS') {
-      payload.grossAmount = Number(row.grossAmount || 0)
-      payload.vatRate = 0
-      payload.amountMode = 'GROSS'
-    } else {
-      payload.netAmount = Number(row.netAmount || 0)
-      payload.vatRate = Number(row.vatRate || 0)
-      payload.amountMode = 'NET'
-    }
-  }
-
-  return { payload }
-}
-
-function scannedInvoiceToBooking(result: LocalInvoiceScanResult): {
-  initial?: { qa: QA; files: File[] }
-  missing?: string[]
-} {
-  const clean = String(result.fields.grossAmount || '').replace(/[^0-9,.-]/g, '')
-  const decimalIndex = Math.max(clean.lastIndexOf(','), clean.lastIndexOf('.'))
-  const normalized = decimalIndex >= 0
-    ? `${clean.slice(0, decimalIndex).replace(/[.,-]/g, '')}.${clean.slice(decimalIndex + 1).replace(/[^0-9]/g, '')}`
-    : clean.replace(/[^0-9-]/g, '')
-  const parsedAmount = Number(normalized)
-  const grossAmount = Number.isFinite(parsedAmount) ? Math.round(parsedAmount * 100) / 100 : 0
-  const missing = [
-    !result.fields.invoiceDate && 'Rechnungsdatum',
-    !result.fields.supplier.trim() && 'Lieferant',
-    grossAmount <= 0 && 'Bruttobetrag'
-  ].filter(Boolean) as string[]
-  if (missing.length) return { missing }
-
-  const invoiceDetails = [
-    result.note.trim(),
-    result.fields.netAmount && `Netto: ${result.fields.netAmount} €`,
-    result.fields.taxAmount && `Umsatzsteuer: ${result.fields.taxAmount} €`,
-    result.fields.iban && `IBAN: ${result.fields.iban}`
-  ].filter(Boolean).join('\n')
-  return {
-    initial: {
-      qa: {
-        date: result.fields.invoiceDate,
-        type: result.bookingMeta.type === 'IN' ? 'IN' : 'OUT',
-        bookingTypeSelected: true,
-        sphere: result.bookingMeta.sphere || 'IDEELL',
-        primaryClassificationValueId: result.bookingMeta.primaryClassificationValueId ?? undefined,
-        mode: 'GROSS',
-        grossAmount,
-        vatRate: 0,
-        description: invoiceDescription(result.fields.description.trim() || result.fields.supplier.trim(), result.fields.invoiceNumber),
-        counterparty: result.fields.supplier.trim() || null,
-        partyId: result.partyId,
-        partyCreationSource: result.partyCreationSource,
-        note: invoiceDetails,
-        paymentMethod: result.bookingMeta.paymentMethod || 'BANK',
-        paymentAccountId: result.bookingMeta.paymentAccountId ?? null,
-        budgets: result.budgets,
-        earmarksAssigned: result.earmarksAssigned,
-        budgetId: result.budgets[0]?.budgetId ?? null,
-        earmarkId: result.earmarksAssigned[0]?.earmarkId ?? null,
-        tags: result.tags
-      },
-      files: [result.file]
-    }
-  }
 }
 
 function aiInvoiceResultToDraft(result: any): LocalInvoiceScanDraftState {
@@ -553,935 +270,6 @@ function aiInvoiceResultToDraft(result: any): LocalInvoiceScanDraftState {
       ...(Array.isArray(result?.warnings) && result.warnings.length ? ['comment' as const] : [])
     ]
   }
-}
-
-function DetachedQuickAddWindow() {
-  const { notify } = useToast()
-  const { quickAddAfterSave, allowVoucherDeletion, showBookingDraftTabs, showBookingEditTabs } =
-    useUIPreferences()
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
-  const eurFmt = useMemo(
-    () => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }),
-    []
-  )
-  const fmtDate = useCallback((s?: string) => s || '', [])
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const openedRef = useRef(false)
-  const detachedDraftIdRef = useRef<string>('')
-  const [loaded, setLoaded] = useState(false)
-  const [earmarks, setEarmarks] = useState<
-    Array<{
-      id: number
-      code: string
-      name: string
-      color?: string | null
-      startDate?: string | null
-      endDate?: string | null
-      enforceTimeRange?: number
-    }>
-  >([])
-  const [budgets, setBudgets] = useState<
-    Array<{
-      id: number
-      year: number
-      categoryName?: string | null
-      projectName?: string | null
-      name?: string | null
-      startDate?: string | null
-      endDate?: string | null
-      color?: string | null
-      isArchived?: number
-      enforceTimeRange?: number
-      earmarkId?: number | null
-    }>
-  >([])
-  const [paymentAccounts, setPaymentAccounts] = useState<
-    Array<{
-      id: number
-      name: string
-      kind: 'CASH' | 'BANK' | 'PAYPAL' | 'CARD' | 'OTHER'
-      iban?: string | null
-      color?: string | null
-      sortOrder: number
-      isActive: number
-    }>
-  >([])
-  const [tagDefs, setTagDefs] = useState<
-    Array<{ id: number; name: string; color?: string | null; usage?: number }>
-  >([])
-  const [descSuggest, setDescSuggest] = useState<string[]>([])
-  const [windowModeKind, setWindowModeKind] = useState<'create' | 'invoice' | 'edit' | 'details'>('create')
-  const [invoiceDraftFile, setInvoiceDraftFile] = useState<File | null>(null)
-  const [receiptIntake, setReceiptIntake] = useState(false)
-  const [confirmDiscardReceipt, setConfirmDiscardReceipt] = useState(false)
-  const [receiptTarget, setReceiptTarget] = useState<'booking' | 'invoice'>('booking')
-  const [receiptOrganization, setReceiptOrganization] = useState<{ id: string; name: string } | null>(null)
-  const [invoiceDraftState, setInvoiceDraftState] = useState<LocalInvoiceScanDraftState | null>(null)
-  const [invoiceDraftGuidance, setInvoiceDraftGuidance] = useState<InvoiceAiGuidance | undefined>()
-  const [editQa, setEditQa] = useState<any | null>(null)
-  const [detailVoucher, setDetailVoucher] = useState<any | null>(null)
-  const [detailAttachmentsVoucher, setDetailAttachmentsVoucher] = useState<null | {
-    voucherId: number
-    voucherNo: string
-    date: string
-    description: string
-  }>(null)
-  const [confirmDetailReverse, setConfirmDetailReverse] = useState(false)
-  const [editFiles, setEditFiles] = useState<File[]>([])
-  const [editExistingFiles, setEditExistingFiles] = useState<
-    Array<{ id: number; fileName: string }>
-  >([])
-  const [editExistingFilesLoading, setEditExistingFilesLoading] = useState(false)
-  const [editInitialSnapshot, setEditInitialSnapshot] = useState('')
-  const [confirmDiscardEdit, setConfirmDiscardEdit] = useState(false)
-  const [confirmDiscardCreate, setConfirmDiscardCreate] = useState(false)
-  const [confirmDeleteEdit, setConfirmDeleteEdit] = useState(false)
-
-  const refreshDetailVoucher = useCallback(async () => {
-    if (!detailVoucher?.id) return
-    try {
-      const refreshed = await window.api?.vouchers.list?.({
-        limit: 1,
-        voucherIds: [detailVoucher.id]
-      })
-      const next = (refreshed as any)?.rows?.[0]
-      if (next) {
-        setDetailVoucher(next)
-      }
-    } catch {
-      // Ignore and keep current details open
-    }
-  }, [detailVoucher?.id])
-
-  useEffect(() => {
-    document.documentElement.classList.add('detached-quick-add-document')
-    document.body.classList.add('detached-quick-add-body')
-
-    return () => {
-      document.documentElement.classList.remove('detached-quick-add-document')
-      document.body.classList.remove('detached-quick-add-body')
-    }
-  }, [])
-
-  const budgetsForEdit = useMemo(() => {
-    const byIdEarmark = new Map(earmarks.map((e) => [e.id, e]))
-    return budgets.map((budget: any) => {
-      let label = ''
-      if (budget.name && String(budget.name).trim()) label = String(budget.name).trim()
-      else if (budget.categoryName && String(budget.categoryName).trim())
-        label = `${budget.year} - ${budget.categoryName}`
-      else if (budget.projectName && String(budget.projectName).trim())
-        label = `${budget.year} - ${budget.projectName}`
-      else if (budget.earmarkId) {
-        const earmark = byIdEarmark.get(budget.earmarkId)
-        if (earmark) label = `${budget.year} - ${earmark.code}`
-      }
-      if (!label) label = String(budget.year)
-      return {
-        id: budget.id,
-        label,
-        year: budget.year,
-        startDate: budget.startDate ?? null,
-        endDate: budget.endDate ?? null,
-        enforceTimeRange: budget.enforceTimeRange ?? 0,
-        isArchived: budget.isArchived ?? 0,
-        color: budget.color ?? null
-      }
-    })
-  }, [budgets, earmarks])
-
-  const {
-    quickAdd,
-    qa,
-    setQa,
-    onQuickSave,
-    files,
-    setFiles,
-    openFilePicker,
-    onDropFiles,
-    openQuickAdd
-  } = useQuickAdd(
-    today,
-    async (payload: any) => {
-      try {
-        const res = await window.api?.vouchers.create?.(payload)
-        if (res) {
-          notify('success', `Beleg erstellt: #${res.voucherNo} (Brutto ${res.grossAmount})`)
-          const warnings = res?.warnings
-          if (warnings?.length) warnings.forEach((msg) => notify('info', 'Warnung: ' + msg))
-          notifyBookingSaved({
-            ...res,
-            mode: 'create',
-            draftId: detachedDraftIdRef.current,
-            agentDraftId: payload?.agentDraftId
-          })
-        }
-        return res
-      } catch (e: any) {
-        notify('error', friendlyVoucherError(e))
-        return null
-      }
-    },
-    () => fileInputRef.current?.click(),
-    notify,
-    false,
-    quickAddAfterSave
-  )
-
-  useEffect(() => {
-    let cancelled = false
-    async function loadLookups() {
-      try {
-        const [bindingsRes, budgetsRes, paymentAccountsRes, tagsRes] = await Promise.all([
-          window.api?.bindings?.list?.({ activeOnly: true }),
-          window.api?.budgets?.list?.({ includeArchived: true } as any),
-          window.api?.paymentAccounts?.list?.(),
-          window.api?.tags?.list?.({ includeUsage: true })
-        ])
-        if (cancelled) return
-        setEarmarks((bindingsRes as any)?.rows || [])
-        setBudgets((budgetsRes as any)?.rows || [])
-        setPaymentAccounts((paymentAccountsRes as any)?.rows || [])
-        setTagDefs((tagsRes as any)?.rows || [])
-      } catch {
-        if (!cancelled)
-          notify('error', 'Stammdaten für das Buchungsfenster konnten nicht geladen werden.')
-      }
-    }
-    loadLookups()
-    return () => {
-      cancelled = true
-    }
-  }, [notify])
-
-  useEffect(() => {
-    if (openedRef.current) return
-    let cancelled = false
-    async function openInitialDraft() {
-      const token = new URLSearchParams(window.location.search).get('token') || ''
-      let initial: any = null
-      try {
-        if (token) {
-          const res = await window.api?.quickAdd?.detachedInitial?.({ token })
-          initial = res?.initial || null
-        }
-      } catch {}
-      if (cancelled || openedRef.current) return
-      detachedDraftIdRef.current = String(initial?.draftId || token || '')
-      const initialFiles = Array.isArray(initial?.files)
-        ? initial.files.map((file: any) => uploadPayloadToFile({ ...file, name: String(file.name || 'Datei') }))
-        : []
-      openedRef.current = true
-      if (initial?.mode === 'invoice') {
-        setReceiptIntake(Boolean(initial.receiptIntake))
-        setReceiptOrganization(initial.organization || null)
-        setWindowModeKind('invoice')
-        setInvoiceDraftFile(initialFiles[0] || null)
-        setInvoiceDraftState((initial?.invoiceState as LocalInvoiceScanDraftState) || null)
-        setInvoiceDraftGuidance((initial?.invoiceGuidance as InvoiceAiGuidance) || undefined)
-      } else if (initial?.mode === 'details') {
-        setWindowModeKind('details')
-        const initialVoucher = initial?.voucher || initial?.qa || null
-        if (initialVoucher?.id) {
-          setDetailVoucher(initialVoucher)
-        } else if (initial?.voucherId) {
-          try {
-            const res = await window.api?.vouchers.list?.({
-              limit: 1,
-              voucherIds: [Number(initial.voucherId)]
-            })
-            setDetailVoucher((res as any)?.rows?.[0] || null)
-          } catch {
-            setDetailVoucher(null)
-          }
-        }
-      } else if (initial?.mode === 'edit') {
-        const initialRow = initial?.qa || initial?.voucher || { id: initial?.voucherId }
-        let currentRow = initialRow
-        const voucherId = Number(initial?.voucherId || initialRow?.id || 0)
-        if (voucherId > 0) {
-          try {
-            const refreshed = await window.api?.vouchers.list?.({ limit: 1, voucherIds: [voucherId] })
-            const freshRow = (refreshed as any)?.rows?.[0]
-            if (freshRow) currentRow = { ...initialRow, ...freshRow }
-          } catch {
-            // The initial payload remains a safe fallback if refreshing fails.
-          }
-        }
-        const form = voucherRowToBookingForm(currentRow)
-        setWindowModeKind('edit')
-        setEditQa(form)
-        setEditFiles(initialFiles)
-        setEditInitialSnapshot(serializeBookingForm(form))
-      } else {
-        setWindowModeKind('create')
-        openQuickAdd(initial?.qa ? { qa: initial.qa, files: initialFiles } : undefined)
-      }
-      setLoaded(true)
-    }
-    openInitialDraft()
-    return () => {
-      cancelled = true
-    }
-  }, [openQuickAdd])
-
-  useEffect(() => {
-    if (!quickAdd || descSuggest.length > 0) return
-    let cancelled = false
-    async function loadSuggestions() {
-      try {
-        const res = await window.api?.vouchers?.recent?.({ limit: 50 })
-        const uniq = new Set<string>()
-        for (const row of (res as any)?.rows || []) {
-          const description = String(row.description || '').trim()
-          if (description) uniq.add(description)
-          if (uniq.size >= 50) break
-        }
-        if (!cancelled) setDescSuggest(Array.from(uniq))
-      } catch {}
-    }
-    loadSuggestions()
-    return () => {
-      cancelled = true
-    }
-  }, [quickAdd, descSuggest.length])
-
-  useEffect(() => {
-    if (windowModeKind === 'create' && openedRef.current && loaded && !quickAdd) {
-      window.api?.window?.confirmClose?.()
-    }
-  }, [loaded, quickAdd, windowModeKind])
-
-  const syncDetachedInvoiceDraft = useCallback(async () => {
-    if (receiptIntake) return
-    if (!detachedDraftIdRef.current) return
-    const encodedFiles = invoiceDraftFile
-      ? [await encodeFileForUpload(invoiceDraftFile)]
-      : []
-    await window.api?.quickAdd?.syncDraft?.({
-      draftId: detachedDraftIdRef.current,
-      files: encodedFiles,
-      invoiceState: invoiceDraftState || undefined,
-      invoiceGuidance: invoiceDraftGuidance,
-      kind: 'invoice',
-      detached: true
-    })
-  }, [invoiceDraftFile, invoiceDraftGuidance, invoiceDraftState, receiptIntake])
-
-  useEffect(() => {
-    if (windowModeKind !== 'invoice' || !loaded || !invoiceDraftFile) return
-    const timeout = window.setTimeout(() => {
-      void syncDetachedInvoiceDraft()
-    }, 250)
-    return () => window.clearTimeout(timeout)
-  }, [invoiceDraftFile, invoiceDraftState, loaded, syncDetachedInvoiceDraft, windowModeKind])
-
-  useEffect(() => {
-    if (windowModeKind !== 'invoice' || !loaded) return
-    void window.api?.window?.setInvoiceScanExpanded?.(!!invoiceDraftFile)
-  }, [invoiceDraftFile, loaded, windowModeKind])
-
-  const isCreateDraftDirty = useCallback(() => {
-    if (!qa) return false
-    const draft = qa as any
-    const textFields = ['description', 'voucherNo', 'note', 'receiptNo']
-    if (textFields.some((key) => String(draft?.[key] ?? '').trim())) return true
-    if (Number(draft?.grossAmount || 0) > 0 || Number(draft?.netAmount || 0) > 0) return true
-    if (draft?.budgetId || draft?.earmarkId || draft?.tagIds?.length) return true
-    if (files.length > 0) return true
-    return false
-  }, [files.length, qa])
-
-  const requestCloseDetachedCreate = useCallback(() => {
-    if (
-      shouldPromptDiscardForDraftClose({
-        showBookingDraftTabs,
-        hasUnsavedChanges: isCreateDraftDirty()
-      })
-    ) {
-      setConfirmDiscardCreate(true)
-      return
-    }
-    if (showBookingDraftTabs && detachedDraftIdRef.current) {
-      const draftId = detachedDraftIdRef.current
-      void (async () => {
-        try {
-          const encodedFiles = await encodeFilesForUpload(files)
-          await window.api?.quickAdd?.syncDraft?.({
-            draftId,
-            qa,
-            files: encodedFiles,
-            detached: false
-          })
-        } catch {
-          // Closing the detached window should still succeed even if the last sync fails.
-        }
-        await window.api?.window?.confirmClose?.()
-      })()
-      return
-    }
-    window.api?.window?.confirmClose?.()
-  }, [files, isCreateDraftDirty, qa, showBookingDraftTabs])
-
-  useEffect(() => {
-    const draftId = detachedDraftIdRef.current
-    if (!loaded || !quickAdd || !draftId) return
-    const timeout = window.setTimeout(() => {
-      void window.api?.quickAdd?.syncDraft?.({ draftId, qa })
-    }, 200)
-    return () => window.clearTimeout(timeout)
-  }, [loaded, quickAdd, qa])
-
-  useEffect(() => {
-    const draftId = detachedDraftIdRef.current
-    if (!loaded || !quickAdd || !draftId) return
-    let cancelled = false
-    async function syncFiles() {
-      const encoded = await encodeFilesForUpload(files)
-      if (!cancelled) void window.api?.quickAdd?.syncDraft?.({ draftId, files: encoded })
-    }
-    syncFiles()
-    return () => {
-      cancelled = true
-    }
-  }, [files, loaded, quickAdd])
-
-  const refreshEditAttachments = useCallback(async (voucherId: number) => {
-    setEditExistingFilesLoading(true)
-    try {
-      const res = await window.api?.attachments.list?.({ voucherId })
-      setEditExistingFiles((res as any)?.files || (res as any)?.rows || [])
-    } catch {
-      setEditExistingFiles([])
-    } finally {
-      setEditExistingFilesLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (windowModeKind !== 'edit' || !editQa?.id) return
-    void refreshEditAttachments(Number(editQa.id))
-  }, [editQa?.id, refreshEditAttachments, windowModeKind])
-
-  const saveDetachedEdit = useCallback(async () => {
-    if (!editQa?.id) return
-    const { payload, error } = buildVoucherUpdatePayloadFromForm(editQa)
-    if (error) {
-      notify('error', error)
-      return
-    }
-    try {
-      const res = await window.api?.vouchers.update?.(payload)
-      for (const file of editFiles) {
-        const encoded = await encodeFileForUpload(file)
-        await window.api?.attachments.add?.({
-          voucherId: Number(editQa.id),
-          fileName: file.name,
-          dataBytes: encoded.dataBytes,
-          mimeType: file.type || undefined
-        })
-      }
-      notify('success', 'Buchung gespeichert')
-      const warnings = res?.warnings
-      if (warnings?.length) warnings.forEach((msg) => notify('info', 'Warnung: ' + msg))
-      await window.api?.quickAdd?.notifySaved?.({
-        id: Number(editQa.id),
-        draftId: detachedDraftIdRef.current,
-        mode: 'edit'
-      })
-      window.api?.window?.confirmClose?.()
-    } catch (e: any) {
-      notify('error', friendlyVoucherError(e))
-    }
-  }, [editFiles, editQa, notify])
-
-  const requestCloseDetachedEdit = useCallback(() => {
-    if (
-      shouldPromptDiscardForEdit({
-        showBookingEditTabs,
-        hasUnsavedChanges: Boolean(
-          editQa && (serializeBookingForm(editQa) !== editInitialSnapshot || editFiles.length > 0)
-        )
-      })
-    ) {
-      setConfirmDiscardEdit(true)
-      return
-    }
-    window.api?.window?.confirmClose?.()
-  }, [editFiles.length, editInitialSnapshot, editQa, showBookingEditTabs])
-
-  useEffect(() => {
-    return window.api?.window?.onCloseRequested?.(() => {
-      if (windowModeKind === 'invoice') {
-        if (receiptIntake) { setConfirmDiscardReceipt(true); return }
-        void (async () => {
-          try {
-            await syncDetachedInvoiceDraft()
-          } finally {
-            window.api?.window?.confirmClose?.()
-          }
-        })()
-        return
-      }
-      if (windowModeKind === 'details') {
-        window.api?.window?.confirmClose?.()
-        return
-      }
-      if (windowModeKind === 'edit') {
-        requestCloseDetachedEdit()
-        return
-      }
-      requestCloseDetachedCreate()
-    })
-  }, [requestCloseDetachedCreate, requestCloseDetachedEdit, syncDetachedInvoiceDraft, windowModeKind, receiptIntake])
-
-  const deleteDetachedEdit = useCallback(async () => {
-    if (!editQa?.id) return
-    const blockReason = voucherMutationBlockReason(editQa)
-    if (blockReason) {
-      setConfirmDeleteEdit(false)
-      notify('info', blockReason)
-      return
-    }
-    try {
-      if (allowVoucherDeletion) {
-        await window.api?.vouchers.delete?.({ id: Number(editQa.id) })
-        notify('success', 'Buchung gelöscht')
-        await window.api?.quickAdd?.notifySaved?.({
-          id: Number(editQa.id),
-          draftId: detachedDraftIdRef.current,
-          mode: 'delete',
-          deleted: true
-        })
-      } else {
-        const res = await window.api?.vouchers.reverse?.({
-          originalId: Number(editQa.id),
-          reason: 'Storno statt Löschen'
-        })
-        notify('success', `Storno erstellt: #${res?.voucherNo || ''}`)
-        await window.api?.quickAdd?.notifySaved?.({
-          id: res?.id,
-          originalId: Number(editQa.id),
-          draftId: detachedDraftIdRef.current,
-          mode: 'reverse'
-        })
-      }
-      window.api?.window?.confirmClose?.()
-    } catch (e: any) {
-      notify('error', e?.message || String(e))
-    }
-  }, [allowVoucherDeletion, editQa, notify])
-
-  const reverseDetachedDetails = useCallback(async () => {
-    if (!detailVoucher?.id) return
-    try {
-      const res = await window.api?.vouchers.reverse?.({
-        originalId: Number(detailVoucher.id),
-        reason: 'Storno statt Löschen'
-      })
-      setConfirmDetailReverse(false)
-      notify('success', `Storno erstellt: #${res?.voucherNo || ''}`)
-      const refreshed = await window.api?.vouchers.list?.({
-        limit: 1,
-        voucherIds: [Number(detailVoucher.id)]
-      })
-      const next = (refreshed as any)?.rows?.[0]
-      if (next) setDetailVoucher(next)
-      dispatchDataChanged(['vouchers'])
-      await window.api?.quickAdd?.notifySaved?.({
-        id: res?.id,
-        originalId: Number(detailVoucher.id),
-        draftId: detachedDraftIdRef.current,
-        mode: 'reverse'
-      })
-    } catch (e: any) {
-      notify('error', e?.message || String(e))
-    }
-  }, [detailVoucher, notify])
-
-  useEffect(() => {
-    if (windowModeKind !== 'edit' || !editQa) return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-        e.preventDefault()
-        void saveDetachedEdit()
-        return
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
-        e.preventDefault()
-        const blockReason = voucherMutationBlockReason(editQa)
-        if (blockReason) {
-          notify('info', blockReason)
-          return
-        }
-        fileInputRef.current?.click()
-        return
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        requestCloseDetachedEdit()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [editQa, notify, requestCloseDetachedEdit, saveDetachedEdit, windowModeKind])
-
-  if (
-    !loaded ||
-    (windowModeKind === 'create' && !quickAdd) ||
-    (windowModeKind === 'edit' && !editQa) ||
-    (windowModeKind === 'details' && !detailVoucher)
-  ) {
-    return <div className="detached-quick-add-loading">Buchungsfenster wird vorbereitet...</div>
-  }
-
-  if (windowModeKind === 'invoice') {
-    return (
-      <>
-      <LocalInvoiceScanModal
-        onClose={() => {
-          if (receiptIntake) { setConfirmDiscardReceipt(true); return }
-          void (async () => {
-            try {
-              await syncDetachedInvoiceDraft()
-            } finally {
-              window.api?.window?.confirmClose?.()
-            }
-          })()
-        }}
-        onCreateInvoice={async (result) => {
-          if (receiptIntake) {
-            const active = await window.api.organizations.active()
-            if ((active.organization?.id || 'default') !== (receiptOrganization?.id || 'default')) {
-              notify('error', 'Der aktive Verein hat sich geändert. Bitte den Beleg erneut öffnen.')
-              return false
-            }
-          }
-          const converted = scannedInvoiceToBooking(result)
-          if (!converted.initial) {
-            notify('error', `Bitte ergänze: ${(converted.missing || []).join(', ')}.`)
-            return false
-          }
-          if (receiptIntake && receiptTarget === 'invoice') {
-            if (!result.fields.invoiceNumber.trim()) { notify('error', 'Bitte ergänze: Rechnungsnummer.'); return false }
-            await window.api.invoices.create({
-              date: result.fields.invoiceDate, dueDate: result.fields.dueDate || null,
-              invoiceNo: result.fields.invoiceNumber.trim(), party: result.fields.supplier.trim(), partyId: result.partyId,
-              description: converted.initial.qa.description || null, note: converted.initial.qa.note || null,
-              grossAmount: converted.initial.qa.grossAmount!,
-              paymentMethod: result.bookingMeta.paymentMethod || null, paymentAccountId: result.bookingMeta.paymentAccountId ?? null,
-              sphere: result.bookingMeta.sphere || 'IDEELL', primaryClassificationValueId: result.bookingMeta.primaryClassificationValueId ?? null,
-              budgets: result.budgets, earmarks: result.earmarksAssigned,
-              budgetId: result.budgets[0]?.budgetId ?? null, earmarkId: result.earmarksAssigned[0]?.earmarkId ?? null,
-              autoPost: true, voucherType: 'OUT', files: await encodeFilesForUpload([result.file]), tags: result.tags
-            })
-            dispatchDataChanged(['invoices'])
-            await window.api.quickAdd.notifySaved({ draftId: detachedDraftIdRef.current, kind: 'invoice' })
-            await window.api.window.confirmClose()
-            return true
-          }
-          const encodedFiles = await encodeFilesForUpload(converted.initial.files)
-          await window.api?.quickAdd?.syncDraft?.({
-            draftId: detachedDraftIdRef.current,
-            qa: converted.initial.qa,
-            files: encodedFiles,
-            kind: 'booking',
-            detached: true
-          })
-          setWindowModeKind('create')
-          openQuickAdd(converted.initial)
-          return true
-        }}
-        budgetsForEdit={budgetsForEdit}
-        earmarks={earmarks}
-        tagDefs={tagDefs}
-        submitLabel={receiptIntake && receiptTarget === 'invoice' ? 'Offene Rechnung anlegen' : 'Als Buchung übernehmen'}
-        intakeHeader={receiptIntake ? <div className="receipt-intake-choice">
-          <strong>{receiptOrganization?.name || 'VereinO'}</strong>
-          <div className="btn-group" role="group" aria-label="Beleg verwenden als">
-            <button type="button" className={`btn ${receiptTarget === 'booking' ? 'primary' : ''}`} aria-pressed={receiptTarget === 'booking'} onClick={() => setReceiptTarget('booking')}>Buchung erfassen</button>
-            <button type="button" className={`btn ${receiptTarget === 'invoice' ? 'primary' : ''}`} aria-pressed={receiptTarget === 'invoice'} onClick={() => setReceiptTarget('invoice')}>Offene Rechnung anlegen</button>
-          </div>
-          <span>{receiptTarget === 'booking' ? 'Eine Einnahme oder Ausgabe mit diesem Beleg erfassen.' : 'Eine noch zu bezahlende Rechnung als Verbindlichkeit vormerken.'}</span>
-        </div> : undefined}
-        commentAriaLabel="Kommentar zur Buchung"
-        closeOnCreate={false}
-        initialFile={invoiceDraftFile || undefined}
-        initialState={invoiceDraftState || undefined}
-        aiGuidance={invoiceDraftGuidance}
-        onDraftChange={(state) => {
-          setInvoiceDraftFile(state.file)
-          setInvoiceDraftState(state)
-        }}
-        onFileChange={setInvoiceDraftFile}
-      />
-      {confirmDiscardReceipt && <DiscardReceiptModal fileName={invoiceDraftFile?.name}
-        onCancel={() => { setConfirmDiscardReceipt(false); void window.api.window.cancelClose() }}
-        onDiscard={() => void window.api.window.confirmClose()} />}
-      </>
-    )
-  }
-
-  if (windowModeKind === 'details' && detailVoucher) {
-    return (
-      <>
-        <VoucherInfoModal
-          voucher={detailVoucher}
-          suspended={!!detailAttachmentsVoucher}
-          onClose={() => window.api?.window?.confirmClose?.()}
-          eurFmt={eurFmt}
-          fmtDate={fmtDate}
-          notify={notify}
-          earmarks={earmarks}
-          budgets={budgetsForEdit}
-          tagDefs={tagDefs}
-          allowVoucherDeletion={allowVoucherDeletion}
-          windowMode
-          onOpenAttachments={() => {
-            setDetailAttachmentsVoucher({
-              voucherId: detailVoucher.id,
-              voucherNo: detailVoucher.voucherNo,
-              date: detailVoucher.date,
-              description: detailVoucher.description || ''
-            })
-          }}
-          onSaveMeta={async (payload) => {
-            const res = await window.api?.vouchers.updateMeta?.({
-              id: detailVoucher.id,
-              note: payload.note,
-              budgets: payload.budgets,
-              earmarks: payload.earmarks,
-              tags: payload.tags
-            })
-            if (!res) throw new Error('Buchungsdetails konnten nicht gespeichert werden.')
-            const refreshed = await window.api?.vouchers.list?.({
-              limit: 1,
-              voucherIds: [detailVoucher.id]
-            })
-            const next = (refreshed as any)?.rows?.[0]
-            if (next) setDetailVoucher(next)
-            dispatchDataChanged(['vouchers'])
-            await window.api?.quickAdd?.notifySaved?.({
-              id: detailVoucher.id,
-              draftId: detachedDraftIdRef.current,
-              mode: 'details'
-            })
-          }}
-          onReverse={() => setConfirmDetailReverse(true)}
-        />
-        {confirmDetailReverse && (
-          <div
-            className="modal-overlay"
-            role="dialog"
-            aria-modal="true"
-            onClick={() => setConfirmDetailReverse(false)}
-            style={{ zIndex: 16000, alignItems: 'center', paddingTop: 0 }}
-          >
-            <div
-              className="modal modal-inset-header"
-              onClick={(e) => e.stopPropagation()}
-              style={{ width: 'min(460px, 92vw)' }}
-            >
-              <ModalHeader title="Buchung stornieren" onClose={() => setConfirmDetailReverse(false)} />
-              <p>
-                Möchtest du die Buchung{' '}
-                <strong>
-                  #{detailVoucher.voucherNo}
-                  {detailVoucher.description ? ` - ${detailVoucher.description}` : ''}
-                </strong>{' '}
-                stornieren? Die Originalbuchung bleibt erhalten und es wird eine Gegenbuchung
-                erstellt.
-              </p>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-                <button className="btn" onClick={() => setConfirmDetailReverse(false)}>
-                  Abbrechen
-                </button>
-                <button
-                  className="btn danger"
-                  onClick={() => {
-                    void reverseDetachedDetails()
-                  }}
-                >
-                  Ja, stornieren
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        {detailAttachmentsVoucher && (
-          <AttachmentsModal
-            voucher={detailAttachmentsVoucher}
-            onClose={() => setDetailAttachmentsVoucher(null)}
-            onChanged={async () => {
-              await refreshDetailVoucher()
-            }}
-          />
-        )}
-      </>
-    )
-  }
-
-  if (windowModeKind === 'edit' && editQa) {
-    const editMutationBlockReason = voucherMutationBlockReason(editQa)
-    return (
-      <>
-        <QuickAddModal notify={notify}
-          qa={editQa}
-          setQa={setEditQa}
-          onSave={saveDetachedEdit}
-          saveLabel="Speichern"
-          showSaveMenu={false}
-          footerLeft={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              {editMutationBlockReason ? (
-                <div className="helper">{editMutationBlockReason}</div>
-              ) : (
-                <button
-                  type="button"
-                  className="btn danger"
-                  title={allowVoucherDeletion ? 'Löschen' : 'Stornieren'}
-                  onClick={() => setConfirmDeleteEdit(true)}
-                >
-                  {allowVoucherDeletion ? 'Löschen' : 'Stornieren'}
-                </button>
-              )}
-              <div className="helper">
-                Ctrl+S = Speichern · Ctrl+U = Datei hinzufügen · Esc = Abbrechen
-              </div>
-            </div>
-          }
-          onClose={requestCloseDetachedEdit}
-          onRequestClose={requestCloseDetachedEdit}
-          confirmingClose={confirmDiscardEdit}
-          onConfirmDiscard={() => window.api?.window?.confirmClose?.()}
-          onCancelDiscard={() => {
-            setConfirmDiscardEdit(false)
-            void window.api?.window?.cancelClose?.()
-          }}
-          files={editFiles}
-          setFiles={setEditFiles}
-          openFilePicker={() => {
-            if (editMutationBlockReason) {
-              notify('info', editMutationBlockReason)
-              return
-            }
-            fileInputRef.current?.click()
-          }}
-          onDropFiles={(fileList) => {
-            if (editMutationBlockReason) {
-              notify('info', editMutationBlockReason)
-              return
-            }
-            if (!fileList) return
-            setEditFiles((prev) => [...prev, ...Array.from(fileList)])
-          }}
-          fileInputRef={fileInputRef}
-          fmtDate={fmtDate}
-          eurFmt={eurFmt}
-          budgetsForEdit={budgetsForEdit}
-          earmarks={earmarks}
-          paymentAccounts={paymentAccounts}
-          tagDefs={tagDefs}
-          descSuggest={descSuggest}
-          title={bookingEditTitle(editQa)}
-          existingFiles={editExistingFiles}
-          existingFilesLoading={editExistingFilesLoading}
-          onOpenExistingFile={(fileId) => {
-            void window.api?.attachments.open?.({ fileId })
-          }}
-          onDownloadExistingFile={async (fileId) => {
-            try {
-              const res = await window.api?.attachments.saveAs?.({ fileId })
-              if (res?.filePath) notify('success', 'Gespeichert: ' + res.filePath)
-            } catch (e: any) {
-              const msg = String(e?.message || e)
-              if (!/Abbruch/i.test(msg)) notify('error', 'Speichern fehlgeschlagen: ' + msg)
-            }
-          }}
-          onDeleteExistingFile={async (file) => {
-            if (editMutationBlockReason) {
-              notify('info', editMutationBlockReason)
-              return
-            }
-            try {
-              await window.api?.attachments.delete?.({ fileId: file.id })
-              await refreshEditAttachments(Number(editQa.id))
-              notify('success', 'Anhang gelöscht')
-            } catch (e: any) {
-              notify('error', e?.message || String(e))
-            }
-          }}
-          windowMode
-        />
-        {confirmDeleteEdit && !editMutationBlockReason && (
-          <div className="modal-overlay" role="dialog" aria-modal="true" style={{ zIndex: 10000 }}>
-            <div
-              className="modal modal-inset-header"
-              onClick={(e) => e.stopPropagation()}
-              style={{ maxWidth: 520, display: 'grid', gap: 12 }}
-            >
-              <ModalHeader
-                title={<>{allowVoucherDeletion ? 'Buchung löschen' : 'Buchung stornieren'}</>}
-                onClose={() => setConfirmDeleteEdit(false)}
-                closeLabel="Schließen"
-                closeOnEscape={false}
-              />
-              <p style={{ margin: 0 }}>
-                {allowVoucherDeletion
-                  ? 'Möchtest du diese Buchung wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.'
-                  : 'Möchtest du diese Buchung stornieren? Die Originalbuchung bleibt erhalten und es wird eine Gegenbuchung erstellt.'}
-              </p>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                <button className="btn" onClick={() => setConfirmDeleteEdit(false)}>
-                  Abbrechen
-                </button>
-                <button
-                  className="btn danger"
-                  onClick={() => {
-                    void deleteDetachedEdit()
-                  }}
-                >
-                  {allowVoucherDeletion ? 'Ja, löschen' : 'Ja, stornieren'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </>
-    )
-  }
-
-  return (
-    <QuickAddModal notify={notify}
-      qa={qa}
-      setQa={setQa}
-      onSave={onQuickSave}
-      onSaveAndNew={() => onQuickSave('new')}
-      onSaveAndClose={() => onQuickSave('close')}
-      afterSaveDefault={quickAddAfterSave}
-      onClose={requestCloseDetachedCreate}
-      onRequestClose={requestCloseDetachedCreate}
-      files={files}
-      setFiles={setFiles}
-      openFilePicker={openFilePicker}
-      onDropFiles={onDropFiles}
-      fileInputRef={fileInputRef}
-      fmtDate={fmtDate}
-      eurFmt={eurFmt}
-      budgetsForEdit={budgetsForEdit}
-      earmarks={earmarks}
-      paymentAccounts={paymentAccounts}
-      tagDefs={tagDefs}
-      descSuggest={descSuggest}
-      windowMode
-      confirmingClose={confirmDiscardCreate}
-      onConfirmDiscard={() => window.api?.window?.confirmClose?.()}
-      onCancelDiscard={() => {
-        setConfirmDiscardCreate(false)
-        void window.api?.window?.cancelClose?.()
-      }}
-    />
-  )
 }
 
 function AppInner() {
@@ -1621,12 +409,14 @@ function AppInner() {
   const [plusCalendarSelection, setPlusCalendarSelection] = useState(() => ({
     month: currentLocalMonth(), from: '', to: ''
   }))
-  const [plusEditQa, setPlusEditQa] = useState<(QA & { id: number }) | null>(null)
+  const [plusEditQa, setPlusEditQa] = useState<BookingEditForm | null>(null)
   const [plusEditInitialSnapshot, setPlusEditInitialSnapshot] = useState('')
   const [plusEditFiles, setPlusEditFiles] = useState<File[]>([])
   const [plusEditExpanded, setPlusEditExpanded] = useState(false)
   const [plusEditDiscardOpen, setPlusEditDiscardOpen] = useState(false)
   const [plusEditSaving, setPlusEditSaving] = useState(false)
+  const plusEditRequest = useRef(0)
+  const plusEditSaveInFlight = useRef(false)
   const plusEditFileInputRef = useRef<HTMLInputElement | null>(null)
   useEffect(() => window.api?.organizations?.onSwitched?.(() => {
     setPlusCalendarSelection({ month: currentLocalMonth(), from: '', to: '' })
@@ -2683,11 +1473,14 @@ function AppInner() {
     setActivePage('Buchungen')
   }
   const openPlusEdit = useCallback(async (row: { id: number }) => {
+    if (plusEditSaveInFlight.current) return
+    const request = ++plusEditRequest.current
     try {
       const result = await window.api.vouchers.list({ limit: 1, voucherIds: [row.id] })
+      if (request !== plusEditRequest.current) return
       const current = result.rows[0]
       if (!current) throw new Error('Buchung wurde nicht gefunden.')
-      const form = voucherRowToBookingForm(current) as QA & { id: number }
+      const form = voucherRowToBookingForm(current)
       setPlusEditQa(form)
       setPlusEditInitialSnapshot(serializeBookingForm(form))
       setPlusEditFiles([])
@@ -2695,37 +1488,32 @@ function AppInner() {
       setPlusEditDiscardOpen(false)
       window.dispatchEvent(new Event('booking-editor-opened'))
     } catch (error) {
-      notify('error', error instanceof Error ? error.message : String(error))
+      if (request === plusEditRequest.current) notify('error', error instanceof Error ? error.message : String(error))
     }
   }, [notify])
   const closePlusEdit = useCallback(() => {
+    plusEditRequest.current++
     setPlusEditQa(null)
     setPlusEditFiles([])
     setPlusEditDiscardOpen(false)
     setPlusEditExpanded(false)
   }, [])
   const requestClosePlusEdit = useCallback(() => {
-    if (plusEditSaving) return
+    if (plusEditSaveInFlight.current) return
     if (plusEditQa && (serializeBookingForm(plusEditQa) !== plusEditInitialSnapshot || plusEditFiles.length > 0)) {
       setPlusEditDiscardOpen(true)
     } else closePlusEdit()
-  }, [closePlusEdit, plusEditFiles.length, plusEditInitialSnapshot, plusEditQa, plusEditSaving])
+  }, [closePlusEdit, plusEditFiles.length, plusEditInitialSnapshot, plusEditQa])
   const savePlusEdit = useCallback(async () => {
-    if (!plusEditQa || plusEditSaving) return
+    if (!plusEditQa || plusEditSaveInFlight.current) return
     const { payload, error } = buildVoucherUpdatePayloadFromForm(plusEditQa)
-    if (error) { notify('error', error); return }
+    if (!payload) { notify('error', error); return }
+    plusEditSaveInFlight.current = true
     setPlusEditSaving(true)
     try {
-      const result = await window.api.vouchers.update(payload)
-      for (const file of plusEditFiles) {
-        const encoded = await encodeFileForUpload(file)
-        await window.api.attachments.add({
-          voucherId: plusEditQa.id,
-          fileName: file.name,
-          dataBytes: encoded.dataBytes,
-          mimeType: file.type || undefined
-        })
-      }
+      const result = await persistBookingEdit(payload, plusEditFiles, file => {
+        setPlusEditFiles(current => current.filter(item => item !== file))
+      })
       notify('success', 'Buchung gespeichert')
       result?.warnings?.forEach(message => notify('info', 'Warnung: ' + message))
       closePlusEdit()
@@ -2733,9 +1521,10 @@ function AppInner() {
     } catch (error) {
       notify('error', friendlyVoucherError(error))
     } finally {
+      plusEditSaveInFlight.current = false
       setPlusEditSaving(false)
     }
-  }, [closePlusEdit, notify, plusEditFiles, plusEditQa, plusEditSaving])
+  }, [closePlusEdit, notify, plusEditFiles, plusEditQa])
   // Reports filter states (separate to avoid interference with Buchungen)
   const [reportsFrom, setReportsFrom] = useState<string>('')
   const [reportsTo, setReportsTo] = useState<string>('')

@@ -1,3 +1,5 @@
+import type { AiProviderId } from '../../../../shared/aiProviders'
+import { attachmentAccept } from './aiAttachments'
 import type React from 'react'
 
 type AttachmentPreview = { key: string; name: string; url: string | null; badge: string }
@@ -11,6 +13,7 @@ type MentionOption = {
 }
 
 type Props = {
+  provider: AiProviderId
   placement: 'initial' | 'followup'
   busy: boolean
   prompt: string
@@ -34,6 +37,7 @@ type Props = {
 
 /** Reine Composer-Darstellung; Dateien, Mentions und Senden bleiben beim jeweiligen Hook. */
 export function AiComposer({
+  provider,
   placement,
   busy,
   prompt,
@@ -91,7 +95,7 @@ export function AiComposer({
         </div>}
         {!busy && isDraggingFiles && <div className="ai-prompt-drop-hint" aria-hidden="true">Dateien hier ablegen, um sie an die Anfrage anzuhängen</div>}
         <button className="btn primary ai-send-btn" type="button" disabled={busy || (!prompt.trim() && !files.length)} onClick={onSubmit}>{busy ? <span className="ai-send-spinner" aria-hidden="true" /> : 'Senden'}</button>
-        <input ref={fileInputRef} type="file" multiple accept=".pdf,.xlsx,.xls,.csv,.tsv,image/png,image/jpeg" hidden onChange={(event) => { onAppendFiles(event.target.files); event.target.value = '' }} />
+        <input ref={fileInputRef} type="file" multiple accept={attachmentAccept(provider)} hidden onChange={(event) => { onAppendFiles(event.target.files); event.target.value = '' }} />
       </div>
     </section>
   )

@@ -9,6 +9,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { initializeExistingOrganization } from './fixtures/initializedOrganization'
 
 let app: ElectronApplication
 let page: Page
@@ -26,14 +27,8 @@ test.beforeAll(async () => {
     }
   })
   page = await app.firstWindow()
-  await expect(page.locator('.side-nav, .top-nav').getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible({
-    timeout: 30_000
-  })
-  const later = page.getByRole('button', { name: 'Später', exact: true })
-  await later.waitFor({ state: 'visible', timeout: 5000 }).catch(() => undefined)
-  if (await later.isVisible()) await later.click()
+  await initializeExistingOrganization(page)
   await page.evaluate(async () => {
-    await window.api.settings.set({ key: 'backup.lastAuto', value: Date.now() })
     await window.api.settings.set({ key: 'updates.autoCheck', value: false })
     const { paymentAccounts } = await window.api.app.bootstrap()
     const account = paymentAccounts[0]
@@ -228,7 +223,8 @@ test('dialog and detached entry remain usable at 640 pixels', async () => {
     animations: 'disabled'
   })
   expect(await detachedDialog.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
-  await detachedDialog.getByRole('button', { name: 'Abbrechen', exact: true }).click()
+  await detachedDialog.getByRole('button', { name: 'Schließen', exact: true }).click()
+  await expect.poll(() => detached.isClosed()).toBe(true)
 })
 
 test('top navigation switches for a narrow tile without changing the preference', async () => {
@@ -350,7 +346,11 @@ test('new dashboard, reports and bookings plus remain usable in half-screen tile
     await page.getByRole('button', { name: 'Buchungsfilter', exact: true }).click()
     await expectFits('.bp-filters-popover')
     await page.keyboard.press('Escape')
-    await page.locator('.bp-header-search input').fill('Material für das Vereinsfest')
+    const searchButton = page.getByRole('button', { name: 'Buchungen suchen', exact: true })
+    const searchField = page.getByRole('searchbox', { name: 'Buchungen suchen', exact: true })
+    await searchButton.click()
+    await searchField.fill('Material für das Vereinsfest')
+    await searchField.press('Enter')
     await expect(page.locator('.bp-row')).toHaveCount(1)
     await screenshot(`bookings-plus-${width}`)
     await page.locator('.bp-row').click()
@@ -360,7 +360,9 @@ test('new dashboard, reports and bookings plus remain usable in half-screen tile
     await expectFits('.bp-inspector--open')
     await screenshot(`bookings-plus-details-${width}`)
     await details.getByRole('button', { name: 'Details schließen' }).click()
-    await page.locator('.bp-header-search input').fill('')
+    await searchButton.click()
+    await searchField.fill('')
+    await searchField.press('Enter')
     await expect(page.locator('.bp-row').nth(1)).toBeVisible()
   }
   await page.setViewportSize({ width: 1440, height: 900 })

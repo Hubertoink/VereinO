@@ -2,6 +2,7 @@ import { _electron as electron, expect, test } from '@playwright/test'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { initializeExistingOrganization } from './fixtures/initializedOrganization'
 
 for (const presentation of ['expanded', 'detached'] as const) {
   for (const notification of ['normal', 'pending', 'rejected'] as const) {
@@ -16,10 +17,7 @@ for (const presentation of ['expanded', 'detached'] as const) {
       })
       try {
         const main = await app.firstWindow()
-        await expect(main.locator('[data-shortcut-nav="Dashboard"]')).toBeVisible({ timeout: 30_000 })
-        const later = main.getByRole('button', { name: 'Später', exact: true })
-        await later.waitFor({ state: 'visible', timeout: 5000 }).catch(() => undefined)
-        if (await later.isVisible()) await later.click()
+        await initializeExistingOrganization(main)
         if (notification !== 'normal') {
           await app.evaluate(({ ipcMain }, mode) => {
             ipcMain.removeHandler('quickAdd.notifySaved')
@@ -33,13 +31,18 @@ for (const presentation of ['expanded', 'detached'] as const) {
         await main.getByRole('button', { name: 'Vollständigen Buchungsdialog öffnen', exact: true }).click()
         let page = main
         if (presentation === 'detached') {
-          const detached = app.waitForEvent('window')
-          await main.getByRole('button', { name: 'In eigenes Fenster abdocken', exact: true }).click()
-          page = await detached
+          const [detached] = await Promise.all([
+            app.waitForEvent('window'),
+            main.getByRole('button', { name: 'In eigenes Fenster abdocken', exact: true }).click()
+          ])
+          page = detached
         }
         const dialog = page.locator('.quick-add-modal')
         await expect(dialog).toBeVisible()
         await dialog.getByRole('button', { name: 'Einnahme', exact: true }).click()
+        const account = dialog.getByRole('button', { name: 'Buchungskonto wählen', exact: true })
+        await account.click()
+        await page.getByRole('option').first().click()
         await dialog.locator('#quick-add-date').fill('2026-10-08')
         await dialog.getByRole('spinbutton', { name: 'Brutto-Betrag' }).fill('25')
         await dialog.getByRole('button', { name: 'Weitere Speicheraktionen' }).click()
@@ -55,6 +58,8 @@ for (const presentation of ['expanded', 'detached'] as const) {
         await expect(dialog.locator('#quick-add-date')).toBeFocused()
 
         // Closing after a second save also succeeds, and a fresh entry uses the flyout again.
+        await account.click()
+        await page.getByRole('option').first().click()
         await dialog.locator('#quick-add-date').fill('2026-10-08')
         await dialog.getByRole('spinbutton', { name: 'Brutto-Betrag' }).fill('30')
         await dialog.getByRole('button', { name: 'Weitere Speicheraktionen' }).click()

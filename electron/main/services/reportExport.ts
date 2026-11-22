@@ -4,7 +4,7 @@ import { escapeReportHtml as esc, voucherDescriptionHtml } from './reportHtml'
 import path from 'node:path'
 import fsp from 'node:fs/promises'
 import { ReportsExportInput, ReportsExportOutput } from '../ipc/schemas'
-import { listVouchersAdvanced, summarizeVouchers, monthlyVouchers } from '../repositories/vouchers'
+import { listReportVouchers, listVouchersAdvanced, summarizeVouchers, monthlyVouchers } from '../repositories/vouchers'
 import { getSetting } from './settings'
 import { voucherStatusKind, voucherStatusText } from './voucherStatus'
 import { buildReportMonths, renderReportAnalytics, reportAnalyticsCss } from '../../../shared/reportAnalytics'
@@ -12,17 +12,19 @@ import { createExportStamp, ensureExportsDir } from './exportPaths'
 
 export async function exportReport(payload: unknown) {
   const parsed = ReportsExportInput.parse(payload)
-  const rows = listVouchersAdvanced({
+  const filters = {
+    from: parsed.from, to: parsed.to,
+    paymentMethod: parsed.filters?.paymentMethod,
+    paymentAccountId: parsed.filters?.paymentAccountId,
+    primaryClassificationValueId: parsed.filters?.primaryClassificationValueId,
+    sphere: parsed.filters?.sphere, type: parsed.filters?.type,
+    earmarkId: parsed.filters?.earmarkId, budgetId: parsed.filters?.budgetId,
+    q: parsed.filters?.q, tag: parsed.filters?.tag,
+  }
+  const loadRows = parsed.format === 'PDF' ? listReportVouchers : listVouchersAdvanced
+  const rows = loadRows({
+    ...filters,
     limit: 100000,
-    paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
-    sphere: (parsed.filters?.sphere as any) || undefined,
-    type: (parsed.filters?.type as any) || undefined,
-    from: parsed.from,
-    to: parsed.to,
-    earmarkId: (parsed.filters as any)?.earmarkId,
-    budgetId: (parsed.filters as any)?.budgetId,
-    q: (parsed.filters as any)?.q,
-    tag: (parsed.filters as any)?.tag,
     // Apply sort from export payload; default to DESC if not provided
     sort: (parsed as any).sort || 'DESC',
     sortBy: (parsed as any).sortBy || 'date'
@@ -82,21 +84,9 @@ export async function exportReport(payload: unknown) {
     const filePath = path.join(baseDir, `Controlling_${stamp}.pdf`)
 
     // Gather summary data for the report
-    const summary = summarizeVouchers({
-      paymentMethod: (parsed.filters?.paymentMethod as any) || undefined,
-      sphere: (parsed.filters?.sphere as any) || undefined,
-      type: (parsed.filters?.type as any) || undefined,
-      from: parsed.from,
-      to: parsed.to,
-      earmarkId: (parsed.filters as any)?.earmarkId,
-      budgetId: (parsed.filters as any)?.budgetId
-    } as any)
-    // Use the same signed monthly series and filters as the report view.
-    const monthlyFilters = { from: parsed.from, to: parsed.to,
-      paymentMethod: parsed.filters?.paymentMethod, sphere: parsed.filters?.sphere,
-      earmarkId: parsed.filters?.earmarkId, budgetId: parsed.filters?.budgetId }
-    const income = parsed.filters?.type && parsed.filters.type !== 'IN' ? [] : monthlyVouchers({ ...monthlyFilters, type: 'IN' })
-    const expense = parsed.filters?.type && parsed.filters.type !== 'OUT' ? [] : monthlyVouchers({ ...monthlyFilters, type: 'OUT' })
+    const summary = summarizeVouchers(filters)
+    const income = filters.type && filters.type !== 'IN' ? [] : monthlyVouchers({ ...filters, type: 'IN' })
+    const expense = filters.type && filters.type !== 'OUT' ? [] : monthlyVouchers({ ...filters, type: 'OUT' })
     const reportMonths = buildReportMonths(income, expense, parsed.from, parsed.to)
     const detailed = reportMonths.map(row => ({ month: row.month, inGross: row.income, outGross: row.expense, saldo: row.net }))
     const orgName =

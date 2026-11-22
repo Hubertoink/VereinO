@@ -325,7 +325,7 @@ export default function LocalInvoiceScanModal({
   }, [])
   const [duplicate, setDuplicate] = useState<InvoiceDuplicate | null>(null)
   const [duplicateCheckInProgress, setDuplicateCheckInProgress] = useState(false)
-  const [rawText, setRawText] = useState('')
+  const [{ text: rawText, embeddedPdfPagesRead }, setDocumentText] = useState({ text: '', embeddedPdfPagesRead: 0 })
   const [fields, setFields] = useState<LocalInvoiceFields>(EMPTY_LOCAL_INVOICE_FIELDS)
   const [partyCreationSource, setPartyCreationSource] = useState<PartyCreationSource>()
   const [partyId, setPartyId] = useState<number | null>(initialState?.partyId ?? null)
@@ -590,7 +590,7 @@ export default function LocalInvoiceScanModal({
     setAnalysisMessage('')
     setDuplicate(null)
     setDuplicateCheckInProgress(false)
-    setRawText('')
+    setDocumentText({ text: '', embeddedPdfPagesRead: 0 })
     setFields(EMPTY_LOCAL_INVOICE_FIELDS)
     setHasAnalysisWarnings(false)
     setAnalysisDetails(undefined)
@@ -644,7 +644,7 @@ export default function LocalInvoiceScanModal({
     manuallyEditedRef.current.clear()
     setFile(nextFile)
     onFileChangeRef.current?.(nextFile)
-    setRawText('')
+    setDocumentText({ text: '', embeddedPdfPagesRead: 0 })
     setFields(EMPTY_LOCAL_INVOICE_FIELDS)
     setHasAnalysisWarnings(false)
     setAnalysisDetails(undefined)
@@ -782,7 +782,7 @@ export default function LocalInvoiceScanModal({
       if (restored) setFields(restored.fields)
       const ocr = await applyLocalOcr()
       if (ocr?.text.length && ocr.text.length >= 20) {
-        setRawText(ocr.text)
+        setDocumentText({ text: ocr.text, embeddedPdfPagesRead: 0 })
         setFields(extractLocalInvoiceFields(ocr.text))
 
         setAnalysisState('text-found')
@@ -835,12 +835,12 @@ export default function LocalInvoiceScanModal({
 
       setSourcePages((current) => ({ ...current, ...Object.fromEntries(Object.entries(locatedPages).filter(([, page]) => page.words.length)) }))
       const text = pageTexts.join('\n\n').trim()
-      setRawText(text)
+      setDocumentText({ text, embeddedPdfPagesRead: pagesToRead })
       if (restored) setFields(restored.fields)
       if (text.length < 20) {
         const ocr = await applyLocalOcr(document)
         if (ocr?.text.length && ocr.text.length >= 20) {
-          setRawText(ocr.text)
+          setDocumentText({ text: ocr.text, embeddedPdfPagesRead: 0 })
           setFields(extractLocalInvoiceFields(ocr.text))
 
           setAnalysisState('text-found')
@@ -1030,6 +1030,7 @@ export default function LocalInvoiceScanModal({
           dataBytes: new Uint8Array(await file.arrayBuffer())
         },
         localDocumentText: rawText.slice(0, 250_000),
+        embeddedPdfPagesRead,
         guidance: activeAiGuidance
       })
       if (requestRef.current !== aiRequestId) return

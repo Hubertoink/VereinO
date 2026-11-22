@@ -1,5 +1,11 @@
 import { getDb } from '../db/database'
 
+/** IN/OUT allocations describe magnitudes; a negative voucher reverses their cash direction.
+ * INTERNAL assignments instead encode source and destination with their own signs. */
+export function signedAllocationAmountSql(amount: string) {
+    return `CASE WHEN v.type IN ('IN','OUT') AND v.gross_amount < 0 THEN -ABS(${amount}) ELSE ${amount} END`
+}
+
 /** The same allocation amounts drive totals and trends, including legacy and internal entries. */
 export function assignmentMonthly(kind: 'budget' | 'earmark', id: number, filters: { from?: string; to?: string; sphere?: string } = {}) {
     const column = kind === 'budget' ? 'budget' : 'earmark'
@@ -11,10 +17,10 @@ export function assignmentMonthly(kind: 'budget' | 'earmark', id: number, filter
     if (filters.sphere) { where.push('sphere = ?'); values.push(filters.sphere) }
     return getDb().prepare(`
         WITH assignments AS (
-            SELECT a.amount, v.type, v.date, v.sphere FROM ${table} a
+            SELECT ${signedAllocationAmountSql('a.amount')} AS amount, v.type, v.date, v.sphere FROM ${table} a
             JOIN vouchers v ON v.id = a.voucher_id WHERE a.${column}_id = ?
             UNION ALL
-            SELECT COALESCE(NULLIF(v.${column}_amount, 0), ABS(v.gross_amount), 0), v.type, v.date, v.sphere
+            SELECT ${signedAllocationAmountSql(`COALESCE(NULLIF(v.${column}_amount, 0), ABS(v.gross_amount), 0)`)}, v.type, v.date, v.sphere
             FROM vouchers v WHERE v.${column}_id = ?
             AND NOT EXISTS (SELECT 1 FROM ${table} a WHERE a.voucher_id = v.id)
         )

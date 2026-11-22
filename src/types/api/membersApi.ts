@@ -12,6 +12,7 @@ import type {
     TMembersListOutput,
     TMemberUpdateInput,
     TMemberUpdateOutput,
+    TContributionBookingInput,
     TPaymentsListDueInput,
     TPaymentsListDueOutput,
     TPaymentsMarkPaidInput,
@@ -57,6 +58,7 @@ export interface MembersApi {
         }) => Promise<{ filePath: string }>
     }
     payments: {
+        bookContribution: (payload: TContributionBookingInput) => Promise<{ id: number; voucherNo: string }>
         availableVouchers: (payload: { q?: string }) => Promise<Array<{ id: number; voucherNo: string; date: string; description?: string | null; available: number }>>
         previewAllocation: (payload: import('../../../shared/membershipPayments').ContributionPaymentInput) => Promise<import('../../../shared/membershipPayments').ContributionPreview>
         allocate: (payload: import('../../../shared/membershipPayments').ContributionPaymentInput & { token: string }) => Promise<{ ok: boolean; receiptId: number; preview: import('../../../shared/membershipPayments').ContributionPreview }>

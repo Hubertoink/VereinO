@@ -3,6 +3,7 @@ import fs from 'node:fs'
 
 import path from 'node:path'
 import { app } from 'electron'
+import { migrateAiCredentials } from '../services/aiCredentials'
 
 import { deleteOrganizationStorage } from './organizationDeletion'
 import { copyOrganizationStorage, validateOrganizationStorageTarget } from './organizationStorage'
@@ -100,6 +101,7 @@ export function getDb(): DB {
     db = new BetterSqlite3(dbPath)
     db.pragma('journal_mode = WAL')
     db.pragma('foreign_keys = ON')
+    try { migrateAiCredentials(db) } catch (error) { closeDb(); throw error }
     return db
 }
 

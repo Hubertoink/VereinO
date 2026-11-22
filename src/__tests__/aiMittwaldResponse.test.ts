@@ -1,3 +1,8 @@
+import { PDFDocument } from 'pdf-lib'
+
+// Jest runs the TypeScript suite as CommonJS. Load the real ESM PDF.js reader through Node.
+jest.mock('pdfjs-dist/legacy/build/pdf.mjs', () =>
+  (require('node:process').getBuiltinModule('module') as typeof import('node:module')).createRequire(process.cwd() + '/package.json')('pdfjs-dist/legacy/build/pdf.mjs'))
 const mockChatCreate = jest.fn()
 const mockResponsesCreate = jest.fn()
 const mockModelsList = jest.fn()
@@ -12,19 +17,25 @@ jest.mock('openai', () => ({
   }))
 }))
 jest.mock('electron', () => ({
-  safeStorage: {},
+  safeStorage: {
+    isEncryptionAvailable: () => true, getSelectedStorageBackend: () => 'gnome_libsecret',
+    encryptString: (value: string) => Buffer.from('fixture:' + value),
+    decryptString: (value: Buffer) => value.toString().slice(8)
+  },
   session: { fromPartition: () => ({ setProxy: async () => {}, resolveProxy: async () => 'DIRECT', fetch: mockNetworkFetch }) }
 }))
-jest.mock('../../electron/main/services/settings', () => ({ getSetting: jest.fn(), setSetting: jest.fn() }))
+jest.mock('../../electron/main/services/settings', () => ({ getSetting: jest.fn(), setSetting: jest.fn(), settingsScope: () => "fixture" }))
 
 import { getSetting, setSetting } from '../../electron/main/services/settings'
-import { createAiResponse, generateAiText, getAiSettings, setAiSettings, normalizeUsage, reviewBankImportTransactions, testAiConnection } from '../../electron/main/services/ai'
+import { analyzeInvoiceDocument, createAiResponse, generateAiText, getAiSettings, setAiSettings, normalizeUsage, reviewBankImportTransactions, testAiConnection } from '../../electron/main/services/ai'
 import { AI_BOOKING_COMMENTS_SETTING } from '../../shared/aiBookingPolicy'
 import { AI_MASTER_DATA_SETTING } from '../../shared/aiMasterDataPolicy'
 
+function encryptedKey(value: string) { return { encrypted: true, value: Buffer.from('fixture:' + value).toString('base64') } }
+
 const structuredRequest = {
   model: 'Qwen3.6-35B-A3B-FP8', input: 'Prüfe die Belege.',
-  text: { format: { type: 'json_schema', schema: { type: 'object' } } }
+  text: { format: { type: 'json_schema' as const, name: 'fixture', schema: { type: 'object' } } }
 }
 function completion(content: string, finish_reason = 'stop') {
   return { choices: [{ finish_reason, message: { content } }], usage: { prompt_tokens: 100, completion_tokens: 200, total_tokens: 300 } }
@@ -34,7 +45,7 @@ beforeEach(() => {
   jest.clearAllMocks()
   mockChatCreate.mockReset()
   jest.mocked(getSetting).mockImplementation(((key: string) => ({
-    'ai.openai.provider': 'mittwald', 'ai.openai.apiKey': 'test-key'
+    'ai.openai.provider': 'mittwald', 'ai.providers.mittwald.apiKey': encryptedKey('test-key')
   } as Record<string, unknown>)[key]) as any)
 })
 
@@ -72,7 +83,7 @@ it('retries a truncated answer once with a larger budget and counts both respons
   const result = await createAiResponse({ ...structuredRequest, max_output_tokens: 8192 })
   expect(mockChatCreate.mock.calls.map(([request]) => request.max_tokens)).toEqual([8192, 16384])
   expect(result.output_parsed).toEqual({ ok: true })
-  expect(result.usage.total_tokens).toBe(600)
+  expect(result.usage).toMatchObject({ total_tokens: 600 })
 })
 
 it('rejects even syntactically valid JSON when the provider reports truncation', async () => {
@@ -179,7 +190,7 @@ it('checks structured JSON during the Mittwald connection test', async () => {
 
 it('keeps legacy keys and explicit model choices with their provider across switches', () => {
   const store = new Map<string, unknown>([
-    ['ai.openai.apiKey', 'legacy-key'], ['ai.openai.model', 'gpt-5.4'], ['ai.openai.textModel', 'gpt-5.4-mini']
+    ['ai.providers.openai.apiKey', encryptedKey('legacy-key')], ['ai.openai.model', 'gpt-5.4'], ['ai.openai.textModel', 'gpt-5.4-mini']
   ])
   jest.mocked(getSetting).mockImplementation(((key: string) => store.get(key)) as any)
   jest.mocked(setSetting).mockImplementation((key, value) => { store.set(key, value) })
@@ -189,12 +200,12 @@ it('keeps legacy keys and explicit model choices with their provider across swit
   setAiSettings({ apiKey: 'claude-key', textProfile: 'quality' })
   expect(setAiSettings({ provider: 'openai' })).toMatchObject({ hasApiKey: true, model: 'gpt-5.4' })
   expect(setAiSettings({ provider: 'anthropic' })).toMatchObject({ hasApiKey: true, textModel: 'claude-opus-5-5' })
-  expect(store.get('ai.providers.openai.apiKey')).toBe('legacy-key')
-  expect(store.get('ai.providers.anthropic.apiKey')).toMatchObject({ value: 'claude-key' })
+  expect(store.get('ai.providers.openai.apiKey')).toEqual(encryptedKey('legacy-key'))
+  expect(store.get('ai.providers.anthropic.apiKey')).toEqual(encryptedKey('claude-key'))
 })
 
 it('tests the available OpenAI profile models and excludes inapplicable catalog entries', async () => {
-  const store = new Map<string, unknown>([['ai.openai.apiKey', 'key']])
+  const store = new Map<string, unknown>([['ai.providers.openai.apiKey', encryptedKey('key')]])
   jest.mocked(getSetting).mockImplementation(((key: string) => store.get(key)) as any)
   jest.mocked(setSetting).mockImplementation((key, value) => { store.set(key, value) })
   mockModelsList.mockResolvedValue({ data: ['gpt-6-luna', 'text-embedding-3-small'].map(id => ({ id })) })
@@ -215,7 +226,7 @@ it('estimates Luna cache writes and the long-context Haiku rate from provider us
 })
 
 it('uses the native Anthropic SDK through the Electron network session for discovery and structured requests', async () => {
-  const store = new Map<string, unknown>([['ai.openai.provider', 'anthropic'], ['ai.providers.anthropic.apiKey', 'claude-test']])
+  const store = new Map<string, unknown>([['ai.openai.provider', 'anthropic'], ['ai.providers.anthropic.apiKey', encryptedKey('claude-test')]])
   jest.mocked(getSetting).mockImplementation(((key: string) => store.get(key)) as any)
   jest.mocked(setSetting).mockImplementation((key, value) => { store.set(key, value) })
   const models = ['claude-sonnet-5-5', 'claude-haiku-5-5']
@@ -405,4 +416,33 @@ it.each(['GENERAL', 'NONPROFIT'] as const)('passes profile-specific classificati
     expect(prompt).not.toContain('Profil NONPROFIT und verwendet steuerliche Sphären')
   } else expect(prompt).toContain('Profil NONPROFIT und verwendet steuerliche Sphären')
   expect(prompt).toContain('"stableKey":"OTHER"')
+})
+
+it('retains newly discovered Mittwald models when inference fails and resolves them without a local preset', async () => {
+  const store = new Map<string, unknown>([
+    ['ai.openai.provider', 'mittwald'], ['ai.providers.mittwald.apiKey', encryptedKey('key')]
+  ])
+  jest.mocked(getSetting).mockImplementation(((key: string) => store.get(key)) as typeof getSetting)
+  jest.mocked(setSetting).mockImplementation((key, value) => { store.set(key, value) })
+  mockModelsList.mockResolvedValue({ data: ['GLM-OCR', 'new-generation-model'].map(id => ({ id })) })
+  mockChatCreate.mockRejectedValueOnce(new Error('Provider offline'))
+  expect(await testAiConnection()).toMatchObject({ ok: false, availableModels: ['GLM-OCR', 'new-generation-model'] })
+  expect(getAiSettings()).toMatchObject({ model: 'new-generation-model', textModel: 'new-generation-model' })
+})
+
+it('includes a digital invoice total from page 21 even when the scanner supplies a partial text layer', async () => {
+  const pdf = await PDFDocument.create()
+  for (let pageNo = 1; pageNo <= 21; pageNo++) {
+    const page = pdf.addPage()
+    page.drawText(pageNo === 21 ? 'Rechnungssumme 479,95 EUR' : 'Position ' + pageNo)
+  }
+  mockChatCreate.mockResolvedValueOnce(completion('OCR ohne Betragszeile'))
+    .mockRejectedValueOnce(new Error('fixture: input captured'))
+  await expect(analyzeInvoiceDocument({
+    file: { fileName: 'Rechnung.pdf', dataBase64: await pdf.saveAsBase64() },
+    context: {}, localDocumentText: 'Positionen von den ersten zwanzig Seiten', embeddedPdfPagesRead: 20
+  })).rejects.toThrow('fixture: input captured')
+  const prompt = mockChatCreate.mock.calls[1][0].messages.at(-1).content[0].text
+  expect(prompt).toContain('Rechnungssumme 479,95 EUR')
+  expect(prompt).toContain('OCR ohne Betragszeile')
 })
