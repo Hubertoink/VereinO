@@ -72,7 +72,7 @@ test.beforeAll(async () => {
           <header className="app-header"><button>KommerzO</button></header>
           <AppSidebar footerActions={options.bookingActions ? <SidebarBookingActions onNewBooking={() => { window.bookingOpened = true }} onNewInvoice={() => {}} onReview={() => {}} notify={() => {}} paymentAccounts={[]} /> : undefined} activePage={active} onNavigate={setActive} collapsed={collapsed} onToggleCollapse={() => setCollapsed(v => !v)} items={items} navIconColorMode="color" openBankImportsCount={6} openInvoicesCount={3} selectedAccountId={account} onSelectAccount={id => { setAccount(id); setActive('Buchungen') }} onSelectAssignment={(kind, id) => { window.assignmentSelection = { kind, id }; setActive('Buchungen') }} onSelectBankAccount={options.bankImports ? id => { window.bankSelection = id; setActive('Bankimport') } : undefined} onSelectMembershipFees={options.membershipFees ? () => { window.feeSelection = { kind: 'members', filter: 'overdue' }; setActive('Mitglieder') } : undefined} />
           <main className="app-main"><h1>{active}</h1><button onClick={() => setAccount(null)}>Kontofilter entfernen</button><p data-testid="filter">{account || 'Alle Konten'}</p><div className="card" style={{padding:24}}>Buchungsübersicht</div></main>
-        </div><LeaderShortcuts commands={[]} /></>
+        </div><LeaderShortcuts commands={[]} showFloatingCommands /></>
       }
       root.render(<Harness />)
     }

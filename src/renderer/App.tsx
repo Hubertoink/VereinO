@@ -284,6 +284,8 @@ function AppInner() {
     setNavLayout,
     sidebarBookingActions,
     setSidebarBookingActions,
+    showFloatingCommands,
+    setShowFloatingCommands,
     sidebarCollapsed,
     setSidebarCollapsed,
     colorTheme,
@@ -2160,6 +2162,8 @@ function AppInner() {
               setDisplayDensity={setDisplayDensity}
               sidebarBookingActions={sidebarBookingActions}
               setSidebarBookingActions={setSidebarBookingActions}
+              showFloatingCommands={showFloatingCommands}
+              setShowFloatingCommands={setShowFloatingCommands}
               navLayout={navLayout}
               setNavLayout={setNavLayout}
               navIconColorMode={navIconColorMode}
@@ -2337,7 +2341,7 @@ function AppInner() {
         </Suspense>
       </main>
 
-      <LeaderShortcuts commands={shortcutCommands} />
+      <LeaderShortcuts commands={shortcutCommands} showFloatingCommands={showFloatingCommands} />
 
       {plusEditQa && bookingEntryPresentation === 'flyout' && !plusEditExpanded && (
         <>

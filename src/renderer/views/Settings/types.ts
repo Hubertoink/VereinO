@@ -140,6 +140,8 @@ export interface SettingsProps {
   setDisplayDensity: (value: DisplayDensity) => void
   sidebarBookingActions?: boolean
   setSidebarBookingActions?: (value: boolean) => void
+  showFloatingCommands: boolean
+  setShowFloatingCommands: (value: boolean) => void
   navLayout: NavLayout
   setNavLayout: (v: NavLayout) => void
   navIconColorMode: NavIconColorMode
@@ -196,6 +198,8 @@ export interface GeneralPaneProps {
   setDisplayDensity: (value: DisplayDensity) => void
   sidebarBookingActions?: boolean
   setSidebarBookingActions?: (value: boolean) => void
+  showFloatingCommands: boolean
+  setShowFloatingCommands: (value: boolean) => void
   navLayout: NavLayout
   setNavLayout: (v: NavLayout) => void
   navIconColorMode: NavIconColorMode

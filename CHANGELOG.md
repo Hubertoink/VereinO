@@ -7,6 +7,12 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.6.1] - 2026-11-23
+
+### Geändert
+
+- Unter Einstellungen → Darstellung → Navigation lässt sich die schwebende Befehlshilfe einschalten. Die Schaltfläche „Alt · Befehle“ und die Übersicht der globalen Tastaturbefehle sind standardmäßig ausgeblendet. Tastenkürzel wie Alt+N funktionieren weiterhin.
+
 ## [5.6.0] - 2026-11-22
 
 ### Behoben

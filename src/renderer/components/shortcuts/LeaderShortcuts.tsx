@@ -77,7 +77,7 @@ function collectHints(commands: ShortcutCommand[]): Hint[] {
   return hints
 }
 
-export function LeaderShortcuts({ commands }: { commands: ShortcutCommand[] }) {
+export function LeaderShortcuts({ commands, showFloatingCommands }: { commands: ShortcutCommand[]; showFloatingCommands: boolean }) {
   const [open, setOpen] = useState(false)
   const [hints, setHints] = useState<Hint[]>([])
   const [prefix, setPrefix] = useState('')
@@ -198,18 +198,18 @@ export function LeaderShortcuts({ commands }: { commands: ShortcutCommand[] }) {
   }, [open, commands])
 
   return <>
-    <button className="leader-shortcut-trigger" data-shortcut-ui type="button" aria-label="Tastaturbefehle anzeigen" aria-expanded={open} title="Tastaturbefehle (Alt)" onClick={() => openRef.current ? close() : show()}>
+    {showFloatingCommands && <button className="leader-shortcut-trigger" data-shortcut-ui type="button" aria-label="Tastaturbefehle anzeigen" aria-expanded={open} title="Tastaturbefehle (Alt)" onClick={() => openRef.current ? close() : show()}>
       <kbd>Alt</kbd><span>Befehle</span>
-    </button>
+    </button>}
     {open && createPortal(<div className="shortcut-hints" data-shortcut-ui>
       {hints.filter(hint => hint.key.startsWith(prefix)).map(hint => <kbd key={hint.key} className="shortcut-badge" style={{ left: hint.left, top: hint.top }} aria-label={`${hint.label}: Alt + ${hint.key.toUpperCase()}`}>{hint.key.toUpperCase()}</kbd>)}
-      <aside className="shortcut-global-flyout" aria-label="Globale Tastaturbefehle">
+      {showFloatingCommands && <aside className="shortcut-global-flyout" aria-label="Globale Tastaturbefehle">
         <div className="shortcut-global-heading"><strong>Überall verfügbar</strong><button type="button" onClick={close} aria-label="Tastaturbefehle schließen">×</button></div>
         {commands.filter(command => command.global).map(command => <button type="button" className="shortcut-global-command" key={command.key} disabled={command.disabled} onClick={() => { close(); command.action?.() }}>
           <span>{command.label}</span><kbd>Alt + {command.key.toUpperCase()}</kbd>
         </button>)}
         <small>Alt halten oder antippen · Buchstaben wählen · Esc schließen</small>
-      </aside>
+      </aside>}
     </div>, document.body)}
   </>
 }

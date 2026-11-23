@@ -16,8 +16,12 @@ test('Alt+N opens a booking flyout from other pages and foreground dialogs', asy
   try {
     const page = await app.firstWindow()
     await initializeExistingOrganization(page)
+    const trigger = page.getByRole('button', { name: 'Tastaturbefehle anzeigen' })
+    const flyoutHelp = page.getByRole('complementary', { name: 'Globale Tastaturbefehle' })
+    await expect(trigger).toHaveCount(0)
     await page.keyboard.press('Alt')
     await expect(page.locator('.shortcut-badge[aria-label^="Dashboard:"]')).toBeVisible()
+    await expect(flyoutHelp).toHaveCount(0)
     await page.keyboard.press('Escape')
     // A foreground editor must not block the fixed global combination.
     await page.evaluate(() => {
@@ -39,9 +43,44 @@ test('Alt+N opens a booking flyout from other pages and foreground dialogs', asy
     })).toBe(true)
     await page.keyboard.press('Alt')
     await expect(page.locator('.shortcut-badge')).not.toHaveCount(0)
-    await expect(page.locator('.shortcut-global-flyout')).toBeVisible()
-    await expect(page.locator('.shortcut-global-flyout')).toHaveCSS('opacity', '1')
+    await expect(flyoutHelp).toHaveCount(0)
     await page.screenshot({ path: 'test-results/shortcut-booking-flyout.png', animations: 'disabled' })
+  } finally {
+    await app.evaluate(({ app }) => app.exit(0)).catch(() => undefined)
+    await fs.rm(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+})
+
+test('floating command help can be enabled in appearance settings and survives reload', async () => {
+  const userData = await fs.mkdtemp(path.join(os.tmpdir(), 'vereino-floating-commands-'))
+  const env = { ...process.env }
+  delete env.ELECTRON_RUN_AS_NODE
+  const app = await electron.launch({
+    args: [path.resolve('dist-electron/main/index.cjs'), `--user-data-dir=${userData}`],
+    env: { ...env, ELECTRON_RENDERER_URL: pathToFileURL(path.resolve('dist/index.html')).toString() }
+  })
+  try {
+    const page = await app.firstWindow()
+    await initializeExistingOrganization(page)
+    const settings = page.getByRole('button', { name: 'Einstellungen', exact: true })
+    await settings.click()
+    const toggle = page.getByRole('switch', { name: /Schwebende Befehlshilfe/ })
+    const trigger = page.getByRole('button', { name: 'Tastaturbefehle anzeigen' })
+    const help = page.getByRole('complementary', { name: 'Globale Tastaturbefehle' })
+    await expect(toggle).not.toBeChecked()
+    await toggle.check()
+    await trigger.click()
+    await expect(help).toBeVisible()
+    await page.reload()
+    await expect(trigger).toBeVisible()
+    await page.keyboard.press('Alt')
+    await expect(help).toBeVisible()
+    await page.keyboard.press('Escape')
+    await settings.click()
+    await toggle.uncheck()
+    await expect(trigger).toHaveCount(0)
+    await page.keyboard.press('Alt')
+    await expect(help).toHaveCount(0)
   } finally {
     await app.evaluate(({ app }) => app.exit(0)).catch(() => undefined)
     await fs.rm(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })

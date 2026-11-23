@@ -121,6 +121,8 @@ export function SettingsView(props: SettingsProps) {
             setDisplayDensity={props.setDisplayDensity}
             sidebarBookingActions={props.sidebarBookingActions}
             setSidebarBookingActions={props.setSidebarBookingActions}
+            showFloatingCommands={props.showFloatingCommands}
+            setShowFloatingCommands={props.setShowFloatingCommands}
             navLayout={props.navLayout}
             setNavLayout={props.setNavLayout}
             navIconColorMode={props.navIconColorMode}

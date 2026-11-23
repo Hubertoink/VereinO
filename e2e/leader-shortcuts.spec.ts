@@ -13,7 +13,7 @@ test.beforeAll(async () => {
         import { createRoot } from 'react-dom/client'
         import { LeaderShortcuts } from './src/renderer/components/shortcuts/LeaderShortcuts'
         createRoot(document.getElementById('root')).render(
-          <LeaderShortcuts commands={[
+          <LeaderShortcuts showFloatingCommands commands={[
             { key: 'n', label: 'Neue Buchung', global: true, action: () => {
               document.getElementById('result').textContent += 'Neu'
             }},

@@ -18,6 +18,8 @@ interface UIPreferencesContextValue {
   setNavLayout: (val: NavLayout) => void
   sidebarBookingActions: boolean
   setSidebarBookingActions: (value: boolean) => void
+  showFloatingCommands: boolean
+  setShowFloatingCommands: (value: boolean) => void
   sidebarCollapsed: boolean
   setSidebarCollapsed: (val: boolean) => void
   colorTheme: ColorTheme

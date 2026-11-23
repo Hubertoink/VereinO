@@ -19,6 +19,8 @@ export function GeneralPane({
   setDisplayDensity,
   sidebarBookingActions = false,
   setSidebarBookingActions,
+  showFloatingCommands,
+  setShowFloatingCommands,
   navLayout,
   setNavLayout,
   navIconColorMode,
@@ -361,6 +363,15 @@ export function GeneralPane({
                 <input id="toggle-sidebar-booking-actions" role="switch" className="toggle" type="checkbox" checked={sidebarBookingActions}
                   onChange={event => setSidebarBookingActions?.(event.target.checked)} />
               </label>}
+
+              <label className="settings-toggle-card" htmlFor="toggle-floating-commands">
+                <span className="settings-toggle-card__copy">
+                  <strong>Schwebende Befehlshilfe</strong>
+                  <span>Zeigt die Schaltfläche „Alt · Befehle“ am Fensterrand und beim Drücken von Alt eine Übersicht der Tastaturbefehle.</span>
+                </span>
+                <input id="toggle-floating-commands" role="switch" className="toggle" type="checkbox" checked={showFloatingCommands}
+                  onChange={event => setShowFloatingCommands(event.target.checked)} />
+              </label>
 
               <label className="settings-toggle-card" htmlFor="toggle-menu-icons">
                 <span className="settings-toggle-card__copy">
