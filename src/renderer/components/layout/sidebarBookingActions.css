@@ -1,15 +1,80 @@
-.sidebar-booking-actions { display: grid; gap: 4px; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
-.sidebar-booking-actions .invoice-split-fab { display: grid; width: 100%; height: auto; gap: 4px; border: 0; background: transparent; box-shadow: none; overflow: visible; border-radius: 0; backdrop-filter: none; }
-.sidebar-booking-actions :is(.sidebar-booking-new, .invoice-split-fab__new, .invoice-split-fab__batch) { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; min-width: 0; height: 38px; min-height: 38px; padding: 8px 10px; border: 0; border-radius: var(--radius-control, 10px); background: transparent; color: var(--text); font: inherit; font-size: var(--type-control); cursor: pointer; position: relative; transition: background 160ms ease; }
-.sidebar-booking-actions :is(.sidebar-booking-new, .invoice-split-fab__new, .invoice-split-fab__batch):hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.sidebar-booking-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.sidebar-booking-actions svg { flex-shrink: 0; color: var(--accent); }
-.sidebar-booking-actions .invoice-split-fab .invoice-split-fab__label { display: inline; opacity: 1; max-width: none; width: auto; transform: none; }
-.side-nav--collapsed .sidebar-booking-actions button { justify-content: center; padding: 8px 0; }
+.sidebar-booking-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.sidebar-booking-actions__title {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--type-caption);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.sidebar-booking-actions .invoice-split-fab {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+  backdrop-filter: none;
+}
+
+.sidebar-booking-actions :is(.sidebar-booking-new, .invoice-split-fab__new, .invoice-split-fab__batch) {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 6px 4px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: var(--type-caption);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sidebar-booking-actions .invoice-split-fab button {
+  border: 1px solid color-mix(in oklab, var(--accent) 32%, var(--border));
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+  color: var(--text);
+  transition: background 160ms ease;
+}
+
+.sidebar-booking-actions .invoice-split-fab button:is(:hover, [aria-expanded='true']),
+.sidebar-booking-actions .invoice-batch-control--dragging .invoice-split-fab button {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 25%, var(--surface));
+}
+
+.sidebar-booking-actions button:focus-visible { outline: 2px solid var(--text); outline-offset: -3px; }
+.sidebar-booking-actions svg { flex-shrink: 0; }
+.sidebar-booking-actions .invoice-split-fab svg { color: var(--accent); }
+.sidebar-booking-actions .invoice-split-fab__label { max-width: none; opacity: 1; }
+.sidebar-booking-actions .invoice-split-fab__badge { right: -2px; top: -5px; color: var(--btn-primary-fg, #0b0e14); }
+
+.side-nav--collapsed .sidebar-booking-actions { padding: 0; border: 0; background: transparent; gap: 4px; }
+.side-nav--collapsed .sidebar-booking-actions .invoice-split-fab { grid-template-columns: 1fr; gap: 4px; }
+.side-nav--collapsed .sidebar-booking-actions__title,
 .side-nav--collapsed .sidebar-booking-actions button > span:not(.invoice-split-fab__badge):not(.invoice-split-fab__icon) { display: none; }
-.sidebar-booking-actions .invoice-split-fab__badge { position: absolute; right: 0; top: 0; }
+
 .invoice-batch-flyout--sidebar { z-index: 6100; }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar-booking-actions button { transition: none; }
+  .sidebar-booking-actions .invoice-split-fab button { transition: none; }
 }

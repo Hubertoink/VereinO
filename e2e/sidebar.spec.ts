@@ -12,7 +12,7 @@ test.beforeAll(async () => {
     import { SidebarBookingActions } from './src/renderer/components/layout/SidebarBookingActions'
     import { AppSidebar } from './src/renderer/components/layout/AppSidebar'
     import { LeaderShortcuts } from './src/renderer/components/shortcuts/LeaderShortcuts'
-    import { navItems, getProfileNavigationItems } from './src/renderer/utils/navItems'
+    import { navItems } from './src/renderer/utils/navItems'
     const root = createRoot(document.getElementById('root'))
     window.renderSidebar = (options = {}) => {
       const switches = new Set()
@@ -37,7 +37,7 @@ test.beforeAll(async () => {
         { id: 3, name: 'PayPal', balance: -125, kind: 'PAYPAL', isActive: 1 },
         { id: 4, name: 'Rücklagenkonto mit sehr langem Namen', balance: 1000000.24, kind: 'BANK', isActive: 1 }
       ]
-      window.api = { classifications: { primary: { list: async () => ({ values: [] }) } }, ai: { invoiceBatch: { onChanged: () => () => {}, list: async () => ({ rows: [], aiAvailable: true }) } }, app: { version: async () => ({ version: '4.11.0' }) },
+      window.api = { classifications: { primary: { list: async () => ({ profile: options.general ? 'GENERAL' : 'NONPROFIT', values: [] }) } }, ai: { invoiceBatch: { onChanged: () => () => {}, list: async () => ({ rows: [], aiAvailable: true }) } }, app: { version: async () => ({ version: '4.11.0' }) },
         members: { list: async input => {
           window.feeRequests.push(input)
           const summary = { ...window.feeSummary }
@@ -64,9 +64,9 @@ test.beforeAll(async () => {
         const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true')
         const [active, setActive] = useState('Buchungen')
         const [account, setAccount] = useState(null)
-        const allowedItems = getProfileNavigationItems(options.general ? 'GENERAL' : 'NONPROFIT')
-        const [items, setItems] = useState(options.minimal ? allowedItems.filter(i => ['Dashboard', 'Einstellungen'].includes(i.key)) : allowedItems)
-        window.setModules = keys => setItems(allowedItems.filter(i => keys.includes(i.key)))
+
+        const [items, setItems] = useState(options.minimal ? navItems.filter(i => ['Dashboard', 'Einstellungen'].includes(i.key)) : navItems)
+        window.setModules = keys => setItems(navItems.filter(i => keys.includes(i.key)))
         useEffect(() => { localStorage.setItem('sidebarCollapsed', String(collapsed)) }, [collapsed])
         return <><div className="app-root-grid app-root-grid--side">
           <header className="app-header"><button>KommerzO</button></header>
@@ -263,7 +263,7 @@ test('GENERAL organizations can enable and open earmarks', async ({ page }) => {
   await page.evaluate(() => (window as any).renderSidebar({ general: true, minimal: true, assignments: true }))
   await expect(page.getByRole('button', { name: 'Zweckbindungen', exact: true })).toHaveCount(0)
   await page.evaluate(() => (window as any).setModules(['Dashboard', 'Buchungen', 'Zweckbindungen', 'Mitglieder', 'Einstellungen']))
-  await expect(page.getByRole('button', { name: 'Mitglieder', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Mitglieder', exact: true })).toBeVisible()
   await expect(page.getByRole('group', { name: 'Aktuelle Zweckbindungen' }).getByRole('button')).toHaveCount(3)
   await page.getByRole('button', { name: 'Zweckbindungen', exact: true }).click()
   await expect(page.getByRole('heading')).toHaveText('Zweckbindungen')
@@ -429,9 +429,11 @@ test('migrates the previous account collapse preference', async ({ page }) => {
 })
 
 
-test('sidebar booking actions use package icons and rounded independent hover surfaces in both modes', async ({ page }, info) => {
+test('sidebar booking actions show a primary action above paired AI buttons and collapse to icons', async ({ page }, info) => {
   await page.evaluate(() => (window as any).renderSidebar({ bookingActions: true }))
   const actions = page.getByRole('group', { name: 'Buchungsaktionen', exact: true })
+  const title = actions.getByRole('heading', { name: 'Buchungsaktionen' })
+  const create = actions.getByRole('button', { name: 'Buchung erstellen', exact: true })
   const ai = actions.getByRole('button', { name: 'KI-Buchung', exact: true })
   const batch = actions.getByRole('button', { name: 'Batch-KI', exact: true })
   await expect(actions).toBeVisible()
@@ -440,6 +442,31 @@ test('sidebar booking actions use package icons and rounded independent hover su
   for (const collapsed of [false, true]) {
     if (collapsed) await page.getByRole('button', { name: 'Seitenleiste einklappen', exact: true }).click()
     await expect(page.locator('.app-sidebar')).toHaveCSS('width', collapsed ? '64px' : '260px')
+    const primaryBox = (await create.boundingBox())!
+    const aiBox = (await ai.boundingBox())!
+    const batchBox = (await batch.boundingBox())!
+    if (collapsed) {
+      await expect(title).toBeHidden()
+      expect(batchBox.y).toBeGreaterThanOrEqual(aiBox.y + aiBox.height)
+    } else {
+      await expect(title).toBeVisible()
+      for (const density of ['compact', 'standard']) {
+        await page.evaluate(value => { document.documentElement.dataset.uiDensity = value }, density)
+        for (const control of [title, create, ai, batch]) {
+          await expect(control).toHaveCSS('font-size', density === 'compact' ? '11px' : '12px')
+        }
+        const label = ai.locator('.invoice-split-fab__label')
+        expect(await label.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+      }
+      await page.evaluate(() => { delete document.documentElement.dataset.uiDensity })
+      expect(aiBox.y).toBeGreaterThanOrEqual(primaryBox.y + primaryBox.height)
+      expect(batchBox.y).toBe(aiBox.y)
+      expect(aiBox.width).toBeCloseTo(batchBox.width, 0)
+      expect(aiBox.x).toBe(primaryBox.x)
+      expect(batchBox.x + batchBox.width).toBeCloseTo(primaryBox.x + primaryBox.width, 0)
+    }
+    await create.click()
+    expect(await page.evaluate(() => (window as any).bookingOpened)).toBe(true)
     for (const button of [ai, batch]) {
       const before = await button.evaluate(el => getComputedStyle(el).backgroundColor)
       await button.hover()

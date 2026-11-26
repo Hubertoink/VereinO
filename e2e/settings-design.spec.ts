@@ -53,8 +53,8 @@ test.beforeAll(async () => {
         db:{location:{get:async()=>({root:'C:/VereinO',dbPath:'C:/VereinO/database.sqlite',filesDir:'C:/VereinO/files',organization:{id:'demo',name:'Beispielverein'}})}},
         backup:{getDir:async()=>({ok:true,dir:'D:/VereinO/Sicherungen'}),getProgress:async()=>null,onProgress:()=>()=>{},list:async()=>({ok:true,backups:[{filePath:'D:/VereinO/Sicherungen/database_manual.sqlite',size:1234567,mtime:1794610800000}]})},
       }
-      const labels={actions:'Aktionen',date:'Datum',description:'Beschreibung',gross:'Brutto',sphere:'Kategorie',paymentMethod:'Zahlweg'}
-      const initial={organizationProfile:profile,displayDensity:'compact',cols:{actions:true,date:true,description:true,gross:true},order:['actions','date','description','gross'],journalLimit:20,dateFmt:'ISO',sidebarCollapsed:false,navLayout:'left',navIconColorMode:'color',colorTheme:'earthy-tones',journalRowStyle:'both',journalRowDensity:'normal',backgroundImage:'none',backgroundImageVisibility:60,customBackgroundImage:null,glassModals:false,bookingView:'classic',showBookingDraftTabs:true,showBookingEditTabs:false,bookingEntryPresentation:'modal',allowVoucherDeletion:false,quickAddAfterSave:'close',visibleNavItems:['Dashboard','Buchungen','Budgets','Einstellungen'],tagDefs:tags,paymentAccounts:accounts}
+      const labels={actions:'Aktionen',date:'Datum',description:'Beschreibung',gross:'Brutto',sphere:'Kategorie',paymentMethod:'Zahlweg',voucherNo:'Nr.',type:'Art',note:'Kommentar',earmark:'Zweckbindung',budget:'Budget',attachments:'Anhänge',net:'Netto',vat:'USt'}
+      const initial={organizationProfile:profile,displayDensity:'compact',cols:{actions:true,date:true,description:true,gross:true},order:['date','actions','description','gross'],journalLimit:20,dateFmt:'ISO',sidebarCollapsed:false,navLayout:'left',navIconColorMode:'color',colorTheme:'earthy-tones',journalRowStyle:'both',journalRowDensity:'normal',backgroundImage:'none',backgroundImageVisibility:60,customBackgroundImage:null,glassModals:false,bookingView:'classic',showBookingDraftTabs:true,showBookingEditTabs:false,bookingEntryPresentation:'modal',allowVoucherDeletion:false,quickAddAfterSave:'close',visibleNavItems:['Dashboard','Buchungen','Budgets','Einstellungen'],tagDefs:tags,paymentAccounts:accounts}
       function Fixture() {
         const [state,setState]=React.useState(initial)
         const setters=React.useMemo(()=>Object.fromEntries(Object.keys(initial).map(key=>['set'+key[0].toUpperCase()+key.slice(1),value=>setState(old=>({...old,[key]:typeof value==='function'?value(old[key]):value}))])),[])
@@ -137,7 +137,7 @@ test('opening voucher number alone previews the signed amount and actual date be
 const panes = [
   ['general', 'Darstellung'],
   ['workflow', 'Arbeitsweise'],
-  ['table', 'Tabelle'],
+  ['table', 'Buchungstabelle'],
   ['storage', 'Speicher & Sicherungen'],
   ['docling', 'Texterkennung'],
   ['import', 'Datenimport'],
@@ -182,6 +182,11 @@ test('table preferences update the preview and survive pane navigation', async (
   await openSettings(page)
   await expect(page.getByRole('group', { name: 'Zeilenhöhe' })).toHaveCount(0)
   await selectPane(page, 'table')
+  await expect(page.getByRole('button', { name: 'Aktionen', exact: true })).toBeDisabled()
+  await expect(page.getByRole('columnheader', { name: 'Aktionen' })).toHaveCount(0)
+  await selectPane(page, 'workflow')
+  await page.locator('#toggle-voucher-delete-mode').check()
+  await selectPane(page, 'table')
   await page.getByRole('button', { name: 'Kompakt', exact: true }).click()
   await page.getByLabel('Zeilenlayout').selectOption('zebra')
   await page
@@ -196,7 +201,18 @@ test('table preferences update the preview and survive pane navigation', async (
   await expect(preview).toHaveAttribute('data-density', 'compact')
   await expect(preview).toHaveAttribute('data-row-style', 'zebra')
   await expect(preview.locator('tbody')).toContainText('15.01.2025')
-  await page.getByRole('checkbox', { name: 'Beschreibung', exact: true }).uncheck()
+  const pills = page.getByRole('group', { name: 'Spalten', exact: true })
+  const description = pills.getByRole('button', { name: 'Beschreibung' })
+  const date = pills.getByRole('button', { name: 'Datum' })
+  const actions = pills.getByRole('button', { name: 'Aktionen' })
+  await expect(actions).toHaveAttribute('draggable', 'false')
+  await description.dragTo(date)
+  await expect(preview.getByRole('columnheader')).toHaveText(['Beschreibung', 'Aktionen', 'Datum', 'Brutto'])
+  await expect(description).toHaveAttribute('aria-pressed', 'true')
+  await description.press('Alt+ArrowRight')
+  await expect(preview.getByRole('columnheader')).toHaveText(['Datum', 'Aktionen', 'Beschreibung', 'Brutto'])
+  await description.click()
+  await expect(description).toHaveAttribute('aria-pressed', 'false')
   await expect(preview.getByRole('columnheader', { name: 'Beschreibung' })).toHaveCount(0)
   await selectPane(page, 'general')
   await selectPane(page, 'table')

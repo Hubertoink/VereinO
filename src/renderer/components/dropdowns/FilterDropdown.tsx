@@ -1,7 +1,6 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { IconX } from '@tabler/icons-react'
-import AppIcon from '../common/AppIcon'
+import FlyoutHeader from '../FlyoutHeader'
 
 export interface FilterDropdownProps {
   panelClassName?: string
@@ -241,21 +240,10 @@ export default function FilterDropdown({
           aria-modal="false"
           aria-label={title}
         >
-          <header className="filter-dropdown__header">
-            <h3 className="filter-dropdown__title">{title}</h3>
-            <button
-              type="button"
-              className="btn ghost filter-dropdown__close"
-              aria-label="Schließen"
-              title="Schließen"
-              onClick={() => {
-                setOpen(false)
-                buttonRef.current?.focus()
-              }}
-            >
-              <AppIcon icon={IconX} size="control" />
-            </button>
-          </header>
+          <FlyoutHeader title={title} onClose={() => {
+            setOpen(false)
+            buttonRef.current?.focus()
+          }} />
 
           <div className="filter-dropdown__content">{children}</div>
         </div>,

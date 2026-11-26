@@ -1,11 +1,31 @@
-import { forwardRef } from 'react'
-import ModalHeader from '../../components/ModalHeader'
+import { forwardRef, useState } from 'react'
+import FlyoutHeader from '../../components/FlyoutHeader'
 import type { TAiJobsListOutput } from '../../../../electron/main/ipc/schemas'
 import { bookingProgress } from './aiBooking'
 import { statusLabel, typeLabel } from './aiText'
 
 type Job = TAiJobsListOutput['rows'][number]
-type Tone = 'open' | 'done' | 'task'
+type Area = 'all' | 'open' | 'done'
+
+const dayFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'long', timeZone: 'UTC' })
+const areas = {
+  all: { label: 'Alle KI-Aufgaben', empty: 'Noch keine gespeicherten KI-Aufgaben.' },
+  open: { label: 'Offene Buchungsreviews', empty: 'Keine offenen Buchungsvorschläge.' },
+  done: { label: 'Gebuchte Vorschläge', empty: 'Noch keine gebuchten Vorschläge.' }
+}
+
+function groupByDay(jobs: Job[]) {
+  const days = new Map<string, Job[]>()
+  for (const job of jobs) {
+    const day = job.createdAt?.slice(0, 10)
+    const date = day && new Date(day)
+    const label = date && Number.isFinite(date.getTime()) ? dayFormat.format(date) : 'Ohne Datum'
+    const group = days.get(label)
+    if (group) group.push(job)
+    else days.set(label, [job])
+  }
+  return days
+}
 
 type Props = {
   jobs: Job[]
@@ -44,65 +64,61 @@ export const AiHistoryDrawer = forwardRef<HTMLElement, Props>(function AiHistory
   onMarkDone,
   onDelete
 }, ref) {
-  const renderJob = (job: Job, tone: Tone, metaItems?: Array<string | null | undefined>) => {
+  const [area, setArea] = useState<Area>('all')
+  const lists = { all: jobs, open: openBookingJobs, done: completedBookingJobs }
+
+  function areaButton(key: Area) {
+    return <button type="button" aria-pressed={area === key} onClick={() => setArea(key)}>
+      <span>{areas[key].label}</span><span className="ai-history-count">{lists[key].length}</span>
+    </button>
+  }
+
+  function renderJob(job: Job) {
     const fallbackTitle = job.type === 'BOOKING_FROM_DOCUMENTS' ? `Buchungsvorschlag #${job.id}` : `KI-Aufgabe #${job.id}`
-    const defaultMeta = [
+    const meta = [
       job.type === 'BOOKING_FROM_DOCUMENTS' ? bookingProgress(job) : typeLabel(job.type),
       statusLabel(job.status),
-      job.createdAt?.slice(0, 10),
+      area === 'done' && job.voucherId ? `Buchung #${job.voucherId}` : null,
       formatUsage(job.usage)
-    ]
-    const canResolve = tone === 'open' && job.type === 'BOOKING_FROM_DOCUMENTS'
-    return <article key={`${tone}-${job.id}`} className={`ai-history-item ai-history-item--${tone} ${selectedJobId === job.id ? 'active' : ''} ${canResolve ? 'ai-history-item--actionable' : ''}`}>
+    ].filter(Boolean).join(' · ')
+    const canResolve = area === 'open' && job.type === 'BOOKING_FROM_DOCUMENTS'
+    return <article key={job.id} className={`ai-history-item ${selectedJobId === job.id ? 'active' : ''}`}>
       <button className="ai-history-item-main" type="button" onClick={() => { onOpenJob(job.id); onClose() }}>
-        <span className="ai-history-item-icon" aria-hidden="true" />
-        <span className="ai-history-item-copy"><strong>{job.title || fallbackTitle}</strong><small>{(metaItems || defaultMeta).filter(Boolean).join(' · ')}</small></span>
+        <strong>{job.title || fallbackTitle}</strong><small>{meta}</small>
       </button>
-      {canResolve && <span className="ai-history-item-actions" aria-label="Buchungsreview Aktionen">
-        <button type="button" className="ai-history-item-action ai-history-item-action--done" disabled={busy} onClick={(event) => { event.stopPropagation(); onMarkDone(job) }} aria-label="Buchungsreview als erledigt markieren" title="Als erledigt markieren">✓</button>
-        <button type="button" className="ai-history-item-action ai-history-item-action--delete" disabled={busy} onClick={(event) => { event.stopPropagation(); onDelete(job) }} aria-label="Buchungsreview löschen" title="Löschen">×</button>
+      {canResolve && <span className="ai-history-item-actions">
+        <button type="button" className="ai-history-item-action ai-history-item-action--done" disabled={busy} onClick={() => onMarkDone(job)} aria-label="Buchungsreview als erledigt markieren" title="Als erledigt markieren">✓</button>
+        <button type="button" className="ai-history-item-action ai-history-item-action--delete" disabled={busy} onClick={() => onDelete(job)} aria-label="Buchungsreview löschen" title="Löschen">×</button>
       </span>}
     </article>
   }
 
-  return <section ref={ref} className="card ai-assistant-sidebar ai-history-drawer" role="dialog" aria-label="KI-Verlauf">
-    <ModalHeader title="Verlauf" subtitle="Schneller zurück in Reviews, gebuchte Vorschläge und alte Agent-Läufe." onClose={onClose} closeOnEscape={false} />
-    <div className="ai-history-stats">
-      <span><strong>{openBookingJobs.length}</strong> offen</span>
-      <span><strong>{completedBookingJobs.length}</strong> gebucht</span>
-      <span><strong>{jobs.length}</strong> Aufgaben</span>
-    </div>
+  return <section ref={ref} className="card ai-flyout ai-assistant-sidebar ai-history-drawer" role="dialog" aria-label="KI-Verlauf">
+    <FlyoutHeader title="KI-Verlauf" onClose={onClose} />
     <div className="ai-history-layout">
-      <div className="ai-history-column ai-history-column--reviews">
-        <div className="ai-history-group ai-history-group--open">
-          <div className="ai-history-group-title"><strong>Offene Buchungsreviews</strong><span>{openBookingJobs.length}</span></div>
-          <div className="ai-history-list">
-            {openBookingJobs.map((job) => renderJob(job, 'open'))}
-            {!openBookingJobs.length && <div className="ai-empty">Keine offenen Buchungsvorschläge.</div>}
-          </div>
+      <nav className="ai-history-nav" aria-label="Verlaufsbereiche">
+        <div>
+          <h3>Aufgaben</h3>
+          {areaButton('all')}
         </div>
-        <div className="ai-history-group ai-history-group--done">
-          <div className="ai-history-group-title"><strong>Gebuchte Vorschläge</strong><span>{completedBookingJobs.length}</span></div>
-          <div className="ai-history-list ai-history-list--compact">
-            {completedBookingJobs.slice(0, 10).map((job) => renderJob(job, 'done', [
-              bookingProgress(job),
-              statusLabel(job.status),
-              job.createdAt?.slice(0, 10),
-              job.voucherId ? `Buchung #${job.voucherId}` : null
-            ]))}
-            {!completedBookingJobs.length && <div className="ai-empty">Noch keine gebuchten Vorschläge.</div>}
-          </div>
+        <div>
+          <h3>Buchungen</h3>
+          {areaButton('open')}
+          {areaButton('done')}
         </div>
-      </div>
-      <div className="ai-history-column">
-        <div className="ai-history-group ai-history-group--all">
-          <div className="ai-history-group-title"><strong>Alle KI-Aufgaben</strong><span>{jobs.length}</span></div>
-          <div className="ai-history-list">
-            {jobs.map((job) => renderJob(job, 'task'))}
-            {!jobs.length && <div className="ai-empty">Noch keine gespeicherten KI-Aufgaben.</div>}
-          </div>
+      </nav>
+      <section className="ai-history-content" aria-label={areas[area].label}>
+        <h3>{areas[area].label}</h3>
+        <div className="ai-history-list" key={area}>
+          {Array.from(groupByDay(lists[area]), ([day, rows]) => (
+            <section className="ai-history-day" key={day}>
+              <h4>{day}</h4>
+              <div className="ai-history-entries">{rows.map(renderJob)}</div>
+            </section>
+          ))}
+          {!lists[area].length && <div className="ai-empty">{areas[area].empty}</div>}
         </div>
-      </div>
+      </section>
     </div>
   </section>
 })

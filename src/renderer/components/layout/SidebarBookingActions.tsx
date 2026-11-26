@@ -7,8 +7,9 @@ type Props = Omit<ComponentProps<typeof InvoiceBatchControl>, 'variant'> & { onN
 
 export function SidebarBookingActions({ onNewBooking, ...invoiceProps }: Props) {
   return <div className="sidebar-booking-actions" role="group" aria-label="Buchungsaktionen">
-    <button className="btn ghost sidebar-booking-new" type="button" onClick={onNewBooking} aria-label="Buchung erstellen" title="Buchung erstellen">
-      <IconPlus size={20} aria-hidden="true" /><span>Buchung erstellen</span>
+    <h2 className="sidebar-booking-actions__title">Buchungsaktionen</h2>
+    <button className="btn primary sidebar-booking-new" type="button" onClick={onNewBooking} aria-label="Buchung erstellen" title="Buchung erstellen">
+      <IconPlus size={18} stroke={2.5} aria-hidden="true" /><span>Buchung erstellen</span>
     </button>
     <InvoiceBatchControl {...invoiceProps} variant="sidebar" />
   </div>

@@ -1,72 +1,71 @@
-import React, { useRef } from 'react'
+import { useRef } from 'react'
+import { IconCheck } from '@tabler/icons-react'
+import type { ColKey } from '../types'
 
 interface DnDOrderProps {
-  order: string[]
-  cols: Record<string, boolean>
-  onChange: (o: string[]) => void
-  labelFor: (k: string) => string
+  order: ColKey[]
+  cols: Record<ColKey, boolean>
+  onChange: (order: ColKey[]) => void
+  actionsAvailable: boolean
+  onToggle: (key: ColKey) => void
+  labelFor: (key: ColKey) => string
 }
 
-/**
- * DnDOrder - Drag & Drop Component for Column Reordering
- * 
- * Allows users to reorder table columns via drag and drop
- * Visually indicates hidden columns with reduced opacity
- */
-export function DnDOrder({ order, cols, onChange, labelFor }: DnDOrderProps) {
-  const dragIndex = useRef<number | null>(null)
+export function DnDOrder({ order, cols, actionsAvailable, onChange, onToggle, labelFor }: DnDOrderProps) {
+  const dragging = useRef<ColKey | null>(null)
+  const movable = order.filter(key => key !== 'actions')
 
-  function onDragStart(e: React.DragEvent<HTMLDivElement>, idx: number) {
-    dragIndex.current = idx
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  function onDragOver(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-  }
-
-  function onDrop(e: React.DragEvent<HTMLDivElement>, idx: number) {
-    e.preventDefault()
-    const from = dragIndex.current
-    dragIndex.current = null
-    if (from == null || from === idx) return
-    const next = order.slice()
-    const [moved] = next.splice(from, 1)
-    next.splice(idx, 0, moved)
-    onChange(next)
+  function move(from: ColKey, to: ColKey) {
+    if (from === 'actions' || to === 'actions' || from === to) return
+    const next = [...movable]
+    const target = next.indexOf(to)
+    next.splice(next.indexOf(from), 1)
+    next.splice(target, 0, from)
+    let index = 0
+    onChange(order.map(key => key === 'actions' ? key : next[index++]))
   }
 
   return (
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-      {order.map((k, idx) => {
-        const visible = !!cols[k]
-        return (
-          <div
-            key={k}
-            draggable
-            onDragStart={(e) => onDragStart(e, idx)}
-            onDragOver={onDragOver}
-            onDrop={(e) => onDrop(e, idx)}
-            title={visible ? 'Sichtbar' : 'Ausgeblendet – Reihenfolge bleibt erhalten'}
-            style={{
-              padding: '4px 8px',
-              borderRadius: 6,
-              border: '1px solid var(--border)',
-              background: visible ? 'var(--surface)' : 'color-mix(in oklab, var(--surface) 60%, transparent)',
-              opacity: visible ? 1 : 0.6,
-              cursor: 'grab',
-              userSelect: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6
-            }}
-          >
-            <span aria-hidden>☰</span>
-            <span>{labelFor(k)}</span>
-          </div>
-        )
-      })}
+    <div className="settings-column-options" role="group" aria-label="Spalten">
+      {order.map(key => (
+        <button
+          key={key}
+          type="button"
+          className="settings-column-pill"
+          disabled={key === 'actions' && !actionsAvailable}
+          aria-pressed={!!cols[key]}
+          draggable={key !== 'actions'}
+          title={key === 'actions'
+            ? (actionsAvailable ? 'Feste Position' : 'Verfügbar, wenn das Löschen von Buchungen unter Arbeitsweise erlaubt ist')
+            : 'Zum Verschieben ziehen oder Alt + Pfeil links/rechts drücken'}
+          onClick={() => onToggle(key)}
+          onDragStart={event => {
+            dragging.current = key
+            event.dataTransfer.effectAllowed = 'move'
+            event.dataTransfer.setData('text/plain', labelFor(key))
+          }}
+          onDragEnd={() => { dragging.current = null }}
+          onDragOver={event => {
+            if (dragging.current && key !== 'actions') event.preventDefault()
+          }}
+          onDrop={event => {
+            event.preventDefault()
+            if (dragging.current) move(dragging.current, key)
+            dragging.current = null
+          }}
+          onKeyDown={event => {
+            if (!event.altKey || key === 'actions') return
+            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+            event.preventDefault()
+            const offset = event.key === 'ArrowLeft' ? -1 : 1
+            const target = movable[movable.indexOf(key) + offset]
+            if (target) move(key, target)
+          }}
+        >
+          {cols[key] && <IconCheck size={14} stroke={2.4} aria-hidden="true" />}
+          {labelFor(key)}
+        </button>
+      ))}
     </div>
   )
 }

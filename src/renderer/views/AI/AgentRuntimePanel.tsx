@@ -47,11 +47,8 @@ const creationOptions: Array<{ key: keyof AiMasterDataPermissions; label: string
 
 export function AgentRuntimePanel({ trace, memory, autoRules, permissions, savingPermissions, onPermissionChange }: Props) {
   return (
-    <section className="card ai-agent-runtime-panel">
-      <div className="ai-section-head">
-        <strong>Agent-Kontext</strong>
-        <span>{trace.length} Trace · {memory.length} Memory · {autoRules.length} Regeln</span>
-      </div>
+    <section className="ai-flyout-body ai-agent-runtime-panel">
+      <p className="ai-agent-runtime-hint">{trace.length} Trace · {memory.length} Memory · {autoRules.length} Regeln</p>
       <p className="ai-agent-runtime-hint">
         Hier siehst du, was die KI über VereinO dauerhaft behalten darf, welche Auto-Regeln gelten und welche Tools der letzte Agent-Lauf benutzt hat.
       </p>

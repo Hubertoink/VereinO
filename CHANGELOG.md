@@ -7,6 +7,14 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.6.2] - 2026-11-26
+
+### Geändert
+
+- Im KI-Verlauf kannst du zwischen allen Aufgaben, offenen Buchungsvorschlägen und gebuchten Vorschlägen wechseln. Die Einträge sind nach Datum gruppiert und auch in schmalen Fenstern erreichbar.
+- In der ausgeklappten Seitenleiste steht „Buchung erstellen“ über den beiden Aktionen „KI-Buchung“ und „Batch-KI“. Eingeklappt sind die drei Aktionen über Symbole erreichbar.
+- In den Einstellungen der Buchungstabelle kannst du Spalten in derselben Liste ein- und ausblenden oder verschieben. Die Vorschau zeigt die gewählte Anordnung mit zwei Beispielbuchungen.
+
 ## [5.6.1] - 2026-11-23
 
 ### Geändert

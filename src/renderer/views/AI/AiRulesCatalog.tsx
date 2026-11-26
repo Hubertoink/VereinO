@@ -1,4 +1,5 @@
-import ModalHeader, { ModalCloseButton } from '../../components/ModalHeader'
+import FlyoutHeader from '../../components/FlyoutHeader'
+import { ModalCloseButton } from '../../components/ModalHeader'
 import { useCallback, useEffect, useState } from 'react';
 
 
@@ -142,125 +143,120 @@ export function AiRulesCatalog({ notify, onClose }: Props) {
   }
 
   return (
-    <section className="card ai-rules-drawer" role="dialog" aria-label="KI-Regelkatalog">
-      <ModalHeader
-        className="ai-rules-head"
-        title="✦ KI-Regelkatalog"
-        subtitle="Gilt organisationsweit für alle passenden KI-Analysen und Agentenaktionen."
-        onClose={onClose}
-        closeLabel="Schließen"
-        closeOnEscape={false}
-      />
+    <section className="card ai-flyout ai-rules-drawer" role="dialog" aria-label="KI-Regelkatalog">
+      <FlyoutHeader title="KI-Regelkatalog" onClose={onClose} />
+      <div className="ai-flyout-body ai-rules-body">
+        <p className="helper">Gilt organisationsweit für alle passenden KI-Analysen und Agentenaktionen.</p>
+        <div className="ai-rules-toolbar">
+          <span>{rules.filter((rule) => rule.enabled !== 0).length} aktiv · {rules.length} gesamt</span>
+          <button className="btn primary" type="button" onClick={openNewRule}>
+            + Neue Regel
+          </button>
+        </div>
 
-      <div className="ai-rules-toolbar">
-        <span>{rules.filter((rule) => rule.enabled !== 0).length} aktiv · {rules.length} gesamt</span>
-        <button className="btn primary" type="button" onClick={openNewRule}>
-          + Neue Regel
-        </button>
-      </div>
-
-      {showEditor && (
-        <section className="ai-rule-editor" aria-label={form.id ? 'KI-Regel bearbeiten' : 'Neue KI-Regel'}>
-          <div className="ai-section-head">
-            <strong>{form.id ? 'Regel bearbeiten' : 'Neue Regel'}</strong>
-            <ModalCloseButton onClick={() => setShowEditor(false)} aria-label="Editor schließen" />
-          </div>
-          <div className="ai-rule-form-grid">
-            <label className="field">
-              <span>Name</span>
-              <input
-                className="input"
-                value={form.name}
-                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                placeholder="z. B. Große Rechnungen markieren"
-                autoFocus
-              />
-            </label>
-            <label className="field">
-              <span>Geltungsbereich</span>
-              <select
-                className="input"
-                value={form.scope}
-                onChange={(event) => setForm((current) => ({ ...current, scope: event.target.value as RuleScope }))}
-              >
-                <option value="ALL">Überall</option>
-                <option value="BOOKINGS">Buchungen & Belege</option>
-                <option value="INVOICES">Rechnungen</option>
-              </select>
-            </label>
-          </div>
-          <label className="field ai-rule-instruction">
-            <span>Regel</span>
-            <textarea
-              className="input"
-              rows={4}
-              value={form.instruction}
-              onChange={(event) => setForm((current) => ({ ...current, instruction: event.target.value }))}
-              placeholder="Wenn der Bruttobetrag über 500 € liegt, füge den Tag „Freigabe“ hinzu."
-            />
-          </label>
-          <div className="ai-rule-editor-footer">
-            <label className="ai-rule-enabled">
-              <input
-                type="checkbox"
-                checked={form.enabled}
-                onChange={(event) => setForm((current) => ({ ...current, enabled: event.target.checked }))}
-              />
-              Direkt aktivieren
-            </label>
-            <div>
-              <button className="btn" type="button" onClick={() => setShowEditor(false)} disabled={saving}>Abbrechen</button>
-              <button className="btn primary" type="button" onClick={() => void saveRule()} disabled={saving}>
-                {saving ? 'Speichert…' : 'Speichern'}
-              </button>
+        {showEditor && (
+          <section className="ai-rule-editor" aria-label={form.id ? 'KI-Regel bearbeiten' : 'Neue KI-Regel'}>
+            <div className="ai-section-head">
+              <strong>{form.id ? 'Regel bearbeiten' : 'Neue Regel'}</strong>
+              <ModalCloseButton onClick={() => setShowEditor(false)} aria-label="Editor schließen" />
             </div>
-          </div>
-        </section>
-      )}
-
-      <div className="ai-rule-list">
-      {loading ? (
-          <div className="ai-agent-empty">Regeln werden geladen…</div>
-        ) : loadError ? (
-          <div className="ai-rules-empty ai-rules-empty--error">
-            <strong>KI-Regeln momentan nicht verfügbar</strong>
-            <span>{loadError}</span>
-          </div>
-        ) : rules.length ? (
-          rules.map((rule) => (
-            <article key={rule.id} className={`ai-rule-row ${rule.enabled === 0 ? 'is-disabled' : ''}`}>
-              <button className="ai-rule-row-main" type="button" onClick={() => openRule(rule)}>
-                <span className="ai-rule-row-title">
-                  <strong>{rule.name}</strong>
-                  <em>{scopeLabel(rule.scope)}</em>
-                </span>
-                <p>{rule.instruction}</p>
-              </button>
-              <div className="ai-rule-row-actions">
-                <button
-                  className={`ai-rule-switch ${rule.enabled !== 0 ? 'is-active' : ''}`}
-                  type="button"
-                  role="switch"
-                  aria-checked={rule.enabled !== 0}
-                  onClick={() => void toggleRule(rule)}
-                  title={rule.enabled !== 0 ? 'Deaktivieren' : 'Aktivieren'}
+            <div className="ai-rule-form-grid">
+              <label className="field">
+                <span>Name</span>
+                <input
+                  className="input"
+                  value={form.name}
+                  onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                  placeholder="z. B. Große Rechnungen markieren"
+                  autoFocus
+                />
+              </label>
+              <label className="field">
+                <span>Geltungsbereich</span>
+                <select
+                  className="input"
+                  value={form.scope}
+                  onChange={(event) => setForm((current) => ({ ...current, scope: event.target.value as RuleScope }))}
                 >
-                  <span />
-                </button>
-                <button className="btn ghost" type="button" onClick={() => openRule(rule)} aria-label={`${rule.name} bearbeiten`} title="Bearbeiten">✎</button>
-                <button className="btn ghost btn-trash" type="button" onClick={() => void deleteRule(rule)} aria-label={`${rule.name} löschen`} title="Löschen">
-                  <IconTrash size={16} />
+                  <option value="ALL">Überall</option>
+                  <option value="BOOKINGS">Buchungen & Belege</option>
+                  <option value="INVOICES">Rechnungen</option>
+                </select>
+              </label>
+            </div>
+            <label className="field ai-rule-instruction">
+              <span>Regel</span>
+              <textarea
+                className="input"
+                rows={4}
+                value={form.instruction}
+                onChange={(event) => setForm((current) => ({ ...current, instruction: event.target.value }))}
+                placeholder="Wenn der Bruttobetrag über 500 € liegt, füge den Tag „Freigabe“ hinzu."
+              />
+            </label>
+            <div className="ai-rule-editor-footer">
+              <label className="ai-rule-enabled">
+                <input
+                  type="checkbox"
+                  checked={form.enabled}
+                  onChange={(event) => setForm((current) => ({ ...current, enabled: event.target.checked }))}
+                />
+                Direkt aktivieren
+              </label>
+              <div>
+                <button className="btn" type="button" onClick={() => setShowEditor(false)} disabled={saving}>Abbrechen</button>
+                <button className="btn primary" type="button" onClick={() => void saveRule()} disabled={saving}>
+                  {saving ? 'Speichert…' : 'Speichern'}
                 </button>
               </div>
-            </article>
-          ))
-        ) : (
-          <div className="ai-rules-empty">
-            <strong>Noch keine KI-Regeln</strong>
-            <span>Lege Regeln für Händler, Beträge, Tags, Budgets oder Kategorien an.</span>
-            <button className="btn primary" type="button" onClick={openNewRule}>Erste Regel anlegen</button>
-          </div>
+            </div>
+          </section>
         )}
+
+        <div className="ai-rule-list">
+        {loading ? (
+            <div className="ai-agent-empty">Regeln werden geladen…</div>
+          ) : loadError ? (
+            <div className="ai-rules-empty ai-rules-empty--error">
+              <strong>KI-Regeln momentan nicht verfügbar</strong>
+              <span>{loadError}</span>
+            </div>
+          ) : rules.length ? (
+            rules.map((rule) => (
+              <article key={rule.id} className={`ai-rule-row ${rule.enabled === 0 ? 'is-disabled' : ''}`}>
+                <button className="ai-rule-row-main" type="button" onClick={() => openRule(rule)}>
+                  <span className="ai-rule-row-title">
+                    <strong>{rule.name}</strong>
+                    <em>{scopeLabel(rule.scope)}</em>
+                  </span>
+                  <p>{rule.instruction}</p>
+                </button>
+                <div className="ai-rule-row-actions">
+                  <button
+                    className={`ai-rule-switch ${rule.enabled !== 0 ? 'is-active' : ''}`}
+                    type="button"
+                    role="switch"
+                    aria-checked={rule.enabled !== 0}
+                    onClick={() => void toggleRule(rule)}
+                    title={rule.enabled !== 0 ? 'Deaktivieren' : 'Aktivieren'}
+                  >
+                    <span />
+                  </button>
+                  <button className="btn ghost" type="button" onClick={() => openRule(rule)} aria-label={`${rule.name} bearbeiten`} title="Bearbeiten">✎</button>
+                  <button className="btn ghost btn-trash" type="button" onClick={() => void deleteRule(rule)} aria-label={`${rule.name} löschen`} title="Löschen">
+                    <IconTrash size={16} />
+                  </button>
+                </div>
+              </article>
+            ))
+          ) : (
+            <div className="ai-rules-empty">
+              <strong>Noch keine KI-Regeln</strong>
+              <span>Lege Regeln für Händler, Beträge, Tags, Budgets oder Kategorien an.</span>
+              <button className="btn primary" type="button" onClick={openNewRule}>Erste Regel anlegen</button>
+            </div>
+          )}
+        </div>
       </div>
     </section>
   )

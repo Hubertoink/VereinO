@@ -8,6 +8,7 @@ import { AgentReimbursementCard } from './AgentReimbursementCard'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './AIView.css'
 import { dispatchDataChanged } from '../../utils/refresh'
+import FlyoutHeader from '../../components/FlyoutHeader'
 import { AgentRuntimePanel } from './AgentRuntimePanel'
 import { AiRulesCatalog } from './AiRulesCatalog'
 import { AgentMasterDataChangeCard } from './AgentMasterDataChangeCard';
@@ -4796,10 +4797,11 @@ export default function AiAssistantController({ notify, onBooked, onBusyChange }
       {showAgentContext && (
         <section
           ref={agentContextDrawerRef}
-          className="ai-agent-context-drawer"
+          className="card ai-flyout ai-agent-context-drawer"
           role="dialog"
           aria-label="Agent-Kontext"
         >
+          <FlyoutHeader title="Agent-Kontext" onClose={() => setShowAgentContext(false)} />
           <AgentRuntimePanel trace={agentTrace} memory={agentMemory} autoRules={agentAutoRules}
             permissions={settings.masterDataCreation} savingPermissions={masterDataSaving}
             onPermissionChange={saveMasterDataPermission} />
