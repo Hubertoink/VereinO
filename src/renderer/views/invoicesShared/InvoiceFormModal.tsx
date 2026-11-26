@@ -1,3 +1,4 @@
+import { CameraAttachmentButton } from '../../components/booking/CameraAttachmentButton'
 import CategoryIcon from '../../components/common/CategoryIcon'
 import { useEffect, useRef, useState } from 'react';
 import { IconX } from '@tabler/icons-react'
@@ -423,7 +424,7 @@ export default function InvoiceFormModal({
               {visibleExtras.has('attachments') && <div className="compact-booking-optional-section" onDragOver={(event) => { event.preventDefault(); event.stopPropagation() }} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); void handleDrop(event.dataTransfer?.files || null) }}>
                 <div className="compact-booking-section-title"><strong>Anhänge</strong><button type="button" onClick={() => toggleExtra('attachments')} aria-label="Anhänge entfernen"><AppIcon icon={IconX} size="inline" /></button></div>
                 <input ref={form.mode === 'create' ? fileInputRef : editInvoiceFileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(event) => { void (form.mode === 'create' ? handleCreateFiles(event.target.files) : handleEditFiles(event.target.files)) }} />
-                <button type="button" className="compact-booking-add-row" onClick={() => (form.mode === 'create' ? fileInputRef : editInvoiceFileInputRef).current?.click?.()}>+ Datei auswählen</button>
+                <div className="camera-attachment-actions"><button type="button" className="compact-booking-add-row" onClick={() => (form.mode === 'create' ? fileInputRef : editInvoiceFileInputRef).current?.click?.()}>+ Datei auswählen</button><CameraAttachmentButton onFiles={handleDrop} /></div>
                 {(form.mode === 'create' ? formFiles : editInvoiceFiles).length > 0 && <div className="compact-booking-files">{form.mode === 'create'
                   ? formFiles.map((file, index) => <span key={`${file.name}-${index}`}>{file.name}<button type="button" onClick={() => onRemovePendingFile(index)} aria-label={`${file.name} entfernen`}><AppIcon icon={IconX} size="inline" /></button></span>)
                   : editInvoiceFiles.map((file) => <span key={file.id}>{file.fileName}<button type="button" onClick={() => void onDeleteEditFile(file.id)} aria-label={`${file.fileName} entfernen`}><AppIcon icon={IconX} size="inline" /></button></span>)}</div>}

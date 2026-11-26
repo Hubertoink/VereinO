@@ -1,3 +1,4 @@
+import { CameraAttachmentButton } from '../booking/CameraAttachmentButton'
 import { selectDraftBookingType } from '../../utils/bookingType'
 import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import { useBankDraftSourceHighlight } from '../../hooks/useBankDraftSourceHighlight'
@@ -1512,6 +1513,7 @@ export default function QuickAddModal({
                                     {hasAnyAttachment && <div className="helper">Dateien hierher ziehen</div>}
                                 </div>
                                 <div className="attachment-actions attachment-actions--header">
+                                    <CameraAttachmentButton onFiles={onDropFiles} iconOnly />
                                     <input ref={fileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={(e) => onDropFiles(e.target.files)} />
                                     <button type="button" className="attachment-icon-btn" onClick={openFilePicker} title="Dateien hinzufügen" aria-label="Dateien hinzufügen">
                                         <AttachmentActionIcon kind="add" />

@@ -144,7 +144,7 @@ export function normalizeInvoiceExtractionText(text: string) {
 }
 
 const DATE_PATTERN = /\b(?:\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{4}-\d{2}-\d{2})\b/
-const MONEY_PATTERN =
+export const MONEY_PATTERN =
   /-?(?:\d{1,3}(?:,\d{3})+\.\d{2}|\d{1,3}(?:\.\d{3})+,\d{2}|\d{1,3}(?:[ \u00a0]\d{3})+[.,]\d{2}|\d+[.,]\d{2})(?!\d)/
 const PICKER_MONEY_PATTERN = new RegExp(`(?:${MONEY_PATTERN.source})|-?\\d+(?![\\d.,])`)
 
@@ -308,7 +308,7 @@ export function extractLocalInvoiceFields(text: string): LocalInvoiceFields {
   const grossAmount =
     findLabeledAmount(
       lines,
-      /(?:^betrag\b|rechnungsbetrag|gesamtbetrag|zu zahlen|zahlbetrag|amount due|grand total|summe brutto|bruttobetrag)/i
+      /(?:^betrag\b|rechnungsbetrag|gesamtbetrag|endsumme|endbetrag|zu zahlen|zahlbetrag|amount due|grand total|summe brutto|bruttobetrag)/i
     ) || summaryFallbacks.gross
   const netAmount =
     findLabeledAmount(lines, /(?:summe netto|nettobetrag|net amount|net total|subtotal)/i) ||

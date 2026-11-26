@@ -1,3 +1,4 @@
+import { CameraAttachmentButton } from './booking/CameraAttachmentButton'
 import { selectDraftBookingType } from '../utils/bookingType'
 import { canPreviewAttachment, type AttachmentPreviewRequest } from '../utils/attachmentPreview'
 import BookingAttachmentPreview from './booking/BookingAttachmentPreview'
@@ -760,7 +761,7 @@ export default function CompactBookingFlyout({
           {visibleSections.has('attachments') && (
             <div className="compact-booking-optional-section" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); onDropFiles(event.dataTransfer.files) }}>
               <div className="compact-booking-section-title"><strong>Anhänge</strong><button type="button" onClick={() => removeSection('attachments')} aria-label="Anhänge entfernen">×</button></div>
-              <button type="button" className="compact-booking-add-row" onClick={openFilePicker}>+ Datei auswählen</button>
+              <div className="camera-attachment-actions"><button type="button" className="compact-booking-add-row" onClick={openFilePicker}>+ Datei auswählen</button><CameraAttachmentButton onFiles={onDropFiles} /></div>
               {!!files.length && <div className="compact-booking-files">{files.map((file, index) => <span key={`${file.name}-${index}`}><button type="button" className="compact-booking-file-preview" disabled={!canPreviewAttachment(file)} onClick={event => { const { x, y, width, height } = event.currentTarget.getBoundingClientRect(); setAttachmentPreviewRequest({ file, origin: { x, y, width, height } }) }} aria-label={`${file.name} anzeigen`} title={canPreviewAttachment(file) ? `${file.name} anzeigen` : 'Für diesen Dateityp ist keine Vorschau verfügbar.'}>{file.name}</button><button type="button" onClick={() => setFiles(files.filter((_, fileIndex) => fileIndex !== index))} aria-label={`${file.name} entfernen`}>×</button></span>)}</div>}
             </div>
           )}

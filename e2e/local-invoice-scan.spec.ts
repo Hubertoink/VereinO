@@ -94,6 +94,42 @@ async function createInvoicePdf() {
   return Buffer.from(await document.save())
 }
 
+test('local OCR links a printed Endsumme on a raster invoice to the gross field', async () => {
+  await page.locator('[data-shortcut-nav="Verbindlichkeiten"]').click()
+  await page.getByRole('button', { name: 'Rechnung erfassen', exact: true }).click()
+  const dialog = page.locator('.local-invoice-scan')
+  const jpeg = await page.evaluate(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 760
+    canvas.height = 920
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#f1efea'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = '#303030'
+    ctx.font = '24px Arial'
+    ctx.fillText('Angebot', 80, 100)
+    ctx.font = '18px Arial'
+    ctx.fillText('Ausgestellt am 20.06.2009', 80, 160)
+    ctx.fillText('Computer und Zubehör', 80, 250)
+    ctx.fillText('Summe Netto', 160, 520)
+    ctx.fillText('EUR 3.359,97', 500, 520)
+    ctx.fillText('Umsatzsteuer 19 %', 160, 552)
+    ctx.fillText('EUR 638,43', 500, 552)
+    ctx.fillText('Endsumme', 160, 584)
+    ctx.fillText('EUR 3.998,40', 500, 584)
+    return canvas.toDataURL('image/jpeg', 0.90).split(',')[1]
+  })
+  await dialog.locator('input[type="file"]').setInputFiles({
+    name: 'angebot.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(jpeg, 'base64')
+  })
+  const gross = dialog.getByRole('button', { name: /^Brutto: Endsumme/ })
+  await expect(gross).toBeVisible({ timeout: 30000 })
+  await gross.click()
+  await expect(dialog.getByLabel('Brutto (€)')).toBeFocused()
+  await expect(dialog.getByLabel('Brutto (€)')).toHaveValue('3998.40')
+  await dialog.getByRole('button', { name: 'Rechnungserfassung schließen' }).click()
+})
+
 test('receipt widget drops a PDF, preserves fields across modes and saves an open invoice', async () => {
   await page.evaluate(() => window.api.paymentAccounts.upsert({ name: 'Beleg Testbank', kind: 'BANK' }))
   await page.locator('[data-shortcut-nav="Einstellungen"]').click()

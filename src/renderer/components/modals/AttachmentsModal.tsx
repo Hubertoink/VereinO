@@ -1,3 +1,4 @@
+import { CameraAttachmentButton } from '../booking/CameraAttachmentButton'
 import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import ReceiptZoomControl from '../ReceiptZoomControl'
 import { useEffect, useRef, useState } from 'react';
@@ -453,12 +454,14 @@ export default function AttachmentsModal({
                             <h3>Noch keine Belege</h3>
                             <p>Füge eine Rechnung oder Quittung zu dieser Buchung hinzu.</p>
                             <button className="btn primary attachments-modal__add" onClick={() => fileInputRef.current?.click()}><IconPlus size={17} />Beleg hinzufügen</button>
+                            <CameraAttachmentButton onFiles={handleAddFiles} />
                             <small>PDF, JPG, PNG oder Word · mehrere Dateien möglich</small>
                         </div> : <>
 
                         {/* File list sidebar */}
                         <aside className="attachments-modal__sidebar" aria-label="Belegliste">
                             <div className="attachments-modal__sidebar-header">
+                                <CameraAttachmentButton onFiles={handleAddFiles} iconOnly />
                                 <span className="attachments-modal__file-count">Belege <span>{files.length}</span></span>
                                 <button 
                                     className="attachments-modal__icon-btn" 

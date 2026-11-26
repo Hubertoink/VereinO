@@ -5,7 +5,7 @@ import * as backup from './services/backup'
 import { applyMigrations } from './db/migrations'
 import { requireAllowedExternalUrl } from './services/externalUrl'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createReceiptWidgetController, WIDGET_STARTUP_ARG } from './services/receiptWidget'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -337,7 +337,14 @@ async function createWindow(showStartup = false): Promise<BrowserWindow> {
             "frame-ancestors 'none'"
         ].join(' ')
 
-        const csp = isDev ? devCsp : prodCsp
+        const scannerWorkerUrl = isDev
+            ? new URL('scanner/document-worker.js', process.env.ELECTRON_RENDERER_URL || 'http://localhost:5173').href
+            : pathToFileURL(path.join(__dirname, '../../dist/scanner/document-worker.js')).href
+        // OpenCV's WASM bindings generate functions. Only its dedicated worker
+        // receives this policy. Frames are transferred in memory, without network access.
+        const csp = details.url === scannerWorkerUrl
+            ? "default-src 'none'; script-src 'self' 'unsafe-eval'; connect-src 'none'"
+            : (isDev ? devCsp : prodCsp)
 
         callback({
             responseHeaders: {

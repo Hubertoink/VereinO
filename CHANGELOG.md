@@ -7,6 +7,15 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.7.0] - 2026-11-26
+
+### Hinzugefügt
+
+- Mit „Kamera“ kannst du einen Beleg als Anhang fotografieren oder direkt in „Rechnung erfassen“ für die KI-Auswertung aufnehmen. VereinO erkennt die Papierkanten lokal und nimmt den Beleg automatisch auf, wenn er ruhig und scharf im Bild liegt. Vor der Übernahme als JPEG kannst du das Foto prüfen oder wiederholen. Manuelles Auslösen ist ebenfalls möglich.
+- Mit „Horizontal spiegeln“ lässt sich spiegelverkehrte Schrift korrigieren. Für besser lesbare Belege kombiniert VereinO passende Bilder einer kurzen Aufnahmeserie. Die Vorschau zeigt das JPEG, das als Anhang oder zur Rechnungserkennung übernommen wird.
+- Die Belegkamera fordert bei geeigneten Webcams eine höhere Auflösung und kontinuierlichen Autofokus an. Sie schärft weiche Schriftkanten nach der Aufnahme leicht nach.
+- „Rechnung erfassen“ markiert Brutto, Netto und Umsatzsteuer auch anhand lokal erkannter Summenzeilen. Ein Klick auf den markierten Betrag öffnet das zugehörige Feld zur Prüfung.
+
 ## [5.6.3] - 2026-11-26
 
 ### Geändert

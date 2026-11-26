@@ -7137,7 +7137,8 @@ body:has(.invoice-batch-flyout) .tooltip-portal.tooltip-modal { display: none !i
 .invoice-batch-flyout__folder-action:hover { background: color-mix(in oklab, #55c9c1 17%, var(--surface)) !important; }
 .invoice-batch-flyout__batch-action { color: color-mix(in oklab, #b475ff 72%, var(--text)) !important; border-color: color-mix(in oklab, #b475ff 50%, var(--border)) !important; background: color-mix(in oklab, #b475ff 17%, var(--surface)) !important; }
 .invoice-batch-flyout__batch-action:hover { background: color-mix(in oklab, #b475ff 27%, var(--surface)) !important; }
-.invoice-single-upload-flyout { width: min(360px, calc(100vw - 32px)); }
+.invoice-single-upload-flyout { width: min(360px, calc(100vw - 32px)); overflow-y: auto; }
+.invoice-single-upload-flyout > .camera-attachment-button { margin: 10px 12px 0; flex-shrink: 0; justify-content: center; }
 .invoice-single-upload-flyout__dropzone {
   min-height: 190px;
   margin: 12px;

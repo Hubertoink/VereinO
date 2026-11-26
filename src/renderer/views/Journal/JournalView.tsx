@@ -1,3 +1,4 @@
+import { CameraAttachmentButton } from '../../components/booking/CameraAttachmentButton'
 import { localIsoDate } from '../../../../shared/recurrence'
 import { openingLabel } from '../../utils/accountOpening'
 import ResponsiveSearch, { type ResponsiveSearchHandle } from '../../components/common/ResponsiveSearch'
@@ -298,6 +299,22 @@ export default function JournalView({
     const [activeEditTabId, setActiveEditTabId] = useState<string | null>(null)
     const [deleteRow, setDeleteRow] = useState<null | { id: number; voucherNo?: string | null; description?: string | null; fromEdit?: boolean }>(null)
     const editFileInputRef = useRef<HTMLInputElement | null>(null)
+
+    async function addEditAttachments(files: FileList | null) {
+        if (!files?.length || !editRow) return
+        try {
+            for (const file of Array.from(files)) {
+                const encoded = await encodeFileForUpload(file)
+                await window.api?.attachments.add?.({ voucherId: editRow.id, fileName: encoded.name, dataBytes: encoded.dataBytes, mimeType: encoded.mime })
+            }
+            const result = await window.api?.attachments.list?.({ voucherId: editRow.id })
+            setEditRowFiles(result?.files || [])
+        } catch (error: any) {
+            notify('error', 'Upload fehlgeschlagen: ' + (error?.message || String(error)))
+        } finally {
+            if (editFileInputRef.current) editFileInputRef.current.value = ''
+        }
+    }
     const searchInputRef = useRef<ResponsiveSearchHandle | null>(null)
     const timeFilterRef = useRef<HTMLDivElement | null>(null)
     const metaFilterRef = useRef<HTMLDivElement | null>(null)
@@ -1811,25 +1828,10 @@ export default function JournalView({
                                         className="card"
                                         style={{ padding: 12 }}
                                         onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
-                                        onDrop={async (e) => {
-                                            e.preventDefault(); e.stopPropagation();
-                                            if (!editRow) return
-                                            try {
-                                                const list = Array.from(e.dataTransfer?.files || [])
-                                                for (const f of list) {
-                                                    const encoded = await encodeFileForUpload(f)
-                                                    await window.api?.attachments.add?.({
-                                                        voucherId: editRow.id,
-                                                        fileName: encoded.name,
-                                                        dataBytes: encoded.dataBytes,
-                                                        mimeType: encoded.mime
-                                                    })
-                                                }
-                                                const res = await window.api?.attachments.list?.({ voucherId: editRow.id })
-                                                setEditRowFiles(res?.files || [])
-                                            } catch (err: any) {
-                                                notify('error', 'Upload fehlgeschlagen: ' + (err?.message || String(err)))
-                                            }
+                                        onDrop={e => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            void addEditAttachments(e.dataTransfer.files)
                                         }}
                                     >
                                         <div className="field booking-note-field" style={{ marginBottom: 10 }}>
@@ -1848,25 +1850,8 @@ export default function JournalView({
                                                 {editRowFiles.length > 0 && <div className="helper">Dateien hierher ziehen</div>}
                                             </div>
                                             <div style={{ display: 'flex', gap: 8 }}>
-                                                <input ref={editFileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={async (e) => {
-                                                    const list = e.target.files
-                                                    if (!list || !list.length || !editRow) return
-                                                    try {
-                                                        for (const f of Array.from(list)) {
-                                                            const encoded = await encodeFileForUpload(f)
-                                                            await window.api?.attachments.add?.({
-                                                                voucherId: editRow.id,
-                                                                fileName: encoded.name,
-                                                                dataBytes: encoded.dataBytes,
-                                                                mimeType: encoded.mime
-                                                            })
-                                                        }
-                                                        const res = await window.api?.attachments.list?.({ voucherId: editRow.id })
-                                                        setEditRowFiles(res?.files || [])
-                                                    } catch (e: any) {
-                                                        notify('error', 'Upload fehlgeschlagen: ' + (e?.message || String(e)))
-                                                    } finally { if (editFileInputRef.current) editFileInputRef.current.value = '' }
-                                                }} />
+                                                <input ref={editFileInputRef} type="file" multiple hidden accept=".png,.jpg,.jpeg,.pdf,.doc,.docx" onChange={e => void addEditAttachments(e.target.files)} />
+                                                <CameraAttachmentButton onFiles={addEditAttachments} />
                                                 <button type="button" className="btn" onClick={() => editFileInputRef.current?.click?.()}>+ Datei(en)</button>
                                             </div>
                                         </div>

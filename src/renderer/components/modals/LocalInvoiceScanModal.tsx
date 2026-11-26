@@ -1,9 +1,10 @@
+import { CameraAttachmentButton } from '../booking/CameraAttachmentButton'
 import { AI_PROVIDER_CONFIG } from '../../../../shared/aiProviders'
 import CategoryIcon from '../common/CategoryIcon'
 import ModalHeader, { ModalCloseButton } from '../ModalHeader'
 import { useInvoicePaste } from '../../hooks/useInvoicePaste'
 import type { PartyCreationSource } from '../../utils/partyCreationSource'
-import { locateInvoiceSource, type InvoiceSource, type SourcePage } from '../../utils/invoiceSources'
+import { extractPrintedAmounts, resolveInvoiceSources, type InvoiceSource, type SourcePage } from '../../utils/invoiceSources'
 import InvoiceFileName from './InvoiceFileName'
 import InvoiceAnalysisInfo from './InvoiceAnalysisInfo'
 import BookingKindSwitch from '../booking/BookingKindSwitch'
@@ -92,6 +93,7 @@ export type LocalInvoiceScanResult = {
 }
 
 export type LocalInvoiceScanDraftState = {
+  manuallyEditedFields?: LocalInvoicePickerField[]
   fieldSources?: InvoiceSource[]
   sourcePages?: Record<number, SourcePage>
   fields: LocalInvoiceFields
@@ -335,6 +337,8 @@ export default function LocalInvoiceScanModal({
   const [pdfPageSize, setPdfPageSize] = useState({ width: 595, height: 842 })
   const [fieldSources, setFieldSources] = useState<InvoiceSource[]>([])
   const [sourcePages, setSourcePages] = useState<Record<number, SourcePage>>({})
+  const locatedSources = useMemo(() => resolveInvoiceSources(fieldSources, sourcePages, fields, manuallyEditedRef.current),
+    [fieldSources, sourcePages, fields])
   const [activeSource, setActiveSource] = useState<LocalInvoicePickerField | null>(null)
   const [showSources, setShowSources] = useState(true)
   const [ocrWordsByPage, setOcrWordsByPage] = useState<Record<number, OcrWord[]>>({})
@@ -683,6 +687,7 @@ export default function LocalInvoiceScanModal({
       if (requestRef.current === requestId) setDuplicateCheckInProgress(false)
     })
     if (restored) {
+      manuallyEditedRef.current = new Set(restored.manuallyEditedFields)
       setFields(restored.fields)
       setFieldSources(restored.fieldSources || [])
       setSourcePages(restored.sourcePages || {})
@@ -701,6 +706,17 @@ export default function LocalInvoiceScanModal({
     // Konkrete OCR-Fehler für die manuelle Prüfung erhalten.
     let localOcrFailure = ''
     const ocrFailureHint = () => localOcrFailure ? ` Lokale OCR-Fehler: ${localOcrFailure}` : ''
+
+    const fillLocalFields = (text: string, pages: Pick<SourcePage, 'words'>[]) => {
+      const extracted = { ...extractLocalInvoiceFields(text), ...extractPrintedAmounts(pages) }
+      setFields(current => {
+        const next = { ...current }
+        for (const key of Object.keys(extracted) as LocalInvoicePickerField[]) {
+          if (!current[key] && !manuallyEditedRef.current.has(key)) next[key] = extracted[key]
+        }
+        return next
+      })
+    }
 
     const applyLocalOcr = async (pdfDocument?: any) => {
       try {
@@ -781,9 +797,10 @@ export default function LocalInvoiceScanModal({
       setPreviewKind('image')
       if (restored) setFields(restored.fields)
       const ocr = await applyLocalOcr()
+      if (requestRef.current !== requestId) return
       if (ocr?.text.length && ocr.text.length >= 20) {
         setDocumentText({ text: ocr.text, embeddedPdfPagesRead: 0 })
-        setFields(extractLocalInvoiceFields(ocr.text))
+        fillLocalFields(ocr.text, ocr.pages)
 
         setAnalysisState('text-found')
         setAnalysisMessage(`Lokal per OCR erkannt und vorbefüllt · ${ocr.confidence}% Zuversicht.`)
@@ -839,9 +856,10 @@ export default function LocalInvoiceScanModal({
       if (restored) setFields(restored.fields)
       if (text.length < 20) {
         const ocr = await applyLocalOcr(document)
+        if (requestRef.current !== requestId) return
         if (ocr?.text.length && ocr.text.length >= 20) {
           setDocumentText({ text: ocr.text, embeddedPdfPagesRead: 0 })
-          setFields(extractLocalInvoiceFields(ocr.text))
+          fillLocalFields(ocr.text, ocr.pages)
 
           setAnalysisState('text-found')
           setAnalysisMessage(
@@ -852,7 +870,7 @@ export default function LocalInvoiceScanModal({
 
       }
       if (text.length >= 20) {
-        if (!restored) setFields(extractLocalInvoiceFields(text))
+        if (!restored) fillLocalFields(text, Object.values(locatedPages))
         setAnalysisState('text-found')
         setAnalysisMessage(
           document.numPages > MAX_TEXT_PAGES
@@ -906,6 +924,7 @@ export default function LocalInvoiceScanModal({
       note,
       bookingMeta,
       analysisDetails,
+      manuallyEditedFields: Array.from(manuallyEditedRef.current),
       fieldSources,
       sourcePages,
       visibleSections: Array.from(visibleSections)
@@ -976,7 +995,7 @@ export default function LocalInvoiceScanModal({
 
   const focusSource = (field: LocalInvoicePickerField) => {
     setActiveSource(field)
-    const source = fieldSources.find((item) => item.field === field && locateInvoiceSource(item, sourcePages[item.page]).length)
+    const source = locatedSources.find((item) => item.field === field)
     if (source) {
       setShowSources(true)
       if (previewKind === 'pdf') setPdfPage(source.page)
@@ -987,13 +1006,13 @@ export default function LocalInvoiceScanModal({
     if (activeSource && showSources) {
       document.querySelector('.local-invoice-scan__source-box.is-active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     }
-  }, [activeSource, showSources, pdfPage, sourcePages])
+  }, [activeSource, showSources, pdfPage, locatedSources])
 
   const renderSources = (page: number) => showSources && !pickerEnabled && (
-    <div className="local-invoice-scan__sources" aria-label="KI-Fundstellen">
-      {fieldSources.filter((source) => source.page === page).flatMap((source, index) => {
+    <div className="local-invoice-scan__sources" aria-label="Fundstellen auf dem Beleg">
+      {locatedSources.filter((source) => source.page === page).flatMap((source, index) => {
         const label = PICKER_FIELDS.find((field) => field.value === source.field)?.label || source.field
-        return locateInvoiceSource(source, sourcePages[page]).map((box, boxIndex) => (
+        return source.boxes.map((box, boxIndex) => (
           <button key={`${index}-${boxIndex}`} type="button"
             className={`local-invoice-scan__source-box${activeSource === source.field ? ' is-active' : ''}`}
             style={{ left: `${box.x}%`, top: `${box.y}%`, width: `${box.width}%`, height: `${box.height}%` }}
@@ -1179,6 +1198,7 @@ export default function LocalInvoiceScanModal({
 
         {intakeHeader}
         {!file && aiGuidancePanel}
+        {!file && <CameraAttachmentButton onFiles={selectFiles} confirmLabel="Foto für Rechnung verwenden" />}
 
         <input
           ref={fileInputRef}
@@ -1231,7 +1251,7 @@ export default function LocalInvoiceScanModal({
                   <span>{(file.size / 1024 / 1024).toFixed(2)} MB</span>
                 </div>
                 <div className="local-invoice-scan__preview-actions">
-                  {fieldSources.length > 0 && <button type="button" className="btn btn-sm" aria-pressed={showSources} onClick={() => setShowSources((value) => !value)}>Fundstellen {showSources ? 'ausblenden' : 'anzeigen'}</button>}
+                  {locatedSources.length > 0 && <button type="button" className="btn btn-sm" aria-pressed={showSources} onClick={() => setShowSources((value) => !value)}>Fundstellen {showSources ? 'ausblenden' : 'anzeigen'}</button>}
                   {previewKind === 'pdf' && (
                     <>
                       <button

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { ReactElement } from 'react'
 import { useSidebarFlyoutPosition } from '../hooks/useSidebarFlyoutPosition'
 import ModalHeader from './ModalHeader'
+import { CameraAttachmentButton } from './booking/CameraAttachmentButton'
 import { useInvoicePaste } from '../hooks/useInvoicePaste'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TAiInvoiceBatchListOutput } from '../../../electron/main/ipc/schemas'
@@ -338,12 +339,13 @@ export default function InvoiceBatchControl({
         <section ref={singleSurfaceRef} style={sidebarPosition} className={`invoice-batch-flyout invoice-single-upload-flyout${variant === 'sidebar' ? ' invoice-batch-flyout--sidebar' : ''}`} aria-label="Rechnung hochladen">
           <ModalHeader
             title="Rechnung erfassen"
-            subtitle="Eine Rechnung zur Erkennung auswählen"
+            subtitle="Eine Rechnung fotografieren oder auswählen"
             onClose={() => setSingleOpen(false)}
             closeLabel="Upload-Flyout schließen"
             closeOnEscape={false}
           />
           {guidanceFields}
+          <CameraAttachmentButton confirmLabel="Foto für Rechnung verwenden" onFiles={files => openSingleInvoice(Array.from(files))} />
           <button
             type="button"
             className={`invoice-single-upload-flyout__dropzone${singleDragging ? ' is-dragging' : ''}`}
