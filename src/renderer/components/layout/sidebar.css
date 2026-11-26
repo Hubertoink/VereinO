@@ -28,7 +28,8 @@
 .sidebar-accounts { margin: 0 3px 7px 17px; border-left: 1px solid var(--border); padding-left: 9px; }
 .sidebar-account, .sidebar-accounts-more { border: 0; background: transparent; color: var(--text); border-radius: 5px; cursor: pointer; font: inherit; }
 .sidebar-section-caption { margin: 0; padding: 6px; font-size: var(--type-caption); color: var(--text-dim); }
-.sidebar-accounts-caption { margin: 0 6px 7px; font-size: var(--type-caption); line-height: 1.5; color: var(--text-dim); }
+.sidebar-accounts-caption { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; margin: 0 6px 3px; padding-bottom: 4px; border-bottom: 1px solid var(--text-dim); font-size: var(--type-caption); line-height: 1.5; color: var(--text); }
+.sidebar-accounts-caption .sidebar-account-balance { margin-left: auto; }
 .sidebar-account { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 6px; padding: 7px 6px; width: 100%; text-align: left; font-size: var(--type-caption); }
 .sidebar-account-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sidebar-account-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }

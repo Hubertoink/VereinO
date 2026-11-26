@@ -7,6 +7,12 @@ und dieses Projekt folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [5.6.3] - 2026-11-26
+
+### Geändert
+
+- Unter „Buchungen“ zeigt die Seitenleiste neben „Kontostand“ die Summe aller Zahlkonten, auch wenn nur die ersten drei Konten sichtbar sind. Eine dünne, kontrastreiche Linie trennt die Summe von den Einzelbeträgen.
+
 ## [5.6.2] - 2026-11-26
 
 ### Geändert

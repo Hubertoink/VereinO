@@ -95,6 +95,15 @@ test('expands with labels, account balances and selection; remembers compact mod
   await expect(page.locator('.app-sidebar')).toHaveCSS('width', '260px')
   await expect(page.getByRole('button', { name: 'Bankimport, 6 offen' })).toBeVisible()
   await expect(page.locator('.sidebar-account')).toHaveCount(3)
+  const summary = page.locator('.sidebar-accounts-caption')
+  await expect(summary.locator('.sidebar-account-balance')).toHaveText('1.008.535,74 €')
+  await page.evaluate(() => {
+    document.documentElement.dataset.theme = 'dark'
+    document.documentElement.dataset.colorTheme = 'monochrome-harmony'
+  })
+  await expect(summary).toHaveCSS('border-bottom-width', '1px')
+  const captionColor = await page.locator('.sidebar-accounts .sidebar-section-caption').evaluate(el => getComputedStyle(el).color)
+  await expect(summary).toHaveCSS('border-bottom-color', captionColor)
   await expect(page.locator('.sidebar-accounts')).toContainText('8.420,50')
   await expect(page.locator('.sidebar-account-balance.is-negative')).toContainText('-125,00')
   const payload = await page.evaluate(() => (window as any).requests[0])
@@ -170,6 +179,7 @@ test('refreshes balances, prevents stale organization results, and offers retry 
   await expect(page.locator('.sidebar-account')).toContainText('Neue Organisation')
   await page.evaluate(() => { (window as any).fail = true; window.dispatchEvent(new Event('data-changed:vouchers')) })
   await expect(page.getByText('Bestände nicht verfügbar.')).toBeVisible()
+  await expect(page.locator('.sidebar-accounts-caption .sidebar-account-balance')).toHaveCount(0)
   await expect(page.locator('.sidebar-account')).toHaveCount(0)
   await page.evaluate(() => { (window as any).fail = false })
   await page.getByRole('button', { name: 'Erneut laden' }).click()

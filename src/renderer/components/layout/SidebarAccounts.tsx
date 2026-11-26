@@ -43,10 +43,14 @@ export function SidebarAccounts({ selectedId, onSelect }: { selectedId?: number 
     return () => { disposed = true; offSwitch?.(); offChange(); window.removeEventListener('focus', load); clearTimeout(midnightTimer) }
   }, [retry])
   const visible = showAll ? accounts : accounts.slice(0, 3)
+  const total = accounts.reduce((cents, account) => cents + Math.round(account.balance * 100), 0) / 100
   return <div className="sidebar-accounts">
     <p className="sidebar-section-caption">Zahlkonten</p>
     <div className="sidebar-accounts-content">
-      <p className="sidebar-accounts-caption">Kontostand · Stand heute</p>
+      <p className="sidebar-accounts-caption">
+        <span>Kontostand</span>
+        {status === 'ready' && <span className={`sidebar-account-balance${total < 0 ? ' is-negative' : ''}`}>{euro.format(total)}</span>}
+      </p>
       {status === 'loading' && <p className="sidebar-accounts-message" role="status">Bestände werden geladen …</p>}
       {status === 'error' && <div className="sidebar-accounts-message" role="status">Bestände nicht verfügbar.<button type="button" className="sidebar-accounts-more" onClick={() => setRetry(value => value + 1)}>Erneut laden</button></div>}
       {status === 'ready' && !accounts.length && <p className="sidebar-accounts-message">Noch keine Zahlkonten angelegt.</p>}
